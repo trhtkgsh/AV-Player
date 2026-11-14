@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Maui.Hosting;
 using Player.App.Composition.Placeholders;
 using Player.App.Platforms.Android.Lifecycle;
 using Player.Core.Contracts;
@@ -21,6 +22,7 @@ public static class InfrastructureServiceCollectionExtensions
 		services.AddSingleton<IGlobalDefaultsStore, InMemoryGlobalDefaultsStore>();
 		services.AddSingleton<IPlaybackStateStore, InMemoryPlaybackStateStore>();
 		services.AddSingleton<IPlaybackStateRecorder, NoOpPlaybackStateRecorder>();
+		services.AddSingleton<IMauiInitializeService, PauseOnBackgroundPlaceholder>();
 
 		return services;
 	}

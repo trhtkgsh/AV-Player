@@ -1,4 +1,13 @@
 using Player.App.Composition;
+using Player.App.Engine;
+using Player.App.Features.Explorer;
+using Player.App.Features.PlayerHud;
+using Player.App.Platforms.Android.Library;
+using Player.App.Platforms.Android.Thumbnails;
+using Player.App.Surface;
+using Player.App.Theming;
+using Player.Core.Contracts;
+using Player.Core.Logic.Playback;
 using Player.Data.Database;
 using Microsoft.Maui.Storage;
 
@@ -16,9 +25,17 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 			});
+		builder.UseVideoSurface();
 
 		builder.Services.AddPlayerDatabase(Path.Combine(FileSystem.AppDataDirectory, "player.db3"));
 		builder.Services.AddAppInfrastructure();
+		builder.Services.AddPlayerEngine();
+		builder.Services.AddMediaLibrary();
+		builder.Services.AddThumbnailCache();
+		builder.Services.AddTheming();
+		builder.Services.AddSingleton<IPlaybackCoordinator, PlaybackCoordinator>();
+		builder.Services.AddExplorer();
+		builder.Services.AddPlayerHud();
 
 		return builder.Build();
 	}
