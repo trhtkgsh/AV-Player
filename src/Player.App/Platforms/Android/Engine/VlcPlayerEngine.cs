@@ -23,6 +23,19 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     private readonly EngineCommandQueue _queue = new("player-engine");
     private readonly AWindow _window = new(new NoOpSurfaceCallback());
 
+    /// <summary>
+    /// Must be constructed on the UI thread. LibVLC's native libraries are loaded through
+    /// System.loadLibrary, which finds the app's own libraries only from a thread that has a Java frame
+    /// of the app on it. On the engine's own thread the load fails with "library not found".
+    /// </summary>
+    public VlcPlayerEngine()
+    {
+        if (Looper.MainLooper is not { IsCurrentThread: true })
+            throw new InvalidOperationException("The player engine must be created on the UI thread.");
+
+        LibVLCSharp.Shared.Core.Initialize();
+    }
+
     private LibVLC? _libVlc;
     private MediaPlayer? _player;
     private VlcMedia? _media;
