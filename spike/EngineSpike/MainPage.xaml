@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vlc="clr-namespace:LibVLCSharp.MAUI;assembly=LibVLCSharp.MAUI"
+             x:Class="EngineSpike.MainPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="Black">
+
+    <Grid IsClippedToBounds="True">
+        <vlc:VideoView x:Name="Video" />
+
+        <VerticalStackLayout VerticalOptions="End" Padding="8" Spacing="6" BackgroundColor="#80000000">
+            <Label x:Name="Status" TextColor="White" FontSize="12" />
+            <FlexLayout Wrap="Wrap">
+                <Button Text="HW" Clicked="OnCommandClicked" CommandParameter="hw" Margin="2" />
+                <Button Text="SW" Clicked="OnCommandClicked" CommandParameter="sw" Margin="2" />
+                <Button Text="Zoom 2x" Clicked="OnCommandClicked" CommandParameter="zoom" Margin="2" />
+                <Button Text="Zoom reset" Clicked="OnCommandClicked" CommandParameter="zoomreset" Margin="2" />
+                <Button Text="Play/Pause" Clicked="OnCommandClicked" CommandParameter="toggle" Margin="2" />
+                <Button Text="Service on" Clicked="OnCommandClicked" CommandParameter="service" Margin="2" />
+                <Button Text="Service off" Clicked="OnCommandClicked" CommandParameter="stopservice" Margin="2" />
+                <Button Text="Play via MediaStore" Clicked="OnCommandClicked" CommandParameter="playfd" Margin="2" />
+            </FlexLayout>
+        </VerticalStackLayout>
+    </Grid>
+
+</ContentPage>

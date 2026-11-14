@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Phase 0 throwaway spike. Not part of the product solution. See docs/SPIKE.md. -->
+	<PropertyGroup>
+		<TargetFramework>net10.0-android</TargetFramework>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>EngineSpike</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<MauiXamlInflator>SourceGen</MauiXamlInflator>
+
+		<ApplicationTitle>EngineSpike</ApplicationTitle>
+		<ApplicationId>com.arielplayer.enginespike</ApplicationId>
+		<ApplicationDisplayVersion>0.1</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+		<SupportedOSPlatformVersion>26.0</SupportedOSPlatformVersion>
+		<!-- Override with -p:LibVlcAndroidVersion=... to compare native builds (16 KB page size check). -->
+		<LibVlcAndroidVersion Condition="'$(LibVlcAndroidVersion)' == ''">3.6.5</LibVlcAndroidVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+		<MauiImage Include="Resources\Images\*" />
+		<MauiFont Include="Resources\Fonts\*" />
+		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="LibVLCSharp.MAUI" Version="3.10.2" />
+		<PackageReference Include="VideoLAN.LibVLC.Android" Version="$(LibVlcAndroidVersion)" />
+	</ItemGroup>
+
+</Project>
