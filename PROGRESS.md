@@ -25,10 +25,22 @@ Phase 0 (spike). HARD GATE active: no product code until every roster agent is r
 | 1 | Read MASTER.md | done |
 | 2 | Repo structure, copilot-instructions, PROGRESS.md | done |
 | 3 | Phase 0 spike and docs/SPIKE.md | done on emulator, owner device test pending |
-| 4 | docs/ARCHITECTURE.md and frozen contracts | written as DRAFT (docs/ARCHITECTURE.md, docs/CONTRACTS.md), frozen on owner approval |
+| 4 | docs/ARCHITECTURE.md and frozen contracts | done, contracts frozen 2026-11-14 |
 | 5 | docs/specs/01-09 and docs/agents/<id>.md | done: 9 specs, 23 agent specs, 23 `.github/agents/<id>.agent.md` with model set |
-| 6 | Roster shown to owner, approval | WAITING FOR OWNER |
-| 7 | Start Phase 1 | blocked by step 6 |
+| 6 | Roster shown to owner, approval | approved 2026-11-14 |
+| 7 | Start Phase 1 | in progress |
+
+## Delegation mechanism
+
+The `task` tool in this session does not list the custom agents in `.github/agents`. Tasks are delegated to its
+`general-purpose` agent with the roster model set explicitly, and the brief is the agent's spec file plus the
+contracts and acceptance criteria. Fable-marked agents are done by the orchestrator. Re-check custom agent
+availability at the start of each session.
+
+## Phase 1 task log
+
+| # | Agent | Model | Branch | Attempts | Result |
+|---|---|---|---|---|---|
 
 ## Agents
 
@@ -61,9 +73,7 @@ Phase 0 (spike). HARD GATE active: no product code until every roster agent is r
 
 ## Open items for the owner
 
-1. Approve the roster (23 agents, 2 added) and the refinements in docs/ARCHITECTURE.md section 6.
-2. Approve docs/CONTRACTS.md so it can be frozen.
-3. Run the device test in docs/SPIKE.md to close Phase 0.
+1. Run the device test in docs/SPIKE.md to close Phase 0 (Phase 1 was started in parallel at the orchestrator's discretion).
 
 ## Escalation log
 
@@ -75,3 +85,4 @@ None.
 |---|---|
 | 2026-11-14 | HARD GATE: no product code before agents are registered and the roster is approved. |
 | 2026-11-14 | Orchestrator codes only for agents marked Fable; everything else is delegated or the owner switches agent manually. |
+| 2026-11-14 | Roster (23 agents), ARCHITECTURE.md section 6 refinements and CONTRACTS.md approved. "Do everything as you see fit." |

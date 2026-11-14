@@ -1,6 +1,6 @@
 # CONTRACTS (Player.Core)
 
-Status: DRAFT. Frozen once the owner approves. After that only the orchestrator may change this file,
+Status: FROZEN. Approved by the owner on 2026-11-14. Only the orchestrator may change this file,
 and `src/Player.Core/Contracts` + `src/Player.Core/Models` must match it exactly.
 Namespaces: `Player.Core.Models`, `Player.Core.Contracts`. All types are public. Nullable enabled.
 

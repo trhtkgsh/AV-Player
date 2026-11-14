@@ -1,6 +1,6 @@
 # ARCHITECTURE
 
-Status: DRAFT until the owner approves the roster and the contracts (MASTER.md section 9, step 6).
+Status: APPROVED by the owner on 2026-11-14, including the roster and the refinements in section 6.
 Sources: docs/MASTER.md (rules), docs/SPIKE.md (measured constraints), docs/CONTRACTS.md (interfaces).
 
 ## 1. Solution layout
@@ -89,7 +89,7 @@ Thumbnails are JPEG files in the app cache directory. Rows for files that no lon
 
 `dotnet build src/Player.App -f net10.0-android` and `dotnet test`. Every task must leave both green.
 
-## 6. Refinements to MASTER.md that need the owner's approval
+## 6. Refinements to MASTER.md (approved by the owner on 2026-11-14)
 
 1. **Two agents added to the roster.** `app-skeleton` (Haiku): solution files, composition root, manifest, database bootstrap. Without it no agent may touch those shared files. `playback-coordinator` (Sonnet): queue, next/previous, repeat modes, A-B repeat, applying resolved settings on open. Without it that logic has no owner.
 2. **`Player.Core/Logic`.** MASTER says Core holds interfaces and models. Pure, platform-free logic is placed there too, in per-agent folders, because net10.0 tests cannot reference the Android app project.
