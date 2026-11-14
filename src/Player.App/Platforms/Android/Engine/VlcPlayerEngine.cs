@@ -20,8 +20,8 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     private const int PositionIntervalMs = 250;
     private static readonly TimeSpan SurfaceWait = TimeSpan.FromSeconds(2);
 
-    private readonly EngineCommandQueue _queue = new("player-engine");
-    private readonly AWindow _window = new(new NoOpSurfaceCallback());
+    private readonly EngineCommandQueue _queue;
+    private readonly AWindow _window;
 
     /// <summary>
     /// Must be constructed on the UI thread. LibVLC's native libraries are loaded through
@@ -34,6 +34,10 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             throw new InvalidOperationException("The player engine must be created on the UI thread.");
 
         LibVLCSharp.Shared.Core.Initialize();
+
+        // Created last, so a failure above leaves no engine thread behind.
+        _window = new AWindow(new NoOpSurfaceCallback());
+        _queue = new EngineCommandQueue("player-engine");
     }
 
     private LibVLC? _libVlc;
@@ -121,10 +125,21 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             return;
 
         _pauseRequested = false;
-        if (Live)
+        if (_revealingFrame)
+        {
+            // Already running for the frame reveal: keep it running and say so.
+            EndFrameReveal(pause: false);
+            _status = PlayerStatus.Playing;
+            Publish();
+        }
+        else if (Live)
+        {
             _player!.SetPause(false);
+        }
         else if (!_waitingForSurface)
+        {
             Start(_startMs);
+        }
     }, ct);
 
     public Task PauseAsync(CancellationToken ct) => _queue.Enqueue(() =>
@@ -340,6 +355,7 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         _surfaceTimer?.Dispose();
         _surfaceTimer = null;
         _waitingForSurface = false;
+        EndFrameReveal(pause: false);
 
         // Stopped is raised inside Stop() and captures the old generation, so it is ignored.
         _player?.Stop();

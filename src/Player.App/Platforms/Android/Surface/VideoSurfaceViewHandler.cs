@@ -23,6 +23,7 @@ internal sealed class VideoSurfaceViewHandler() : ViewHandler<VideoSurfaceView, 
     protected override void DisconnectHandler(VideoSurfaceContainer platformView)
     {
         _controller?.Detach(platformView);
+        platformView.Release();
         base.DisconnectHandler(platformView);
     }
 }

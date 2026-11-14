@@ -13,6 +13,12 @@ public sealed partial class VlcPlayerEngine
     private volatile bool _surfaceAttached;
     private volatile VideoFormat? _format;
 
+    private const int RevealAdvanceMs = 120;
+    private static readonly TimeSpan RevealTimeout = TimeSpan.FromSeconds(2);
+    private volatile bool _revealingFrame;
+    private long _revealFromMs;
+    private int _revealId;
+
     public VideoFormat? Format => _format;
     public event EventHandler<VideoFormat?>? FormatChanged;
 
@@ -89,7 +95,8 @@ public sealed partial class VlcPlayerEngine
             return;
 
         var player = _player!;
-        Trace($"video output: enabled={_videoEnabled} surface={_surfaceAttached} noVideoStart={_startedWithoutVideo} track={player.VideoTrack} saved={_savedVideoTrack} status={_status}");
+        if (Diagnostics)
+            Trace($"video output: enabled={_videoEnabled} surface={_surfaceAttached} noVideoStart={_startedWithoutVideo} track={player.VideoTrack} saved={_savedVideoTrack} status={_status}");
         if (!(_videoEnabled && _surfaceAttached))
         {
             if (!_startedWithoutVideo && player.VideoTrack >= 0)
@@ -111,8 +118,54 @@ public sealed partial class VlcPlayerEngine
 
             // A track selected in mid-stream starts out of sync with the clock and stays black for
             // seconds. A seek to the current position flushes and resyncs it from the last key frame.
-            player.Time = CurrentPositionMs;
+            // The last published position is used: LibVLC can still report the time from before a
+            // seek that was issued a moment ago, and this resync must not undo that seek.
+            player.Time = _positionMs;
+
+            if (_status == PlayerStatus.Paused)
+                BeginFrameReveal(player);
         }
+    }
+
+    /// <summary>
+    /// Shows a picture for a paused input whose video track was just selected again.
+    /// LibVLC 3 has no reliable way to draw one frame in that state: the new decoder is not paused
+    /// although the input is, so the first picture races the stopped clock (black about one time in
+    /// eight), stepping a frame aborts on the assertion "p_owner->paused", and a restart with
+    /// :start-paused stays black. So the input runs muted until its clock has moved, then pauses again.
+    /// The reported status stays Paused the whole time.
+    /// </summary>
+    private void BeginFrameReveal(MediaPlayer player)
+    {
+        _revealFromMs = _positionMs;
+        _revealingFrame = true;
+        player.Mute = true;
+        player.SetPause(false);
+
+        // If the clock never moves (end of file, a decoder that fails), do not stay muted and running.
+        var reveal = ++_revealId;
+        var generation = _generation;
+        _ = Task.Delay(RevealTimeout).ContinueWith(
+            _ => _queue.Post(() =>
+            {
+                if (generation == _generation && reveal == _revealId)
+                    EndFrameReveal(pause: true);
+            }),
+            TaskScheduler.Default);
+    }
+
+    private void EndFrameReveal(bool pause)
+    {
+        if (!_revealingFrame)
+            return;
+
+        _revealingFrame = false;
+        if (_player is not { } player)
+            return;
+
+        if (pause)
+            player.SetPause(true);
+        player.Mute = false;
     }
 
     private MediaPlayer EnsurePlayer()
@@ -138,6 +191,7 @@ public sealed partial class VlcPlayerEngine
         player.Vout += (_, _) => PostEvent(RefreshTracks);
         player.EndReached += (_, _) => PostEvent(() =>
         {
+            EndFrameReveal(pause: false);
             _status = PlayerStatus.Ended;
             _positionMs = _durationMs;
             _startMs = 0;
@@ -155,13 +209,21 @@ public sealed partial class VlcPlayerEngine
         player.TimeChanged += (_, e) =>
         {
             var now = System.Environment.TickCount64;
-            if (now - Interlocked.Read(ref _lastPositionPost) < PositionIntervalMs)
+            if (!_revealingFrame && now - Interlocked.Read(ref _lastPositionPost) < PositionIntervalMs)
                 return;
 
             Interlocked.Exchange(ref _lastPositionPost, now);
             var time = e.Time;
             PostEvent(() =>
             {
+                if (_revealingFrame)
+                {
+                    // The clock has moved past the resync point, so that picture is on screen.
+                    if (time - _revealFromMs >= RevealAdvanceMs)
+                        EndFrameReveal(pause: true);
+                    return;
+                }
+
                 _positionMs = time;
                 Publish();
             });
@@ -184,6 +246,11 @@ public sealed partial class VlcPlayerEngine
     private void OnRunning(PlayerStatus status)
     {
         var player = _player!;
+
+        // The resume that reveals a frame is internal: the input is still paused as far as anyone knows.
+        if (_revealingFrame && status == PlayerStatus.Playing)
+            return;
+
         _status = status;
         if (status == PlayerStatus.Paused)
             _positionMs = Math.Max(0, player.Time);
@@ -208,6 +275,7 @@ public sealed partial class VlcPlayerEngine
             {
                 _seekOnStart = null;
                 player.Time = seek;
+                _positionMs = seek;
             }
         }
 

@@ -59,7 +59,7 @@ internal sealed class VideoSurfaceController : IVideoSurface
 
     public void SetWindowBrightness(double? value)
     {
-        var brightness = value is { } v ? Math.Clamp(v, 0.01, 1.0) : SystemBrightness;
+        var brightness = value is { } v && !double.IsNaN(v) ? Math.Clamp(v, 0.01, 1.0) : SystemBrightness;
         lock (_sync)
             _brightness = brightness;
 
