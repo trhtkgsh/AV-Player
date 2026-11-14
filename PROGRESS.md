@@ -56,13 +56,18 @@ the orchestrator.
 | P1-13 | explorer-ui | Haiku 5.5 | task/p1-13-explorer-vm | 1 | merged. Reviewer: approve with non-blocking findings, fixed in P1-14 and P1-20. 613 lines. |
 | P1-14 | explorer-ui | Haiku 5.5 | task/p1-14-explorer-pages | 1 | merged. Reviewer: approve with non-blocking findings (P1-20). |
 | P1-15 | test-writer | Haiku 5.5 | task/p1-15-tests-core-a | 1 | merged. 91 tests pass. Reviewer: approve. 926 lines. |
-| P1-16 | test-writer | Haiku 5.5 | task/p1-16-tests-core-b | 1 (first launch died on a model stream error before writing anything; relaunched, not counted as a failed attempt) | running |
+| P1-16 | test-writer | Haiku 5.5 | task/p1-16-tests-core-b | 2 launches died after about 30 minutes on a model stream error (`EOF while parsing`), with nothing written. Not a capability failure, so no model escalation; the task was split into three small ones (P1-16a surface, P1-16b theming, P1-16c formatter and gaps). If a small one fails too, escalate to Sonnet. | P1-16a running |
 | P1-17 | app-skeleton | Haiku 5.5 | task/p1-17-wiring | 1 | merged. Reviewer: approve. Release manifest has no network permission. |
-| P1-18 | app-skeleton | Haiku 5.5 | task/p1-18-shell-route | 1 | merged. One-line fix of an orchestrator design error (root route `explorer` shadowed `explorer/items`). Diff read by the orchestrator, reviewer pass at the gate. |
-| P1-19 | player-engine | Fable 5.2 (orchestrator) | task/p1-19-engine-fixes | 1 | merged. Two defects found on the first emulator run (SPIKE.md findings 11 and 12). Not reviewed yet (gate). |
-| P1-20 | explorer-ui | Haiku 5.5 | task/p1-20-explorer-polish | 1 | running |
-| P1-21 | theming-engine | Sonnet 5.5 | task/p1-21-shell-style | 1 | running |
-| P1-22 | device-qa | Haiku 5.5 | task/p1-22-device-qa | 1 | running |
+| P1-18 | app-skeleton | Haiku 5.5 | task/p1-18-shell-route | 1 | merged. One-line fix of an orchestrator design error (root route `explorer` shadowed `explorer/items`). Gate reviewer: approve. |
+| P1-19 | player-engine | Fable 5.2 (orchestrator) | task/p1-19-engine-fixes | 1 | merged. Two defects found on the first emulator run (SPIKE.md findings 11 and 12). Gate reviewer: approve with non-blocking findings (P1-24). |
+| P1-20 | explorer-ui | Haiku 5.5 | task/p1-20-explorer-polish | 1 | merged. Reviewer: approve. |
+| P1-21 | theming-engine | Sonnet 5.5 | task/p1-21-shell-style | 1 | merged. Gate reviewer: approve. Verified on the emulator. |
+| P1-22 | device-qa | Haiku 5.5 | task/p1-22-device-qa | 1 | merged. 60 items. The agent had no shell tool (orchestrator's definition error, fixed); the orchestrator created the folder and committed for it. |
+| P1-23 | media-library | Sonnet 5.5 | task/p1-23-library-permissions | 1 | merged. Fixes the gate reviewer's changes-required (API 34 partial access re-requested on every load). Reviewer: approve. Not run on a device. |
+| P1-24 | player-engine, video-surface | Fable 5.2 (orchestrator) | task/p1-24-engine-surface-fixes | 1 | merged. Gate review fixes, plus a paused black frame after backgrounding found while testing them (SPIKE.md finding 12). Emulator: 16 of 16 cycles. Not re-reviewed. |
+| P1-25 | playback-coordinator | Sonnet 5.5 | task/p1-25-coordinator-fixes | 1 | running. Gate reviewer approved P1-06 with 13 non-blocking defects. |
+
+Gate review (2026-11-14, three reviewer runs on main at a21d967): media-library changes-required then approve (P1-23); thumbnail-cache approve; playback-coordinator approve; core-contracts approve (matches docs/CONTRACTS.md member by member); video-surface approve; player-engine fixes approve; theming-engine approve; shell route approve.
 
 Parallel tasks run in git worktrees under `D:\Projects\Ariel Video Player.wt\<task>` so that each keeps its own branch.
 
@@ -76,8 +81,11 @@ picture restored and hardware decoding kept, vertical video, audio file, 8 rapid
 Defects found and fixed: shell route (P1-18), native library load thread and late picture after backgrounding (P1-19).
 Not verified: anything on a physical device, HEVC, 4K, 500+ files, API levels other than 34, a Release build on a device.
 
-Phase 1 tasks not finished yet: P1-16, P1-20, P1-21, P1-22, tests for the coordinator and the data layer,
-gate review of the merges that were not reviewed (P1-02, 04, 05, 06, 07, 09, 18, 19), owner device test.
+Phase 1 tasks not finished yet: P1-16a/b/c, P1-25, tests for the coordinator and the data layer, owner device test.
+
+Lessons recorded for later briefs:
+- An agent that builds with a relative path can build in the main checkout and corrupt its `obj` folder (a crash at startup that a clean build removed). Every brief now gives full paths for build commands.
+- Reviewers that build at the same time need separate worktrees.
 
 ## Known gaps carried forward
 
