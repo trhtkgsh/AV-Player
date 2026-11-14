@@ -37,6 +37,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private Dictionary<MediaFileId, MediaMetadata> _metadata = new();
     private Dictionary<MediaFileId, PlaybackState> _states = new();
     private Dictionary<MediaFileId, MediaRowViewModel> _rows = new();
+    private int _loadVersion;
 
     [ObservableProperty]
     private string _title = string.Empty;
@@ -204,10 +205,10 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         _searchDebounce?.Cancel();
         _searchDebounce?.Dispose();
         _searchDebounce = new CancellationTokenSource();
-        _ = DebounceRebuildAsync(_searchDebounce.Token);
+        _ = DebounceRebuildAsync(_searchDebounce.Token, _loadVersion);
     }
 
-    private async Task DebounceRebuildAsync(CancellationToken ct)
+    private async Task DebounceRebuildAsync(CancellationToken ct, int version)
     {
         try
         {
@@ -218,22 +219,43 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             return;
         }
 
+        // A newer load has started since the search text changed; that load rebuilds the rows itself.
+        if (!IsCurrentLoad(version))
+        {
+            return;
+        }
+
         RebuildRows();
     }
 
+    private bool IsCurrentLoad(int version) => version == _loadVersion;
+
     private async Task LoadAsync()
     {
+        var version = ++_loadVersion;
         var ct = SessionToken;
         IsLoading = true;
         ErrorMessage = null;
 
         try
         {
-            _settings = await _uiSettings.GetAsync(ct);
+            var settings = await _uiSettings.GetAsync(ct);
+            if (!IsCurrentLoad(version))
+            {
+                return;
+            }
+
+            _settings = settings;
             SortField = _settings.SortField;
             SortDirection = _settings.SortDirection;
 
-            if (!await _library.EnsureReadPermissionAsync(ct))
+            var permitted = await _library.EnsureReadPermissionAsync(ct);
+            if (!IsCurrentLoad(version))
+            {
+                return;
+            }
+
+            if (!permitted)
             {
                 PermissionDenied = true;
                 _items = [];
@@ -243,9 +265,23 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
 
             PermissionDenied = false;
             var items = await _library.GetItemsAsync(new MediaQuery(_bucketId, null), ct);
+            if (!IsCurrentLoad(version))
+            {
+                return;
+            }
+
             var ids = items.Select(item => item.Id).ToList();
             var states = await _stateStore.GetManyAsync(ids, ct);
+            if (!IsCurrentLoad(version))
+            {
+                return;
+            }
+
             var cached = await _metadataService.GetCachedAsync(ids, ct);
+            if (!IsCurrentLoad(version))
+            {
+                return;
+            }
 
             _items = items;
             _states = new Dictionary<MediaFileId, PlaybackState>(states);
@@ -257,12 +293,19 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         }
         catch (Exception ex)
         {
-            ReportError(ex);
+            if (IsCurrentLoad(version))
+            {
+                ReportError(ex);
+            }
         }
         finally
         {
-            IsLoading = false;
-            IsRefreshing = false;
+            // Only the newest load owns the loading flags.
+            if (IsCurrentLoad(version))
+            {
+                IsLoading = false;
+                IsRefreshing = false;
+            }
         }
     }
 
