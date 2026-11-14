@@ -38,6 +38,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private Dictionary<MediaFileId, PlaybackState> _states = new();
     private Dictionary<MediaFileId, MediaRowViewModel> _rows = new();
     private int _loadVersion;
+    private bool _settingsLoaded;
 
     [ObservableProperty]
     private string _title = string.Empty;
@@ -102,7 +103,11 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         await LoadAsync();
     }
 
-    public void Deactivate() => StopSession();
+    public void Deactivate()
+    {
+        StopSession();
+        _loadVersion++;
+    }
 
     public void VisibleRangeChanged(int firstIndex, int lastIndex)
     {
@@ -170,8 +175,53 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     }
 
     [RelayCommand]
-    private async Task SetSort(SortField field)
+    private Task SetSort(SortField field) => ApplySortAsync(field);
+
+    [RelayCommand]
+    private async Task ChooseSort()
     {
+        try
+        {
+            var shell = Shell.Current;
+            if (shell is null)
+            {
+                return;
+            }
+
+            var choice = await shell.DisplayActionSheetAsync(
+                "Sort by", "Cancel", null, "Name", "Date added", "Size", "Duration");
+
+            SortField? field = choice switch
+            {
+                "Name" => SortField.Name,
+                "Date added" => SortField.DateAdded,
+                "Size" => SortField.Size,
+                "Duration" => SortField.Duration,
+                _ => null,
+            };
+
+            if (field is not null)
+            {
+                await ApplySortAsync(field.Value);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
+    }
+
+    private async Task ApplySortAsync(SortField field)
+    {
+        // Until the first load has read the saved settings, saving would overwrite them with defaults.
+        if (!_settingsLoaded)
+        {
+            return;
+        }
+
         var direction = field != SortField
             ? SortDirection.Ascending
             : SortDirection == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending;
@@ -204,11 +254,18 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     {
         _searchDebounce?.Cancel();
         _searchDebounce?.Dispose();
+        _searchDebounce = null;
+
+        if (_session is null)
+        {
+            return;
+        }
+
         _searchDebounce = new CancellationTokenSource();
-        _ = DebounceRebuildAsync(_searchDebounce.Token, _loadVersion);
+        _ = DebounceRebuildAsync(_searchDebounce.Token);
     }
 
-    private async Task DebounceRebuildAsync(CancellationToken ct, int version)
+    private async Task DebounceRebuildAsync(CancellationToken ct)
     {
         try
         {
@@ -219,8 +276,8 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             return;
         }
 
-        // A newer load has started since the search text changed; that load rebuilds the rows itself.
-        if (!IsCurrentLoad(version))
+        // Rebuilds from the fields held now, also while a load is running. A session that ended is skipped.
+        if (ct.IsCancellationRequested)
         {
             return;
         }
@@ -246,6 +303,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             }
 
             _settings = settings;
+            _settingsLoaded = true;
             SortField = _settings.SortField;
             SortDirection = _settings.SortDirection;
 
@@ -349,7 +407,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         try
         {
             var metadata = await _metadataService.GetOrCreateAsync(item, request.Token);
-            if (metadata is null)
+            if (metadata is null || request.Token.IsCancellationRequested || _session is null)
             {
                 return;
             }
@@ -405,15 +463,25 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     }
 
     private void OnLibraryChanged(object? sender, EventArgs e) =>
-        MainThread.BeginInvokeOnMainThread(() => _ = LoadAsync());
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            // A callback queued before Deactivate does nothing.
+            if (_session is not null)
+            {
+                _ = LoadAsync();
+            }
+        });
 
     private void OnSettingsChanged(object? sender, UiSettings settings) =>
-        MainThread.BeginInvokeOnMainThread(() => ApplySettings(settings));
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            // A callback queued before Deactivate does nothing.
+            if (_session is not null)
+            {
+                ApplySettings(settings);
+            }
+        });
 
-    private void ReportError(Exception ex)
-    {
-        ErrorMessage = ex.Message;
-        IsLoading = false;
-        IsRefreshing = false;
-    }
+    // Only the load owns IsLoading and IsRefreshing; a failed command reports through ErrorMessage alone.
+    private void ReportError(Exception ex) => ErrorMessage = ex.Message;
 }

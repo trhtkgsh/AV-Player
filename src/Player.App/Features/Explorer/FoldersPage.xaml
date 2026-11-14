@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="Player.App.Features.Explorer.FoldersPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:explorer="clr-namespace:Player.App.Features.Explorer"
+             x:DataType="explorer:FoldersViewModel"
+             Title="Ariel Player">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="All files" Command="{Binding ShowAllCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <Grid>
+        <RefreshView IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
+            <CollectionView ItemsSource="{Binding Folders}" SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="explorer:FolderRow">
+                        <Grid Style="{StaticResource ListRow}" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding OpenFolderCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                                    CommandParameter="{Binding .}" />
+                            </Grid.GestureRecognizers>
+
+                            <Label Grid.Row="0" Grid.Column="0" Text="{Binding Name}" Style="{StaticResource LabelTitle}" />
+                            <Label Grid.Row="1" Grid.Column="0" Text="{Binding CountText}" Style="{StaticResource LabelMuted}" />
+                            <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Text="{Binding NewText}"
+                                   IsVisible="{Binding HasNew}" TextColor="{DynamicResource ColorAccent}"
+                                   FontAttributes="Bold" VerticalOptions="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
+
+        <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}"
+                           HorizontalOptions="Center" VerticalOptions="Center" />
+
+        <Label Text="No media folders found" IsVisible="{Binding IsEmpty}"
+               HorizontalOptions="Center" VerticalOptions="Center" />
+
+        <VerticalStackLayout IsVisible="{Binding PermissionDenied}" Padding="24" Spacing="12"
+                             HorizontalOptions="Fill" VerticalOptions="Center">
+            <Label Text="Ariel Player needs permission to read your video and audio files."
+                   HorizontalTextAlignment="Center" />
+            <Button Text="Try again" Command="{Binding RetryPermissionCommand}" />
+            <Button Text="Open app settings" Command="{Binding OpenAppSettingsCommand}" />
+        </VerticalStackLayout>
+
+        <Label Text="{Binding ErrorMessage}" TextColor="{DynamicResource ColorDanger}"
+               Margin="16" VerticalOptions="End" />
+    </Grid>
+
+</ContentPage>
