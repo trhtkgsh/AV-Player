@@ -23,7 +23,7 @@ public sealed partial class VlcPlayerEngine
     public void SurfaceReady(object nativeSurface, int widthPx, int heightPx)
     {
         EnsureMainThread();
-        if (nativeSurface is not Surface surface)
+        if (nativeSurface is not global::Android.Views.Surface surface)
             throw new ArgumentException("An Android.Views.Surface is required.", nameof(nativeSurface));
 
         if (_surfaceAttached)
@@ -86,7 +86,7 @@ public sealed partial class VlcPlayerEngine
         {
             // An input started with :no-video cannot select a video track later.
             if (_item!.Kind == MediaKind.Video)
-                Start(Math.Max(0, player.Time), _status == PlayerStatus.Paused);
+                Start(CurrentPositionMs);
         }
         else if (_savedVideoTrack is { } track)
         {
@@ -101,7 +101,9 @@ public sealed partial class VlcPlayerEngine
             return _player;
 
         LibVLCSharp.Shared.Core.Initialize();
-        _libVlc = new LibVLC();
+        // Debug level is required: the decoder line parsed in OnLog is a debug message.
+        // Subscribing to Log replaces LibVLC's own logger, so nothing is written to logcat by LibVLC itself.
+        _libVlc = new LibVLC(enableDebugLogs: true);
         _libVlc.Log += OnLog;
 
         var player = new MediaPlayer(_libVlc);
@@ -180,7 +182,17 @@ public sealed partial class VlcPlayerEngine
                 player.SetAudioTrack(audio);
             if (_subtitleTrackId is { } subtitle)
                 player.SetSpu(subtitle);
+            if (_subtitleFileUri is { } subtitleFile)
+                player.AddSlave(MediaSlaveType.Subtitle, subtitleFile, true);
+            if (_seekOnStart is { } seek)
+            {
+                _seekOnStart = null;
+                player.Time = seek;
+            }
         }
+
+        if (status == PlayerStatus.Playing && _pauseRequested)
+            player.SetPause(true);
 
         UpdateVideoOutput();
         if (Live)
@@ -243,7 +255,7 @@ public sealed partial class VlcPlayerEngine
             return;
 
         _format = format;
-        FormatChanged?.Invoke(this, format);
+        Raise(() => FormatChanged?.Invoke(this, format));
     }
 
     private void OnLog(object? sender, LogEventArgs e)

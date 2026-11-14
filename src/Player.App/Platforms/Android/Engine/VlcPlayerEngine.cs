@@ -47,7 +47,9 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     private SubtitleStyle _subtitleStyle = SubtitleStyle.Default;
 
     private long _startMs;
-    private bool _startPaused;
+    private bool _pauseRequested;
+    private long? _seekOnStart;
+    private string? _subtitleFileUri;
     private bool _waitingForSurface;
     private bool _startedWithoutVideo;
     private bool _settingsPending;
@@ -68,6 +70,16 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     private bool Live =>
         !_waitingForSurface && _status is PlayerStatus.Opening or PlayerStatus.Playing or PlayerStatus.Paused;
 
+    /// <summary>LibVLC reports no time until the input plays, so the requested position is used while opening.</summary>
+    private long CurrentPositionMs
+    {
+        get
+        {
+            var time = _status == PlayerStatus.Opening ? -1 : _player?.Time ?? -1;
+            return time >= 0 ? time : _positionMs;
+        }
+    }
+
     public Task OpenAsync(MediaItem item, EffectivePlaybackSettings settings, bool startPaused, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(item);
@@ -82,9 +94,11 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             _audioDelayMs = settings.AudioDelayMs;
             _subtitleDelayMs = settings.SubtitleDelayMs;
             _subtitleStyle = settings.SubtitleStyle;
+            _subtitleFileUri = null;
+            _pauseRequested = startPaused;
             _durationMs = 0;
             SetFormat(null);
-            Start(Math.Max(0, settings.StartPositionMs), startPaused);
+            Start(Math.Max(0, settings.StartPositionMs));
         }, ct);
     }
 
@@ -92,19 +106,19 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     {
         if (_item is null)
             return;
+
+        _pauseRequested = false;
         if (Live)
             _player!.SetPause(false);
-        else if (_waitingForSurface)
-            _startPaused = false;
-        else
-            Start(_startMs, false);
+        else if (!_waitingForSurface)
+            Start(_startMs);
     }, ct);
 
     public Task PauseAsync(CancellationToken ct) => _queue.Enqueue(() =>
     {
-        if (_waitingForSurface)
-            _startPaused = true;
-        else if (_status == PlayerStatus.Playing)
+        // The intent is kept, so a pause that arrives while opening or just before a restart is not lost.
+        _pauseRequested = true;
+        if (_status == PlayerStatus.Playing)
             _player!.SetPause(true);
     }, ct);
 
@@ -126,10 +140,18 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             return;
 
         var target = Math.Max(0, _durationMs > 0 ? Math.Min(positionMs, _durationMs) : positionMs);
-        if (Live)
+        if (Live && _status != PlayerStatus.Opening)
+        {
             _player!.Time = target;
+        }
         else
+        {
+            // Not seekable yet: start there, or seek as soon as the input plays.
             _startMs = target;
+            if (Live)
+                _seekOnStart = target;
+        }
+
         _positionMs = target;
         Publish();
     }, ct);
@@ -155,7 +177,7 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         _requestedDecoder = mode;
         // LibVLC 3 picks the decoder per media: restart at the current position (docs/SPIKE.md finding 3).
         if (Live)
-            Start(Math.Max(0, _player!.Time), _status == PlayerStatus.Paused);
+            Start(CurrentPositionMs);
         else
             Publish();
     }, ct);
@@ -163,7 +185,10 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     public Task SetVideoEnabledAsync(bool enabled, CancellationToken ct) => _queue.Enqueue(() =>
     {
         _videoEnabled = enabled;
-        UpdateVideoOutput();
+        if (_waitingForSurface && !enabled)
+            Launch();
+        else
+            UpdateVideoOutput();
         Publish();
     }, ct);
 
@@ -200,8 +225,12 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         ArgumentException.ThrowIfNullOrEmpty(localFilePath);
         return _queue.Enqueue(() =>
         {
-            if (!Live || !_player!.AddSlave(MediaSlaveType.Subtitle, new Uri(localFilePath).AbsoluteUri, true))
+            var uri = new Uri(localFilePath).AbsoluteUri;
+            if (!Live || !_player!.AddSlave(MediaSlaveType.Subtitle, uri, true))
                 throw new InvalidOperationException("The subtitle file could not be loaded.");
+
+            // Remembered so that a decoder switch or a video restart loads it again.
+            _subtitleFileUri = uri;
         }, ct);
     }
 
@@ -223,12 +252,11 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         });
     }
 
-    private void Start(long startMs, bool paused)
+    private void Start(long startMs)
     {
         Halt();
         _status = PlayerStatus.Opening;
         _positionMs = _startMs = startMs;
-        _startPaused = paused;
         _error = null;
         _actualDecoder = null;
 
@@ -273,7 +301,7 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             _media.AddOption(_requestedDecoder == DecoderMode.Hardware ? ":codec=mediacodec_ndk,all" : ":codec=all");
             if (_startMs > 0)
                 _media.AddOption(string.Create(CultureInfo.InvariantCulture, $":start-time={_startMs / 1000.0:F3}"));
-            if (_startPaused)
+            if (_pauseRequested)
                 _media.AddOption(":start-paused");
             if (!withVideo)
                 _media.AddOption(":no-video");
@@ -307,7 +335,9 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         _media?.Dispose();
         _media = null;
         _descriptor?.Close();
+        _descriptor?.Dispose();
         _descriptor = null;
+        _seekOnStart = null;
         _savedVideoTrack = null;
         _startedWithoutVideo = false;
         _hasVideo = false;
@@ -334,7 +364,20 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             return;
 
         _snapshot = snapshot;
-        SnapshotChanged?.Invoke(this, snapshot);
+        Raise(() => SnapshotChanged?.Invoke(this, snapshot));
+    }
+
+    /// <summary>A failing subscriber must not fault the command that changed the state.</summary>
+    private static void Raise(Action notify)
+    {
+        try
+        {
+            notify();
+        }
+        catch (Exception ex)
+        {
+            global::Android.Util.Log.Error(Tag, $"Engine event subscriber failed: {ex}");
+        }
     }
 
     private static void AddSubtitleStyleOptions(VlcMedia media, SubtitleStyle style)
