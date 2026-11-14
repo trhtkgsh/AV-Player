@@ -171,6 +171,9 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         if (Live && _status != PlayerStatus.Opening)
         {
             _player!.Time = target;
+
+            // A frame reveal in progress must now wait for the clock to pass the new position.
+            _revealFromMs = target;
         }
         else
         {

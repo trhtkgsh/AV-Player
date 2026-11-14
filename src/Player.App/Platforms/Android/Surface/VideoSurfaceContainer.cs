@@ -1,7 +1,6 @@
 using Android.Content;
 using Android.Graphics;
 using Android.Views;
-using Player.Core.Contracts;
 using AndroidColor = Android.Graphics.Color;
 using AndroidView = Android.Views.View;
 
@@ -14,17 +13,15 @@ namespace Player.App.Surface;
 /// </summary>
 internal sealed class VideoSurfaceContainer : ViewGroup, ISurfaceHolderCallback
 {
-    private readonly IVideoOutputBinding _binding;
     private readonly VideoSurfaceController _controller;
     private readonly SurfaceView _surface;
     private bool _surfaceReported;
     private int _reportedWidth;
     private int _reportedHeight;
 
-    public VideoSurfaceContainer(Context context, IVideoOutputBinding binding, VideoSurfaceController controller)
+    public VideoSurfaceContainer(Context context, VideoSurfaceController controller)
         : base(context)
     {
-        _binding = binding;
         _controller = controller;
 
         SetBackgroundColor(AndroidColor.Black);
@@ -48,11 +45,11 @@ internal sealed class VideoSurfaceContainer : ViewGroup, ISurfaceHolderCallback
         if (!_surfaceReported)
         {
             _surfaceReported = true;
-            _binding.SurfaceReady(surface, width, height);
+            _controller.SurfaceReady(this, surface, width, height);
         }
         else if (width != _reportedWidth || height != _reportedHeight)
         {
-            _binding.SurfaceSizeChanged(width, height);
+            _controller.SurfaceSizeChanged(this, width, height);
         }
 
         _reportedWidth = width;
@@ -77,7 +74,7 @@ internal sealed class VideoSurfaceContainer : ViewGroup, ISurfaceHolderCallback
             return;
 
         _surfaceReported = false;
-        _binding.SurfaceLost();
+        _controller.SurfaceLost(this);
     }
 
     protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)

@@ -122,7 +122,10 @@ public sealed partial class VlcPlayerEngine
             // seek that was issued a moment ago, and this resync must not undo that seek.
             player.Time = _positionMs;
 
-            if (_status == PlayerStatus.Paused)
+            // The requested state decides, not only the reported one: a pause that was just requested
+            // may not have been reported yet, and it would leave the new decoder with a black picture.
+            // Never while opening: the first running event still has the start settings to apply.
+            if (_status == PlayerStatus.Paused || (_pauseRequested && _status == PlayerStatus.Playing))
                 BeginFrameReveal(player);
         }
     }
