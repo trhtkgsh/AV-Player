@@ -52,6 +52,7 @@ public interface IPlayerEngine
 /// <summary>
 /// The boundary between the engine and the native video surface.
 /// Implemented by the engine, called by the surface. The surface knows nothing about the engine's internals.
+/// The three Surface methods must be called on the UI thread.
 /// </summary>
 public interface IVideoOutputBinding
 {

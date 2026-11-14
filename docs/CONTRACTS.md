@@ -168,7 +168,7 @@ public interface IPlayerEngine
     Task SetSubtitleStyleAsync(SubtitleStyle style, CancellationToken ct);
 }
 
-// --- Engine <-> surface boundary. Implemented by player-engine, called by video-surface.
+// --- Engine <-> surface boundary. Implemented by player-engine, called by video-surface on the UI thread.
 public interface IVideoOutputBinding
 {
     VideoFormat? Format { get; }
