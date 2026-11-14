@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <Style TargetType="ContentPage" ApplyToDerivedTypes="True">
+        <Setter Property="BackgroundColor" Value="{DynamicResource ColorBackground}" />
+    </Style>
+
+    <Style TargetType="Label">
+        <Setter Property="TextColor" Value="{DynamicResource ColorOnSurface}" />
+        <Setter Property="FontSize" Value="16" />
+    </Style>
+
+    <Style x:Key="LabelMuted" TargetType="Label">
+        <Setter Property="TextColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+        <Setter Property="FontSize" Value="14" />
+    </Style>
+
+    <Style x:Key="LabelTitle" TargetType="Label">
+        <Setter Property="TextColor" Value="{DynamicResource ColorOnSurface}" />
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="FontAttributes" Value="Bold" />
+    </Style>
+
+    <Style TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{DynamicResource ColorAccent}" />
+        <Setter Property="TextColor" Value="{DynamicResource ColorOnAccent}" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="MinimumHeightRequest" Value="48" />
+        <Setter Property="Padding" Value="16,8" />
+    </Style>
+
+    <Style TargetType="Entry">
+        <Setter Property="TextColor" Value="{DynamicResource ColorOnSurface}" />
+        <Setter Property="PlaceholderColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource ColorSurface}" />
+    </Style>
+
+    <Style TargetType="Slider">
+        <Setter Property="MinimumTrackColor" Value="{DynamicResource ColorAccent}" />
+        <Setter Property="MaximumTrackColor" Value="{DynamicResource ColorDivider}" />
+        <Setter Property="ThumbColor" Value="{DynamicResource ColorAccent}" />
+    </Style>
+
+    <Style TargetType="Switch">
+        <Setter Property="OnColor" Value="{DynamicResource ColorAccent}" />
+        <Setter Property="ThumbColor" Value="{DynamicResource ColorOnSurface}" />
+    </Style>
+
+    <Style TargetType="ActivityIndicator">
+        <Setter Property="Color" Value="{DynamicResource ColorAccent}" />
+    </Style>
+
+    <Style TargetType="ProgressBar">
+        <Setter Property="ProgressColor" Value="{DynamicResource ColorProgress}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource ColorDivider}" />
+    </Style>
+
+    <Style x:Key="ListRow" TargetType="Grid">
+        <Setter Property="BackgroundColor" Value="{DynamicResource ColorSurface}" />
+        <Setter Property="Padding" Value="12,8" />
+        <Setter Property="ColumnSpacing" Value="12" />
+    </Style>
+
+</ResourceDictionary>
