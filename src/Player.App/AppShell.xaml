@@ -9,6 +9,6 @@
     <ShellContent
         Title="Ariel Player"
         ContentTemplate="{DataTemplate explorer:FoldersPage}"
-        Route="explorer" />
+        Route="folders" />
 
 </Shell>
