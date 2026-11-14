@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Player.App.Features.PlayerHud.PlayerPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:surface="clr-namespace:Player.App.Surface"
+    xmlns:vm="clr-namespace:Player.App.Features.PlayerHud"
+    x:DataType="vm:PlayerViewModel"
+    Shell.NavBarIsVisible="False"
+    Shell.TabBarIsVisible="False"
+    BackgroundColor="{DynamicResource ColorBackground}">
+
+    <Grid>
+        <!-- (a) The picture, behind everything. -->
+        <surface:VideoSurfaceView HorizontalOptions="Fill" VerticalOptions="Fill" />
+
+        <!-- (b) Transparent tap layer: a single tap toggles the HUD. -->
+        <ContentView BackgroundColor="Transparent">
+            <ContentView.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding ToggleHudCommand}" />
+            </ContentView.GestureRecognizers>
+        </ContentView>
+
+        <!-- (c) Loading indicator while the file opens. -->
+        <ActivityIndicator
+            HorizontalOptions="Center"
+            VerticalOptions="Center"
+            IsRunning="{Binding IsOpening}" />
+
+        <!-- (d) HUD. Only the top and bottom bars have a background and catch input; the middle lets taps through. -->
+        <Grid IsVisible="{Binding IsHudVisible}" RowDefinitions="Auto,*,Auto">
+
+            <Grid
+                Grid.Row="0"
+                Padding="8,6"
+                ColumnDefinitions="Auto,*,Auto"
+                ColumnSpacing="8"
+                BackgroundColor="{DynamicResource ColorHudBackground}">
+                <Button
+                    Grid.Column="0"
+                    Text="Back"
+                    Command="{Binding CloseCommand}" />
+                <Label
+                    Grid.Column="1"
+                    VerticalOptions="Center"
+                    LineBreakMode="TailTruncation"
+                    Text="{Binding Title}"
+                    TextColor="{DynamicResource ColorHudOnBackground}" />
+                <Label
+                    Grid.Column="2"
+                    VerticalOptions="Center"
+                    IsVisible="{Binding ShowClock}"
+                    Text="{Binding ClockText}"
+                    TextColor="{DynamicResource ColorHudOnBackground}" />
+            </Grid>
+
+            <Grid
+                Grid.Row="2"
+                Padding="12,8"
+                RowDefinitions="Auto,Auto"
+                RowSpacing="6"
+                BackgroundColor="{DynamicResource ColorHudBackground}">
+
+                <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                    <Label
+                        Grid.Column="0"
+                        VerticalOptions="Center"
+                        Text="{Binding PositionText}"
+                        TextColor="{DynamicResource ColorHudOnBackground}" />
+                    <Slider
+                        Grid.Column="1"
+                        VerticalOptions="Center"
+                        Minimum="0"
+                        Maximum="{Binding DurationMs}"
+                        Value="{Binding PositionMs, Mode=TwoWay}"
+                        DragStartedCommand="{Binding SeekStartedCommand}"
+                        DragCompletedCommand="{Binding SeekCompletedCommand}" />
+                    <Label
+                        Grid.Column="2"
+                        VerticalOptions="Center"
+                        Text="{Binding DurationText}"
+                        TextColor="{DynamicResource ColorHudOnBackground}" />
+                </Grid>
+
+                <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                    <Button
+                        Grid.Column="0"
+                        Text="Prev"
+                        Command="{Binding PreviousCommand}" />
+                    <Button
+                        Grid.Column="1"
+                        Text="{Binding PlayPauseText}"
+                        Command="{Binding PlayPauseCommand}" />
+                    <Button
+                        Grid.Column="2"
+                        Text="Next"
+                        Command="{Binding NextCommand}" />
+                    <Button
+                        Grid.Column="3"
+                        Text="{Binding DecoderText}"
+                        Command="{Binding ToggleDecoderCommand}" />
+                </Grid>
+            </Grid>
+        </Grid>
+    </Grid>
+</ContentPage>
