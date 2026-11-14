@@ -19,6 +19,7 @@ public sealed class MediaStoreLibrary : IMediaLibrary, IDisposable
 	private readonly MediaChangeObserver _observer;
 	private readonly object _changedLock = new();
 	private Timer? _changedTimer;
+	private bool _disposed;
 
 	public MediaStoreLibrary(IPlaybackStateStore stateStore)
 	{
@@ -34,14 +35,16 @@ public sealed class MediaStoreLibrary : IMediaLibrary, IDisposable
 	public async Task<bool> EnsureReadPermissionAsync(CancellationToken ct)
 	{
 		ct.ThrowIfCancellationRequested();
-		var permission = new MediaReadPermission();
-		var status = await permission.CheckStatusAsync().WaitAsync(ct).ConfigureAwait(false);
-		if (status != PermissionStatus.Granted)
+
+		// Already usable (full or partial, one collection is enough): never request again.
+		if (CanReadVideo() || CanReadAudio())
 		{
-			status = await MainThread.InvokeOnMainThreadAsync(permission.RequestAsync).WaitAsync(ct).ConfigureAwait(false);
+			return true;
 		}
 
-		return status == PermissionStatus.Granted || HasPartialAccess();
+		var permission = new MediaReadPermission();
+		await MainThread.InvokeOnMainThreadAsync(permission.RequestAsync).WaitAsync(ct).ConfigureAwait(false);
+		return CanReadVideo() || CanReadAudio();
 	}
 
 	public async Task<IReadOnlyList<MediaFolder>> GetFoldersAsync(int newTagDays, CancellationToken ct)
@@ -59,12 +62,18 @@ public sealed class MediaStoreLibrary : IMediaLibrary, IDisposable
 			var items = new List<MediaItem>();
 			if (query.Kind is null or MediaKind.Video)
 			{
-				Query(MediaStore.Video.Media.ExternalContentUri!, MediaKind.Video, query.BucketId, items, ct);
+				if (CanReadVideo())
+				{
+					Query(MediaStore.Video.Media.ExternalContentUri!, MediaKind.Video, query.BucketId, items, ct);
+				}
 			}
 
 			if (query.Kind is null or MediaKind.Audio)
 			{
-				Query(MediaStore.Audio.Media.ExternalContentUri!, MediaKind.Audio, query.BucketId, items, ct);
+				if (CanReadAudio())
+				{
+					Query(MediaStore.Audio.Media.ExternalContentUri!, MediaKind.Audio, query.BucketId, items, ct);
+				}
 			}
 
 			return items;
@@ -73,13 +82,20 @@ public sealed class MediaStoreLibrary : IMediaLibrary, IDisposable
 
 	public void Dispose()
 	{
-		_context.ContentResolver?.UnregisterContentObserver(_observer);
-		_observer.Dispose();
 		lock (_changedLock)
 		{
+			if (_disposed)
+			{
+				return;
+			}
+
+			_disposed = true;
 			_changedTimer?.Dispose();
 			_changedTimer = null;
 		}
+
+		_context.ContentResolver?.UnregisterContentObserver(_observer);
+		_observer.Dispose();
 	}
 
 	private void Query(AndroidUri collection, MediaKind kind, long? bucketId, List<MediaItem> items, CancellationToken ct)
@@ -166,20 +182,42 @@ public sealed class MediaStoreLibrary : IMediaLibrary, IDisposable
 		return hash;
 	}
 
-	// API 34 "selected media" access: only the user-selected permission is granted.
+	private bool IsGranted(string permission) =>
+		_context.CheckSelfPermission(permission) == global::Android.Content.PM.Permission.Granted;
+
+	// API 34 "selected media" access: only the user-selected permission is granted. Covers video (and images), not audio.
 	private bool HasPartialAccess() =>
-		OperatingSystem.IsAndroidVersionAtLeast(34)
-		&& _context.CheckSelfPermission("android.permission.READ_MEDIA_VISUAL_USER_SELECTED") == global::Android.Content.PM.Permission.Granted;
+		OperatingSystem.IsAndroidVersionAtLeast(34) && IsGranted(MediaReadPermission.VisualUserSelected);
+
+	private bool CanReadVideo() =>
+		OperatingSystem.IsAndroidVersionAtLeast(33)
+			? IsGranted(global::Android.Manifest.Permission.ReadMediaVideo) || HasPartialAccess()
+			: IsGranted(global::Android.Manifest.Permission.ReadExternalStorage);
+
+	private bool CanReadAudio() =>
+		OperatingSystem.IsAndroidVersionAtLeast(33)
+			? IsGranted(global::Android.Manifest.Permission.ReadMediaAudio)
+			: IsGranted(global::Android.Manifest.Permission.ReadExternalStorage);
 
 	// Coalesces bursts: the first change arms a one-second timer and Changed fires once when it elapses.
 	private void OnStoreChanged()
 	{
 		lock (_changedLock)
 		{
+			if (_disposed)
+			{
+				return;
+			}
+
 			_changedTimer ??= new Timer(_ =>
 			{
 				lock (_changedLock)
 				{
+					if (_disposed)
+					{
+						return;
+					}
+
 					_changedTimer?.Dispose();
 					_changedTimer = null;
 				}
