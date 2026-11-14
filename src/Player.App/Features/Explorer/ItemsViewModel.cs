@@ -67,6 +67,12 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     [ObservableProperty]
     private string? _errorMessage;
 
+    [ObservableProperty]
+    private bool _hasError;
+
+    [ObservableProperty]
+    private bool _showBusy;
+
     public ItemsViewModel(
         IMediaLibrary library,
         IMediaMetadataService metadataService,
@@ -216,21 +222,24 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
 
     private async Task ApplySortAsync(SortField field)
     {
-        // Until the first load has read the saved settings, saving would overwrite them with defaults.
-        if (!_settingsLoaded)
-        {
-            return;
-        }
-
-        var direction = field != SortField
-            ? SortDirection.Ascending
-            : SortDirection == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending;
-
-        SortField = field;
-        SortDirection = direction;
-
         try
         {
+            // Until the first load has read the saved settings, read them now. Never save defaults.
+            if (!_settingsLoaded)
+            {
+                _settings = await _uiSettings.GetAsync(SessionToken);
+                _settingsLoaded = true;
+                SortField = _settings.SortField;
+                SortDirection = _settings.SortDirection;
+            }
+
+            var direction = field != SortField
+                ? SortDirection.Ascending
+                : SortDirection == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending;
+
+            SortField = field;
+            SortDirection = direction;
+
             _settings = _settings with { SortField = field, SortDirection = direction };
             await _uiSettings.SaveAsync(_settings, SessionToken);
             RebuildRows();
@@ -248,7 +257,38 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private Task RetryPermission() => LoadAsync();
 
     [RelayCommand]
-    private void OpenAppSettings() => AppInfo.Current.ShowSettingsUI();
+    private void OpenAppSettings()
+    {
+        try
+        {
+            AppInfo.Current.ShowSettingsUI();
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
+    }
+
+    partial void OnErrorMessageChanged(string? value)
+    {
+        HasError = !string.IsNullOrEmpty(value);
+    }
+
+    partial void OnIsLoadingChanged(bool value)
+    {
+        UpdateShowBusy();
+    }
+
+    partial void OnIsRefreshingChanged(bool value)
+    {
+        UpdateShowBusy();
+    }
+
+    // The centered spinner is for the first load only; a pull-to-refresh shows its own spinner.
+    private void UpdateShowBusy() => ShowBusy = IsLoading && !IsRefreshing;
+
+    // "No media files" is not shown while a load is in flight.
+    private void UpdateIsEmpty() => IsEmpty = Rows.Count == 0 && !PermissionDenied && !IsLoading;
 
     partial void OnSearchTextChanged(string value)
     {
@@ -363,6 +403,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             {
                 IsLoading = false;
                 IsRefreshing = false;
+                UpdateIsEmpty();
             }
         }
     }
@@ -390,7 +431,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             Rows.Add(row);
         }
 
-        IsEmpty = Rows.Count == 0 && !PermissionDenied;
+        UpdateIsEmpty();
         VisibleRangeChanged(0, InitialVisibleLast);
     }
 

@@ -10,7 +10,7 @@
         <ToolbarItem Text="All files" Command="{Binding ShowAllCommand}" />
     </ContentPage.ToolbarItems>
 
-    <Grid>
+    <Grid RowDefinitions="*,Auto">
         <RefreshView IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
             <CollectionView ItemsSource="{Binding Folders}" SelectionMode="None">
                 <CollectionView.ItemTemplate>
@@ -33,7 +33,7 @@
             </CollectionView>
         </RefreshView>
 
-        <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}"
+        <ActivityIndicator IsRunning="{Binding ShowBusy}" IsVisible="{Binding ShowBusy}"
                            HorizontalOptions="Center" VerticalOptions="Center" />
 
         <Label Text="No media folders found" IsVisible="{Binding IsEmpty}"
@@ -47,8 +47,8 @@
             <Button Text="Open app settings" Command="{Binding OpenAppSettingsCommand}" />
         </VerticalStackLayout>
 
-        <Label Text="{Binding ErrorMessage}" TextColor="{DynamicResource ColorDanger}"
-               Margin="16" VerticalOptions="End" />
+        <Label Grid.Row="1" Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
+               TextColor="{DynamicResource ColorDanger}" Margin="16" />
     </Grid>
 
 </ContentPage>

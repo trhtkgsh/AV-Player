@@ -16,6 +16,9 @@ public sealed partial class FoldersViewModel : ObservableObject
 {
     private const string ItemsRoute = "explorer/items";
 
+    // Why a load runs. Only an activation may move the stored view mode or navigate.
+    private enum LoadReason { Activate, Library, Refresh, Retry }
+
     private readonly IMediaLibrary _library;
     private readonly IUiSettingsStore _uiSettings;
 
@@ -38,6 +41,12 @@ public sealed partial class FoldersViewModel : ObservableObject
     [ObservableProperty]
     private string? _errorMessage;
 
+    [ObservableProperty]
+    private bool _hasError;
+
+    [ObservableProperty]
+    private bool _showBusy;
+
     public FoldersViewModel(IMediaLibrary library, IUiSettingsStore uiSettings)
     {
         _library = library;
@@ -53,7 +62,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         StopSession();
         _session = new CancellationTokenSource();
         _library.Changed += OnLibraryChanged;
-        await LoadAsync();
+        await LoadAsync(LoadReason.Activate);
     }
 
     public void Deactivate()
@@ -66,7 +75,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     private async Task Refresh()
     {
         IsRefreshing = true;
-        await LoadAsync();
+        await LoadAsync(LoadReason.Refresh);
     }
 
     [RelayCommand]
@@ -104,6 +113,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         {
             var ct = SessionToken;
             var settings = await _uiSettings.GetAsync(ct);
+            _flatSeen = true;
             await _uiSettings.SaveAsync(settings with { ViewMode = ExplorerViewMode.Flat }, ct);
             await NavigateToAllAsync();
         }
@@ -117,7 +127,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private Task RetryPermission() => LoadAsync();
+    private Task RetryPermission() => LoadAsync(LoadReason.Retry);
 
     [RelayCommand]
     private void OpenAppSettings()
@@ -132,7 +142,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         }
     }
 
-    private async Task LoadAsync()
+    private async Task LoadAsync(LoadReason reason)
     {
         var version = ++_loadVersion;
         var ct = SessionToken;
@@ -147,7 +157,7 @@ public sealed partial class FoldersViewModel : ObservableObject
                 return;
             }
 
-            if (settings.ViewMode == ExplorerViewMode.Flat)
+            if (reason == LoadReason.Activate && settings.ViewMode == ExplorerViewMode.Flat)
             {
                 if (!_flatSeen)
                 {
@@ -247,9 +257,27 @@ public sealed partial class FoldersViewModel : ObservableObject
             // A callback queued before Deactivate does nothing.
             if (_session is not null)
             {
-                _ = LoadAsync();
+                _ = LoadAsync(LoadReason.Library);
             }
         });
+
+    partial void OnErrorMessageChanged(string? value)
+    {
+        HasError = !string.IsNullOrEmpty(value);
+    }
+
+    partial void OnIsLoadingChanged(bool value)
+    {
+        UpdateShowBusy();
+    }
+
+    partial void OnIsRefreshingChanged(bool value)
+    {
+        UpdateShowBusy();
+    }
+
+    // The centered spinner is for the first load only; a pull-to-refresh shows its own spinner.
+    private void UpdateShowBusy() => ShowBusy = IsLoading && !IsRefreshing;
 
     private void ReportError(Exception ex) => ErrorMessage = ex.Message;
 }

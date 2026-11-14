@@ -10,7 +10,7 @@
         <ToolbarItem Text="Sort" Command="{Binding ChooseSortCommand}" />
     </ContentPage.ToolbarItems>
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid RowDefinitions="Auto,*,Auto">
         <Entry Grid.Row="0" Placeholder="Search" Text="{Binding SearchText, Mode=TwoWay}"
                ClearButtonVisibility="WhileEditing" />
 
@@ -50,7 +50,7 @@
                 </CollectionView>
             </RefreshView>
 
-            <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}"
+            <ActivityIndicator IsRunning="{Binding ShowBusy}" IsVisible="{Binding ShowBusy}"
                                HorizontalOptions="Center" VerticalOptions="Center" />
 
             <Label Text="No media files" IsVisible="{Binding IsEmpty}"
@@ -64,9 +64,10 @@
                 <Button Text="Open app settings" Command="{Binding OpenAppSettingsCommand}" />
             </VerticalStackLayout>
 
-            <Label Text="{Binding ErrorMessage}" TextColor="{DynamicResource ColorDanger}"
-                   Margin="16" VerticalOptions="End" />
         </Grid>
+
+        <Label Grid.Row="2" Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
+               TextColor="{DynamicResource ColorDanger}" Margin="16" />
     </Grid>
 
 </ContentPage>
