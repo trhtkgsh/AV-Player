@@ -118,7 +118,10 @@ public sealed record ThemeSettings
 public sealed record PlayerSnapshot(
     PlayerStatus Status, MediaFileId? Current, long PositionMs, long DurationMs, float Speed,
     DecoderMode RequestedDecoder, DecoderMode? ActualDecoder, bool HasVideo, bool VideoEnabled,
-    int VolumePercent, string? Error);
+    int VolumePercent, string? Error)
+{
+    public static PlayerSnapshot Idle { get; }   // Status Idle, speed 1.0, Hardware requested, video enabled, volume 100
+}
 
 public sealed record VideoFormat(int Width, int Height, int SarNumerator, int SarDenominator);
 
@@ -184,7 +187,7 @@ public interface IVideoSurface
     void SetAspect(AspectMode mode);
     void SetTransform(ViewTransform transform);        // clamped to 100% .. 400%, pan kept inside the picture
     void SetWindowBrightness(double? value);           // 0 .. 1, null = system default
-    double WindowBrightness { get; }
+    double WindowBrightness { get; }                   // 0 .. 1, or -1 while the system default is in effect
 }
 
 // --- Gestures (gestures). Raw native touch turned into semantic events. No side effects.
@@ -336,6 +339,8 @@ public static class PlaybackSettingsResolver
 {
     // Per-file value if set, otherwise the global default. Start position = state position
     // when defaults.ResumeFromLastPosition and the file is not Finished, otherwise 0.
+    // SubtitleTrackId with no per-file value: null (engine/preferred track) when
+    // defaults.SubtitlesEnabled, otherwise -1 (off). SubtitleStyle always comes from the defaults.
     public static EffectivePlaybackSettings Resolve(PlaybackState? state, GlobalDefaults defaults);
 }
 ```
