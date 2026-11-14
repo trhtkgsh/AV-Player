@@ -6,6 +6,15 @@
         <Setter Property="BackgroundColor" Value="{DynamicResource ColorBackground}" />
     </Style>
 
+    <Style TargetType="Shell" ApplyToDerivedTypes="True">
+        <Setter Property="Shell.BackgroundColor" Value="{DynamicResource ColorSurface}" />
+        <Setter Property="Shell.ForegroundColor" Value="{DynamicResource ColorOnSurface}" />
+        <Setter Property="Shell.TitleColor" Value="{DynamicResource ColorOnSurface}" />
+        <Setter Property="Shell.DisabledColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+        <Setter Property="Shell.UnselectedColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+        <Setter Property="Shell.NavBarHasShadow" Value="False" />
+    </Style>
+
     <Style TargetType="Label">
         <Setter Property="TextColor" Value="{DynamicResource ColorOnSurface}" />
         <Setter Property="FontSize" Value="16" />
