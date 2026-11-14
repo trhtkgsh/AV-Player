@@ -31,7 +31,10 @@ public static class MediaInfoFormatter
         return string.Format(CultureInfo.InvariantCulture, "{0}:{1:00}:{2:00}", totalSeconds / 3600, minutes, seconds);
     }
 
-    /// <summary>Bytes, KB and MB with one decimal, GB with two. Empty for negative sizes.</summary>
+    /// <summary>
+    /// Bytes, KB and MB with one decimal, GB with two. Empty for negative sizes.
+    /// The value is rounded before the unit is chosen, so 1_048_575 bytes is "1.0 MB", not "1024.0 KB".
+    /// </summary>
     public static string Size(long bytes)
     {
         if (bytes < 0)
@@ -44,17 +47,20 @@ public static class MediaInfoFormatter
             return string.Format(CultureInfo.InvariantCulture, "{0} B", bytes);
         }
 
-        if (bytes < Mega)
+        var kilo = Math.Round(bytes / (double)Kilo, 1, MidpointRounding.AwayFromZero);
+        if (kilo < 1024)
         {
-            return string.Format(CultureInfo.InvariantCulture, "{0:0.0} KB", bytes / (double)Kilo);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0.0} KB", kilo);
         }
 
-        if (bytes < Giga)
+        var mega = Math.Round(bytes / (double)Mega, 1, MidpointRounding.AwayFromZero);
+        if (mega < 1024)
         {
-            return string.Format(CultureInfo.InvariantCulture, "{0:0.0} MB", bytes / (double)Mega);
+            return string.Format(CultureInfo.InvariantCulture, "{0:0.0} MB", mega);
         }
 
-        return string.Format(CultureInfo.InvariantCulture, "{0:0.00} GB", bytes / (double)Giga);
+        var giga = Math.Round(bytes / (double)Giga, 2, MidpointRounding.AwayFromZero);
+        return string.Format(CultureInfo.InvariantCulture, "{0:0.00} GB", giga);
     }
 
     /// <summary>"1920x1080". Empty when the width or the height is not positive.</summary>
