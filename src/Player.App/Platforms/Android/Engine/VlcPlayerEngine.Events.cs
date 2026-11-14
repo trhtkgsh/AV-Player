@@ -191,8 +191,12 @@ public sealed partial class VlcPlayerEngine
             }
         }
 
+        // Pause and play requests can cross the opening of an input, where LibVLC ignores them.
+        // The requested state wins once the input reports its own.
         if (status == PlayerStatus.Playing && _pauseRequested)
             player.SetPause(true);
+        else if (status == PlayerStatus.Paused && !_pauseRequested)
+            player.SetPause(false);
 
         UpdateVideoOutput();
         if (Live)
