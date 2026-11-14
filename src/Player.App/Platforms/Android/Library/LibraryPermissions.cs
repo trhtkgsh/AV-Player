@@ -4,6 +4,7 @@ using Android.App;
 [assembly: UsesPermission(Manifest.Permission.ReadMediaVideo)]
 [assembly: UsesPermission(Manifest.Permission.ReadMediaAudio)]
 [assembly: UsesPermission(Manifest.Permission.ReadExternalStorage, MaxSdkVersion = 32)]
+[assembly: UsesPermission("android.permission.READ_MEDIA_VISUAL_USER_SELECTED")]
 
 namespace Player.App.Platforms.Android.Library;
 
