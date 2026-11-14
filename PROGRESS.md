@@ -42,6 +42,17 @@ availability at the start of each session.
 | # | Agent | Model | Branch | Attempts | Result |
 |---|---|---|---|---|---|
 | P1-01 | app-skeleton | Haiku 5.5 | task/p1-01-app-skeleton | 1 | merged. Reviewer: approve. Build and tests green. Brief error by orchestrator: manifest check must use the Release build. |
+| P1-02 | core-contracts | Fable 5.2 (orchestrator) | task/p1-02-core-contracts | 1 | merged. Player.Core builds with 0 warnings and no references. Reviewer pass deferred to the phase gate. |
+| P1-03 | app-skeleton | Haiku 5.5 | task/p1-03-app-skeleton | 1 | running (worktree) |
+| P1-04 | media-library | Sonnet 5.5 | task/p1-04-media-library | 1 | running (worktree) |
+| P1-05 | thumbnail-cache | Sonnet 5.5 | task/p1-05-thumbnail-cache | 1 | running (worktree) |
+| P1-06 | playback-coordinator | Sonnet 5.5 | task/p1-06-playback-coordinator | 1 | running (worktree) |
+| P1-07 | theming-engine | Sonnet 5.5 | task/p1-07-theming-engine | 1 | running (worktree) |
+
+Parallel tasks run in git worktrees under `D:\Projects\Ariel Video Player.wt\<task>` so that each keeps its own branch.
+
+Phase 1 tasks not started yet: player-engine (basic) and video-surface (Fit slice) by the orchestrator, explorer-ui,
+player-hud-ui, app-skeleton wiring, test-writer, device-qa, gate review.
 
 ## Agents
 
