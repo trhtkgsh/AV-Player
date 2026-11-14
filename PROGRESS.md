@@ -12,7 +12,7 @@ Phase 0 (spike). HARD GATE active: no product code until every roster agent is r
 | Phase | Build | Tests | Reviewer | Owner device test | Status |
 |---|---|---|---|---|---|
 | 0 Spike | green (spike) | n/a | n/a | pending | go on emulator, waiting for owner device test (docs/SPIKE.md) |
-| 1 | - | - | - | - | not started |
+| 1 | green | 91 pass (Core) | partial | pending | in progress: runs end to end on the emulator |
 | 2 | - | - | - | - | not started |
 | 3 | - | - | - | - | not started |
 | 4 | - | - | - | - | not started |
@@ -52,13 +52,32 @@ the orchestrator.
 | P1-08 | player-engine | Fable 5.2 (orchestrator) | task/p1-08-player-engine | 1 | merged. 730 lines (far over the guideline: queue, engine and binding do not compile separately). Reviewer: 2 rounds, 3 blocking findings, all fixed; the last fix was not re-reviewed. Never run on a device. |
 | P1-09 | video-surface | Fable 5.2 (orchestrator) | task/p1-09-video-surface | 1 | merged. Geometry for all aspect modes and zoom/pan is in Core. Not reviewed, never run on a device. |
 | P1-11 | explorer-ui | Haiku 5.5 | task/p1-11-explorer-logic | 1 | merged. Reviewer: approve (logic traced by hand, no tests yet). |
-| P1-12 | player-hud-ui | Haiku 5.5 | task/p1-12-player-hud | 1 | running (worktree) |
-| P1-13 | explorer-ui | Haiku 5.5 | task/p1-13-explorer-vm | 1 | running (worktree) |
+| P1-12 | player-hud-ui | Haiku 5.5 | task/p1-12-player-hud | 2 | merged. Reviewer: changes-required (unguarded close and error paths), approve after the fixes. |
+| P1-13 | explorer-ui | Haiku 5.5 | task/p1-13-explorer-vm | 1 | merged. Reviewer: approve with non-blocking findings, fixed in P1-14 and P1-20. 613 lines. |
+| P1-14 | explorer-ui | Haiku 5.5 | task/p1-14-explorer-pages | 1 | merged. Reviewer: approve with non-blocking findings (P1-20). |
+| P1-15 | test-writer | Haiku 5.5 | task/p1-15-tests-core-a | 1 | merged. 91 tests pass. Reviewer: approve. 926 lines. |
+| P1-16 | test-writer | Haiku 5.5 | task/p1-16-tests-core-b | 1 (first launch died on a model stream error before writing anything; relaunched, not counted as a failed attempt) | running |
+| P1-17 | app-skeleton | Haiku 5.5 | task/p1-17-wiring | 1 | merged. Reviewer: approve. Release manifest has no network permission. |
+| P1-18 | app-skeleton | Haiku 5.5 | task/p1-18-shell-route | 1 | merged. One-line fix of an orchestrator design error (root route `explorer` shadowed `explorer/items`). Diff read by the orchestrator, reviewer pass at the gate. |
+| P1-19 | player-engine | Fable 5.2 (orchestrator) | task/p1-19-engine-fixes | 1 | merged. Two defects found on the first emulator run (SPIKE.md findings 11 and 12). Not reviewed yet (gate). |
+| P1-20 | explorer-ui | Haiku 5.5 | task/p1-20-explorer-polish | 1 | running |
+| P1-21 | theming-engine | Sonnet 5.5 | task/p1-21-shell-style | 1 | running |
+| P1-22 | device-qa | Haiku 5.5 | task/p1-22-device-qa | 1 | running |
 
 Parallel tasks run in git worktrees under `D:\Projects\Ariel Video Player.wt\<task>` so that each keeps its own branch.
 
-Phase 1 tasks not started yet: explorer pages (explorer-ui), app-skeleton wiring, test-writer, device-qa,
-first run on the emulator, gate review.
+## First run of the product (emulator, Pixel 5 AVD, API 34, 2026-11-14)
+
+Verified by the orchestrator, evidence in `docs/evidence/phase1/`: start, permission dialogs, folder list, item list
+with lazy thumbnails and natural sort, open a video, HUD show/hide/auto-hide, decoder HW -> SW -> HW with the position
+kept, pause/play, slider seek, end of file -> next file, end of the last file, 6 background/foreground cycles with the
+picture restored and hardware decoding kept, vertical video, audio file, 8 rapid open/close cycles, Back.
+
+Defects found and fixed: shell route (P1-18), native library load thread and late picture after backgrounding (P1-19).
+Not verified: anything on a physical device, HEVC, 4K, 500+ files, API levels other than 34, a Release build on a device.
+
+Phase 1 tasks not finished yet: P1-16, P1-20, P1-21, P1-22, tests for the coordinator and the data layer,
+gate review of the merges that were not reviewed (P1-02, 04, 05, 06, 07, 09, 18, 19), owner device test.
 
 ## Known gaps carried forward
 
