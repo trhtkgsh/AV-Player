@@ -25,7 +25,7 @@
 **Acceptance.**
 - `dotnet build src/Player.App -f net10.0-android` and `dotnet test` green.
 - Player.Core has no package and no project reference. Player.Data references only Player.Core. No iOS, Mac or Windows target.
-- The merged manifest in `obj` contains no network permission.
+- The Release merged manifest in `obj` contains no network permission (Debug gets INTERNET from the SDK for the debugger).
 - Device: the app starts and shows the start route.
 
 **Out of scope.** Any feature logic, page content, styles, platform services, tests. Adding a package or a permission that the brief does not name.

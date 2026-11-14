@@ -12,13 +12,13 @@
 
 **Inputs.** docs/CONTRACTS.md, docs/ARCHITECTURE.md sections 1 and 3.
 
-**Deliverables.** One file per type under `Models` and `Contracts`. `PlaybackSettingsResolver` under `Logic/Resolution`. XML doc comments on every public member.
+**Deliverables.** Models grouped by area in a few files under `Models`, interfaces grouped by area under `Contracts`, `PlaybackSettingsResolver` under `Logic/Resolution`. XML doc comments wherever units, ranges or threading are not obvious from the name.
 
 **Steps.**
 1. Create each model and enum from CONTRACTS.md with the same names, members, defaults and nullability.
 2. Create each interface with the same signatures.
 3. Implement `PlaybackSettingsResolver.Resolve` as specified: per-file value if not null, otherwise the global default. Start position is 0 when the file is finished or resume is disabled.
-4. Add XML docs stating units, ranges and threading for each member.
+4. Add XML docs stating units, ranges and threading where they are not obvious.
 5. Build Player.Core.
 
 **Acceptance.**

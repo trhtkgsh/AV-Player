@@ -73,7 +73,7 @@ Rules that keep the paths disjoint:
 
 **I/O.** Async with CancellationToken everywhere. Nothing blocks the UI thread. SQLite goes through `SQLiteAsyncConnection`.
 
-**No network.** No INTERNET or network-state permission, no network API, no streaming URL input. The reviewer rejects any diff that adds one.
+**No network.** No INTERNET or network-state permission, no network API, no streaming URL input. The reviewer rejects any diff that adds one. The check is done on the Release merged manifest: the .NET Android SDK injects INTERNET into Debug builds for the debugger, and that cannot be removed without breaking debugging.
 
 ## 4. Data (single SQLite file `player.db3` in app data)
 

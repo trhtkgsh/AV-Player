@@ -41,6 +41,7 @@ availability at the start of each session.
 
 | # | Agent | Model | Branch | Attempts | Result |
 |---|---|---|---|---|---|
+| P1-01 | app-skeleton | Haiku 5.5 | task/p1-01-app-skeleton | 1 | merged. Reviewer: approve. Build and tests green. Brief error by orchestrator: manifest check must use the Release build. |
 
 ## Agents
 
