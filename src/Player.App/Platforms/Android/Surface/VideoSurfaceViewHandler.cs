@@ -11,7 +11,7 @@ internal sealed class VideoSurfaceViewHandler() : ViewHandler<VideoSurfaceView, 
     {
         var services = MauiContext?.Services ?? throw new InvalidOperationException("No MAUI context.");
         _controller = services.GetRequiredService<VideoSurfaceController>();
-        return new VideoSurfaceContainer(Context, services.GetRequiredService<IVideoOutputBinding>(), _controller);
+        return new VideoSurfaceContainer(Context, _controller);
     }
 
     protected override void ConnectHandler(VideoSurfaceContainer platformView)

@@ -86,6 +86,32 @@ internal sealed class VideoSurfaceController : IVideoSurface
             _container = container;
     }
 
+    // The three surface reports below run on the UI thread (surface holder callbacks and the handler).
+    // The engine has one surface. Only the view that owns it may change it or report it lost: a page
+    // that is torn down late must not detach the surface of the page that replaced it.
+    private VideoSurfaceContainer? _surfaceOwner;
+
+    internal void SurfaceReady(VideoSurfaceContainer owner, object nativeSurface, int widthPx, int heightPx)
+    {
+        _surfaceOwner = owner;
+        _binding.SurfaceReady(nativeSurface, widthPx, heightPx);
+    }
+
+    internal void SurfaceSizeChanged(VideoSurfaceContainer owner, int widthPx, int heightPx)
+    {
+        if (ReferenceEquals(_surfaceOwner, owner))
+            _binding.SurfaceSizeChanged(widthPx, heightPx);
+    }
+
+    internal void SurfaceLost(VideoSurfaceContainer owner)
+    {
+        if (!ReferenceEquals(_surfaceOwner, owner))
+            return;
+
+        _surfaceOwner = null;
+        _binding.SurfaceLost();
+    }
+
     internal void Detach(VideoSurfaceContainer container)
     {
         lock (_sync)
