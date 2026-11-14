@@ -32,6 +32,7 @@ public sealed partial class VlcPlayerEngine
         _window.AttachViews();
         _window.SetWindowSize(widthPx, heightPx);
         _surfaceAttached = true;
+        Trace($"surface ready {widthPx}x{heightPx}");
         _queue.Post(OnSurfaceChanged);
     }
 
@@ -50,6 +51,7 @@ public sealed partial class VlcPlayerEngine
 
         _surfaceAttached = false;
         _window.DetachViews();
+        Trace("surface lost");
         _queue.Post(OnSurfaceChanged);
     }
 
@@ -57,6 +59,19 @@ public sealed partial class VlcPlayerEngine
     {
         if (Looper.MainLooper is not { IsCurrentThread: true })
             throw new InvalidOperationException("The video surface must be reported on the UI thread.");
+    }
+
+    /// <summary>
+    /// Engine tracing and full LibVLC logs. Off by default. Turn on with
+    /// <c>adb shell setprop log.tag.ArielEngine DEBUG</c> and restart the app.
+    /// </summary>
+    private static readonly bool Diagnostics =
+        global::Android.Util.Log.IsLoggable(Tag, global::Android.Util.LogPriority.Debug);
+
+    private static void Trace(string message)
+    {
+        if (Diagnostics)
+            global::Android.Util.Log.Debug(Tag, message);
     }
 
     private void OnSurfaceChanged()
@@ -74,6 +89,7 @@ public sealed partial class VlcPlayerEngine
             return;
 
         var player = _player!;
+        Trace($"video output: enabled={_videoEnabled} surface={_surfaceAttached} noVideoStart={_startedWithoutVideo} track={player.VideoTrack} saved={_savedVideoTrack} status={_status}");
         if (!(_videoEnabled && _surfaceAttached))
         {
             if (!_startedWithoutVideo && player.VideoTrack >= 0)
@@ -92,6 +108,10 @@ public sealed partial class VlcPlayerEngine
         {
             _savedVideoTrack = null;
             player.SetVideoTrack(track);
+
+            // A track selected in mid-stream starts out of sync with the clock and stays black for
+            // seconds. A seek to the current position flushes and resyncs it from the last key frame.
+            player.Time = CurrentPositionMs;
         }
     }
 
@@ -100,7 +120,7 @@ public sealed partial class VlcPlayerEngine
         if (_player is not null)
             return _player;
 
-        LibVLCSharp.Shared.Core.Initialize();
+        // The native libraries were loaded in the constructor, on the UI thread.
         // Debug level is required: the decoder line parsed in OnLog is a debug message.
         // Subscribing to Log replaces LibVLC's own logger, so nothing is written to logcat by LibVLC itself.
         _libVlc = new LibVLC(enableDebugLogs: true);
@@ -271,6 +291,8 @@ public sealed partial class VlcPlayerEngine
 
         if (e.Level == LogLevel.Error)
             global::Android.Util.Log.Warn(Tag, $"libvlc: {message}");
+        else if (Diagnostics)
+            global::Android.Util.Log.Debug(Tag, $"libvlc [{e.Level}] {e.Module}: {message}");
 
         // The only reliable signal of the decoder really in use (docs/SPIKE.md finding 4).
         if (!message.StartsWith(marker, StringComparison.Ordinal))
