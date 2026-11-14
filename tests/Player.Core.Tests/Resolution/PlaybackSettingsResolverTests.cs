@@ -94,6 +94,24 @@ public sealed class PlaybackSettingsResolverTests
     }
 
     [Fact]
+    public void Resolve_PerFileSubtitleTrackSetAndSubtitlesDisabled_PerFileTrackWins()
+    {
+        var state = State() with { SubtitleTrackId = 3 };
+
+        var result = PlaybackSettingsResolver.Resolve(state, Defaults(subtitlesEnabled: false));
+
+        Assert.Equal(3, result.SubtitleTrackId);
+    }
+
+    [Fact]
+    public void Resolve_ResumeAndNegativeStoredPosition_StartsAtZero()
+    {
+        var result = PlaybackSettingsResolver.Resolve(State(positionMs: -500), Defaults(resume: true));
+
+        Assert.Equal(0, result.StartPositionMs);
+    }
+
+    [Fact]
     public void Resolve_PerFileSubtitleDelaySet_WinsOverDefault()
     {
         var state = State() with { SubtitleDelayMs = -50 };
