@@ -1,0 +1,11 @@
+<Project>
+
+  <!-- Applies to src and tests only. The spike folder has its own project and is never part of the solution. -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('\src\')) Or $(MSBuildProjectDirectory.Contains('\tests\'))">
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>
