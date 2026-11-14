@@ -18,6 +18,8 @@ internal sealed class VideoSurfaceContainer : ViewGroup, ISurfaceHolderCallback
     private readonly VideoSurfaceController _controller;
     private readonly SurfaceView _surface;
     private bool _surfaceReported;
+    private int _reportedWidth;
+    private int _reportedHeight;
 
     public VideoSurfaceContainer(Context context, IVideoOutputBinding binding, VideoSurfaceController controller)
         : base(context)
@@ -43,18 +45,33 @@ internal sealed class VideoSurfaceContainer : ViewGroup, ISurfaceHolderCallback
         if (holder.Surface is not { IsValid: true } surface)
             return;
 
-        if (_surfaceReported)
-        {
-            _binding.SurfaceSizeChanged(width, height);
-        }
-        else
+        if (!_surfaceReported)
         {
             _surfaceReported = true;
             _binding.SurfaceReady(surface, width, height);
         }
+        else if (width != _reportedWidth || height != _reportedHeight)
+        {
+            _binding.SurfaceSizeChanged(width, height);
+        }
+
+        _reportedWidth = width;
+        _reportedHeight = height;
     }
 
-    public void SurfaceDestroyed(ISurfaceHolder holder)
+    public void SurfaceDestroyed(ISurfaceHolder holder) => ReportLost();
+
+    /// <summary>
+    /// Called when the MAUI handler lets go of this view. The engine must never be left attached to a
+    /// surface that nobody reports on any more.
+    /// </summary>
+    internal void Release()
+    {
+        _surface.Holder?.RemoveCallback(this);
+        ReportLost();
+    }
+
+    private void ReportLost()
     {
         if (!_surfaceReported)
             return;
