@@ -21,9 +21,11 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     private UiSettings _settings = new();
     private bool _active;
+    private int _activation;
     private bool _dragging;
     private bool _closing;
     private bool _errorHandled;
+    private double _enginePositionMs;
     private CancellationTokenSource? _hideCts;
     private CancellationTokenSource? _clockCts;
 
@@ -51,24 +53,25 @@ public sealed partial class PlayerViewModel : ObservableObject
     public async Task ActivateAsync()
     {
         if (_active) return;
-        _active = true;
+        int activation = ++_activation;
 
         var settings = await _uiSettings.GetAsync(CancellationToken.None);
-        if (!_active) return; // deactivated while the settings were loading
+        if (activation != _activation || _active) return; // deactivated, or another activation took over
 
+        _active = true;
         ApplySettings(settings);
         _engine.SnapshotChanged += OnSnapshotChanged;
         _coordinator.Changed += OnCoordinatorChanged;
         _uiSettings.Changed += OnUiSettingsChanged;
 
         ApplySnapshot(_engine.Snapshot);
-        StartClock();
         RestartHideTimer();
     }
 
-    /// <summary>Called when the page disappears. Unsubscribes and stops both timers.</summary>
+    /// <summary>Called when the page disappears. Unsubscribes and stops both timers. Safe to call more than once.</summary>
     public void Deactivate()
     {
+        _activation++;
         _active = false;
         _engine.SnapshotChanged -= OnSnapshotChanged;
         _coordinator.Changed -= OnCoordinatorChanged;
@@ -79,7 +82,8 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     partial void OnPositionMsChanged(double value)
     {
-        PositionText = TimeFormatter.Format((long)value);
+        // Only a drag shows the slider value. Otherwise show the engine position, so a clamped slider write-back is ignored.
+        PositionText = TimeFormatter.Format((long)(_dragging ? value : _enginePositionMs));
     }
 
     partial void OnIsPlayingChanged(bool value)
@@ -146,17 +150,17 @@ public sealed partial class PlayerViewModel : ObservableObject
         try
         {
             await _coordinator.CloseAsync(CancellationToken.None);
+            if (Shell.Current is { } shell) await shell.GoToAsync("..");
         }
         catch (OperationCanceledException)
         {
-            // The page is leaving anyway; nothing to show.
+            _closing = false; // the page is leaving anyway; allow a later Back press to try again
         }
         catch (Exception ex)
         {
-            await ShowAlertAsync("Error", ex.Message);
+            _closing = false; // close failed: allow a later Back press to try again
+            System.Diagnostics.Debug.WriteLine($"Close failed: {ex}");
         }
-
-        if (Shell.Current is { } shell) await shell.GoToAsync("..");
     }
 
     private async Task RunAsync(Func<Task> action)
@@ -192,9 +196,11 @@ public sealed partial class PlayerViewModel : ObservableObject
         IsOpening = snapshot.Status == PlayerStatus.Opening;
         DurationMs = Math.Max(1d, snapshot.DurationMs);
         DurationText = TimeFormatter.Format(snapshot.DurationMs);
+        _enginePositionMs = snapshot.PositionMs;
         if (!_dragging)
         {
-            PositionMs = snapshot.PositionMs;
+            PositionMs = _enginePositionMs;
+            PositionText = TimeFormatter.Format((long)_enginePositionMs);
         }
 
         DecoderText = snapshot.ActualDecoder switch
@@ -216,18 +222,25 @@ public sealed partial class PlayerViewModel : ObservableObject
     {
         _settings = settings;
         ShowClock = settings.ShowClock;
-        UpdateClock();
+        UpdateClockState();
     }
 
     private void RefreshTitle() => Title = _coordinator.Current?.DisplayName ?? "";
 
-    /// <summary>Shows the error once, then closes the page through the same path as the Back button.</summary>
+    /// <summary>Shows the error once, then closes the page through the same path as the Back button. Never throws.</summary>
     private async Task HandleErrorAsync(string message)
     {
         if (_errorHandled) return;
         _errorHandled = true;
-        await ShowAlertAsync("Cannot play", message);
-        await CloseAsync();
+        try
+        {
+            await ShowAlertAsync("Cannot play", message);
+            await CloseAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error handling failed: {ex}");
+        }
     }
 
     private void RestartHideTimer()
@@ -251,7 +264,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     {
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(Math.Max(0, _settings.HudAutoHideSeconds)), ct);
+            await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, _settings.HudAutoHideSeconds)), ct);
         }
         catch (OperationCanceledException)
         {
@@ -262,9 +275,17 @@ public sealed partial class PlayerViewModel : ObservableObject
         if (!ct.IsCancellationRequested && IsPlaying && !_dragging) IsHudVisible = false;
     }
 
-    private void StartClock()
+    /// <summary>The clock runs only while active and ShowClock is on.</summary>
+    private void UpdateClockState()
     {
-        StopClock();
+        if (!_active || !ShowClock)
+        {
+            StopClock();
+            return;
+        }
+
+        if (_clockCts is not null) return; // already running
+
         UpdateClock();
         var cts = new CancellationTokenSource();
         _clockCts = cts;
@@ -299,11 +320,19 @@ public sealed partial class PlayerViewModel : ObservableObject
         if (ShowClock) ClockText = DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture);
     }
 
+    /// <summary>Shows an alert. Never throws, so it is safe to await inside a catch block.</summary>
     private static async Task ShowAlertAsync(string title, string message)
     {
-        if (Shell.Current is { } shell)
+        try
         {
-            await shell.DisplayAlertAsync(title, message, "OK");
+            if (Shell.Current is { } shell)
+            {
+                await shell.DisplayAlertAsync(title, message, "OK");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Alert failed: {ex}");
         }
     }
 }
