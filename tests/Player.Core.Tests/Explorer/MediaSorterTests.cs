@@ -255,6 +255,120 @@ public sealed class MediaSorterTests
     }
 
     [Fact]
+    public void Sort_TiesOnKeyAndNameDescending_BreaksTiesByMediaStoreIdAscending()
+    {
+        var items = new List<MediaItem>
+        {
+            TestData.Item(9, "same.mp4"),
+            TestData.Item(3, "same.mp4"),
+        };
+
+        var result = Sort(items, SortField.Name, SortDirection.Descending);
+
+        Assert.Equal(new long[] { 3, 9 }, result.Select(i => i.Id.MediaStoreId).ToArray());
+    }
+
+    [Fact]
+    public void Sort_DurationAscending_ItemsWithoutDurationKeepNaturalNameOrder()
+    {
+        var items = new List<MediaItem>
+        {
+            TestData.Item(1, "b10.mp4"),
+            TestData.Item(2, "known.mp4"),
+            TestData.Item(3, "b2.mp4"),
+            TestData.Item(4, "a.mp4"),
+        };
+
+        var result = Sort(items, SortField.Duration, SortDirection.Ascending, TestData.Metadata(TestData.Id(2), 1000));
+
+        Assert.Equal(new[] { "known.mp4", "a.mp4", "b2.mp4", "b10.mp4" }, NamesOf(result));
+    }
+
+    [Fact]
+    public void Sort_DurationDescending_ItemsWithoutDurationKeepNaturalNameOrder()
+    {
+        var items = new List<MediaItem>
+        {
+            TestData.Item(1, "b10.mp4"),
+            TestData.Item(2, "known.mp4"),
+            TestData.Item(3, "b2.mp4"),
+            TestData.Item(4, "a.mp4"),
+        };
+
+        var result = Sort(items, SortField.Duration, SortDirection.Descending, TestData.Metadata(TestData.Id(2), 1000));
+
+        Assert.Equal(new[] { "known.mp4", "a.mp4", "b2.mp4", "b10.mp4" }, NamesOf(result));
+    }
+
+    [Fact]
+    public void Sort_DurationAscending_NegativeDurationSortsLast()
+    {
+        var items = Trio();
+        var metadata = new[]
+        {
+            TestData.Metadata(TestData.Id(1), -500),
+            TestData.Metadata(TestData.Id(2), 1000),
+            TestData.Metadata(TestData.Id(3), 2000),
+        };
+
+        var result = Sort(items, SortField.Duration, SortDirection.Ascending, metadata);
+
+        Assert.Equal(new[] { "b.mp4", "c.mp4", "a.mp4" }, NamesOf(result));
+    }
+
+    [Fact]
+    public void Sort_DurationDescending_NegativeDurationSortsLast()
+    {
+        var items = Trio();
+        var metadata = new[]
+        {
+            TestData.Metadata(TestData.Id(1), -500),
+            TestData.Metadata(TestData.Id(2), 1000),
+            TestData.Metadata(TestData.Id(3), 2000),
+        };
+
+        var result = Sort(items, SortField.Duration, SortDirection.Descending, metadata);
+
+        Assert.Equal(new[] { "c.mp4", "b.mp4", "a.mp4" }, NamesOf(result));
+    }
+
+    [Fact]
+    public void Sort_DateAddedDescendingWithTies_BreaksTiesByNameAscending()
+    {
+        var items = new List<MediaItem>
+        {
+            TestData.Item(1, "c.mp4", dateAddedSeconds: 500),
+            TestData.Item(2, "a.mp4", dateAddedSeconds: 500),
+            TestData.Item(3, "b.mp4", dateAddedSeconds: 500),
+        };
+
+        var result = Sort(items, SortField.DateAdded, SortDirection.Descending);
+
+        Assert.Equal(new[] { "a.mp4", "b.mp4", "c.mp4" }, NamesOf(result));
+    }
+
+    [Fact]
+    public void Sort_DurationAscendingWithTies_BreaksTiesByNameAscending()
+    {
+        var items = new List<MediaItem>
+        {
+            TestData.Item(1, "c.mp4"),
+            TestData.Item(2, "a.mp4"),
+            TestData.Item(3, "b.mp4"),
+        };
+        var metadata = new[]
+        {
+            TestData.Metadata(TestData.Id(1), 4000),
+            TestData.Metadata(TestData.Id(2), 4000),
+            TestData.Metadata(TestData.Id(3), 4000),
+        };
+
+        var result = Sort(items, SortField.Duration, SortDirection.Ascending, metadata);
+
+        Assert.Equal(new[] { "a.mp4", "b.mp4", "c.mp4" }, NamesOf(result));
+    }
+
+    [Fact]
     public void Sort_EmptyList_ReturnsEmptyList()
     {
         var result = Sort(new List<MediaItem>(), SortField.Name, SortDirection.Ascending);
