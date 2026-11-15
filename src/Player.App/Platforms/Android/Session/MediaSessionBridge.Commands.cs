@@ -1,5 +1,6 @@
 using Android.Content;
 using Android.Media.Session;
+using Android.OS;
 using Android.Views;
 using Player.Core.Logic.Session;
 using Player.Core.Models;
@@ -87,6 +88,15 @@ public sealed partial class MediaSessionBridge
         public override void OnFastForward() => bridge.Skip(1);
 
         public override void OnRewind() => bridge.Skip(-1);
+
+        // The extra button of the session. Other ids are not ours.
+        public override void OnCustomAction(string action, Bundle? extras)
+        {
+            if (action == CloseActionId)
+            {
+                bridge.Stop();
+            }
+        }
 
         // The headset button (and the play/pause key of some remotes) is grouped into 1, 2 and 3 presses. Every other
         // key goes to the base class, which calls the methods above.
