@@ -47,6 +47,37 @@
                 TextColor="{DynamicResource ColorHudOnBackground}" />
         </Border>
 
+        <!-- (c2b) Quiet display while the controls are hidden (spec 12). It spans the whole window (no safe-area padding),
+             takes no touches (every child inherits InputTransparent) and is hidden by the view model when not shown. -->
+        <Grid
+            IsVisible="{Binding IsOverlayVisible}"
+            InputTransparent="True"
+            SafeAreaEdges="None"
+            FlowDirection="LeftToRight">
+            <!-- The progress line: spans the screen width and is scaled from its left edge by the played share (no layout pass per report). -->
+            <BoxView
+                HeightRequest="2"
+                HorizontalOptions="Fill"
+                VerticalOptions="{Binding ProgressLineVertical}"
+                AnchorX="0"
+                ScaleX="{Binding ProgressScale}"
+                IsVisible="{Binding ProgressLineEnabled}"
+                Color="{DynamicResource ColorProgress}" />
+            <!-- The text line: one corner of the screen, flush at margin 0, with a dark shadow for readability (literal: no shadow token exists). -->
+            <Label
+                VerticalOptions="{Binding OverlayVertical}"
+                HorizontalOptions="{Binding OverlayHorizontal}"
+                Margin="{Binding OverlayMargin}"
+                FontSize="{Binding OverlayFontSize}"
+                IsVisible="{Binding OverlayTextVisible}"
+                Text="{Binding OverlayText}"
+                TextColor="{Binding OverlayColor}">
+                <Label.Shadow>
+                    <Shadow Brush="Black" Offset="1,1" Radius="3" Opacity="0.8" />
+                </Label.Shadow>
+            </Label>
+        </Grid>
+
         <!-- (c3) Unlock button while the screen is locked. A round background keeps it visible on a bright picture. -->
         <Border
             HorizontalOptions="Start"
