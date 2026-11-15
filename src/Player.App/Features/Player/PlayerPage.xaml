@@ -56,21 +56,58 @@
             FlowDirection="LeftToRight">
             <!-- The progress line: spans the screen width and is scaled from its left edge by the played share (no layout pass per report). -->
             <BoxView
-                HeightRequest="2"
+                HeightRequest="{Binding ProgressLineHeight}"
                 HorizontalOptions="Fill"
                 VerticalOptions="{Binding ProgressLineVertical}"
                 AnchorX="0"
                 ScaleX="{Binding ProgressScale}"
                 IsVisible="{Binding ProgressLineEnabled}"
                 Color="{DynamicResource ColorProgress}" />
-            <!-- The text line: one corner of the screen, flush at margin 0, with a dark shadow for readability (literal: no shadow token exists). -->
+            <!-- The text lines: one label per physical corner, flush at the margin, with a dark shadow for readability
+                 (literal: no shadow token exists). Each label is shown while its text is not empty. -->
             <Label
-                VerticalOptions="{Binding OverlayVertical}"
-                HorizontalOptions="{Binding OverlayHorizontal}"
+                VerticalOptions="Start"
+                HorizontalOptions="Start"
                 Margin="{Binding OverlayMargin}"
                 FontSize="{Binding OverlayFontSize}"
-                IsVisible="{Binding OverlayTextVisible}"
-                Text="{Binding OverlayText}"
+                IsVisible="{Binding CornerTopLeft.Visible}"
+                Text="{Binding CornerTopLeft.Text}"
+                TextColor="{Binding OverlayColor}">
+                <Label.Shadow>
+                    <Shadow Brush="Black" Offset="1,1" Radius="3" Opacity="0.8" />
+                </Label.Shadow>
+            </Label>
+            <Label
+                VerticalOptions="Start"
+                HorizontalOptions="End"
+                Margin="{Binding OverlayMargin}"
+                FontSize="{Binding OverlayFontSize}"
+                IsVisible="{Binding CornerTopRight.Visible}"
+                Text="{Binding CornerTopRight.Text}"
+                TextColor="{Binding OverlayColor}">
+                <Label.Shadow>
+                    <Shadow Brush="Black" Offset="1,1" Radius="3" Opacity="0.8" />
+                </Label.Shadow>
+            </Label>
+            <Label
+                VerticalOptions="End"
+                HorizontalOptions="Start"
+                Margin="{Binding OverlayMargin}"
+                FontSize="{Binding OverlayFontSize}"
+                IsVisible="{Binding CornerBottomLeft.Visible}"
+                Text="{Binding CornerBottomLeft.Text}"
+                TextColor="{Binding OverlayColor}">
+                <Label.Shadow>
+                    <Shadow Brush="Black" Offset="1,1" Radius="3" Opacity="0.8" />
+                </Label.Shadow>
+            </Label>
+            <Label
+                VerticalOptions="End"
+                HorizontalOptions="End"
+                Margin="{Binding OverlayMargin}"
+                FontSize="{Binding OverlayFontSize}"
+                IsVisible="{Binding CornerBottomRight.Visible}"
+                Text="{Binding CornerBottomRight.Text}"
                 TextColor="{Binding OverlayColor}">
                 <Label.Shadow>
                     <Shadow Brush="Black" Offset="1,1" Radius="3" Opacity="0.8" />
@@ -187,7 +224,7 @@
                 Grid.Row="2"
                 Padding="{Binding BottomBarPadding}"
                 RowDefinitions="Auto,Auto"
-                RowSpacing="6"
+                RowSpacing="2"
                 FlowDirection="LeftToRight"
                 BackgroundColor="{DynamicResource ColorHudBackground}">
 
@@ -215,21 +252,23 @@
                 <Grid
                     Grid.Row="1"
                     ColumnDefinitions="Auto,Auto,Auto"
-                    ColumnSpacing="20"
+                    ColumnSpacing="12"
                     HorizontalOptions="Center">
                     <controls:HudIconButton
                         Grid.Column="0"
                         IconData="M6 5 H8.5 V19 H6 Z M19 5 V19 L9.5 12 Z"
-                        IconSize="26"
+                        IconSize="22"
                         WidthRequest="56"
+                        TouchHeight="44"
                         IconColor="{DynamicResource ColorHudOnBackground}"
                         Command="{Binding PreviousCommand}"
                         SemanticProperties.Description="{loc:T Player.Previous}" />
                     <controls:HudIconButton
                         Grid.Column="1"
                         IconData="M7 4.5 L19.5 12 L7 19.5 Z"
-                        IconSize="36"
+                        IconSize="30"
                         WidthRequest="64"
+                        TouchHeight="44"
                         IsVisible="{Binding ShowPlayIcon}"
                         IconColor="{DynamicResource ColorHudOnBackground}"
                         Command="{Binding PlayPauseCommand}"
@@ -237,8 +276,9 @@
                     <controls:HudIconButton
                         Grid.Column="1"
                         IconData="M6.5 5 H10.5 V19 H6.5 Z M13.5 5 H17.5 V19 H13.5 Z"
-                        IconSize="36"
+                        IconSize="30"
                         WidthRequest="64"
+                        TouchHeight="44"
                         IsVisible="{Binding IsPlaying}"
                         IconColor="{DynamicResource ColorHudOnBackground}"
                         Command="{Binding PlayPauseCommand}"
@@ -246,8 +286,9 @@
                     <controls:HudIconButton
                         Grid.Column="2"
                         IconData="M15.5 5 H18 V19 H15.5 Z M5 5 L14.5 12 L5 19 Z"
-                        IconSize="26"
+                        IconSize="22"
                         WidthRequest="56"
+                        TouchHeight="44"
                         IconColor="{DynamicResource ColorHudOnBackground}"
                         Command="{Binding NextCommand}"
                         SemanticProperties.Description="{loc:T Player.Next}" />

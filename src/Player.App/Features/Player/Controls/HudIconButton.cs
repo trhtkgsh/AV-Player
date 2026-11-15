@@ -54,7 +54,16 @@ public sealed class HudIconButton : ContentView
         typeof(ICommand),
         typeof(HudIconButton));
 
+    public static readonly BindableProperty TouchHeightProperty = BindableProperty.Create(
+        nameof(TouchHeight),
+        typeof(double),
+        typeof(HudIconButton),
+        48d,
+        propertyChanged: (bindable, _, newValue) =>
+            ((HudIconButton)bindable)._touchArea.MinimumHeightRequest = (double)newValue);
+
     private readonly Microsoft.Maui.Controls.Shapes.Path _icon;
+    private readonly Grid _touchArea;
 
     public HudIconButton()
     {
@@ -70,19 +79,26 @@ public sealed class HudIconButton : ContentView
             FlowDirection = FlowDirectionFor(MirrorInRightToLeft),
         };
 
-        var grid = new Grid
+        _touchArea = new Grid
         {
             BackgroundColor = Colors.Transparent,
             MinimumWidthRequest = 40,
-            MinimumHeightRequest = 48,
+            MinimumHeightRequest = TouchHeight,
         };
-        grid.Children.Add(_icon);
+        _touchArea.Children.Add(_icon);
 
         var tap = new TapGestureRecognizer();
         tap.Tapped += OnTapped;
-        grid.GestureRecognizers.Add(tap);
+        _touchArea.GestureRecognizers.Add(tap);
 
-        Content = grid;
+        Content = _touchArea;
+    }
+
+    /// <summary>The smallest height of the touch area, in units. Default 48; the bottom transport buttons use 44.</summary>
+    public double TouchHeight
+    {
+        get => (double)GetValue(TouchHeightProperty);
+        set => SetValue(TouchHeightProperty, value);
     }
 
     [TypeConverter(typeof(PathGeometryConverter))]

@@ -162,6 +162,15 @@ public sealed class PlayerGestureHandler
     {
         if (e.Phase != GesturePhase.Ended) return;
 
+        // The middle third toggles play and pause. The left and right thirds skip (below), as before.
+        if (e.FocusX >= 1d / 3 && e.FocusX < 2d / 3)
+        {
+            Fire(() => _engine.Snapshot.Status == PlayerStatus.Playing
+                ? _engine.PauseAsync(CancellationToken.None)
+                : _engine.PlayAsync(CancellationToken.None));
+            return;
+        }
+
         int seconds = _settings().SkipSeconds;
         int signed = e.Side == ScreenSide.Left ? -seconds : seconds;
         _osd.Show(_localizer.Format("Player.Osd.Seconds", signed.ToString("+0;-0;0", CultureInfo.InvariantCulture)));

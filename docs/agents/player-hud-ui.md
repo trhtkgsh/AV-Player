@@ -65,6 +65,13 @@
 - The clock and battery are read when the display appears. While it is shown, a loop waits until just after each minute boundary (200 ms slack), then reads them again. The loop checks its cancellation token after each wait and runs only while the display is shown. The clock uses the same `HH:mm` source as the status line; the battery uses the same `ReadBatteryPercent` as the status line.
 - The seek row's right label is `-remaining / total` (`PlaybackOverlayText.FormatRemaining`). It is rebuilt on each report only while the controls show, and again when they show. While the duration is unknown it shows `0:00` as before.
 
+**R7-20 (2026-11-15, spec 13 items 7-12; they win over the text above where they differ).**
+- Quiet display: the progress line height follows `ProgressLineThickness` (clamped to 1..12). The single corner label is replaced by four input-transparent labels, one per physical corner, each with `PlaybackOverlayText.FormatCorner`, hidden when its text is empty. Only corners whose text changed are set (`OverlayCornerText`). Same update rules as before.
+- Restart: Previous above 3000 ms (`RestartConfirmMs`, same value as `PlaybackCoordinator.RestartThresholdMs`) asks "Start again from the beginning?" with Yes / No; Previous is called only on Yes. Playback keeps running; the controls do not auto-hide while the question shows; a second question cannot open. At or under 3000 ms, Previous runs at once.
+- Screen on: `PlayerScreenKeeper` keeps `DeviceDisplay.Current.KeepScreenOn` on while the engine is Playing and the picture is on screen (page active, or Picture-in-Picture). It is off when paused, ended, idle or failed, when the page is left, and when the app is in the background without Picture-in-Picture. Nothing set the flag before this task.
+- Double tap: a tap in the middle third (`FocusX` 1/3 up to 2/3) toggles play and pause. The left and right thirds skip as before; the direction rules, including Hebrew, are unchanged.
+- Bottom bar: row spacing 6 to 2, transport column spacing 20 to 12, transport icons 26/36 to 22/30, transport touch targets 44 (`HudIconButton.TouchHeight`), padding 8 to 4 top and bottom.
+
 **Out of scope.** Touch recognition, surface rendering, engine code, settings pages, PiP implementation.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned path is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

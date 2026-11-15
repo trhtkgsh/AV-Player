@@ -34,6 +34,7 @@ internal sealed class PlayerStrings : IStringSource
         ["Player.PlaybackSpeed"] = new("Playback speed", "מהירות ניגון"),
         ["Player.Previous"] = new("Previous", "הקודם"),
         ["Player.Repeat"] = new("Repeat", "ניגון חוזר"),
+        ["Player.RestartQuestion"] = new("Start again from the beginning?", "להתחיל שוב מההתחלה?"),
         ["Player.Subtitles"] = new("Subtitles", "כתוביות"),
         ["Player.Unlock"] = new("Unlock the screen", "בטל נעילה"),
     };
