@@ -94,6 +94,16 @@ internal sealed class FakePlayerEngine : IPlayerEngine
         }
     }
 
+    public event EventHandler? TracksChanged;
+
+    public int? CurrentAudioTrackId { get; set; }
+    public int? CurrentSubtitleTrackId { get; set; }
+    public long AudioDelayMs { get; set; }
+    public long SubtitleDelayMs { get; set; }
+    public SubtitleStyle SubtitleStyle { get; set; } = SubtitleStyle.Default;
+
+    public void RaiseTracksChanged() => TracksChanged?.Invoke(this, EventArgs.Empty);
+
     public int Count(string call) => Calls.Count(c => c == call);
 
     public int CountPrefix(string prefix) => Calls.Count(c => c.StartsWith(prefix, StringComparison.Ordinal));
@@ -124,6 +134,12 @@ internal sealed class FakePlayerEngine : IPlayerEngine
             _calls.Add($"Open:{item.DisplayName}");
             _opens.Add(new OpenCall(item, settings, startPaused));
         }
+
+        CurrentAudioTrackId = settings.AudioTrackId;
+        CurrentSubtitleTrackId = settings.SubtitleTrackId;
+        AudioDelayMs = settings.AudioDelayMs;
+        SubtitleDelayMs = settings.SubtitleDelayMs;
+        SubtitleStyle = settings.SubtitleStyle;
 
         var hook = OpenHook;
         if (hook is not null)
@@ -172,17 +188,37 @@ internal sealed class FakePlayerEngine : IPlayerEngine
 
     public Task SetVideoEnabledAsync(bool enabled, CancellationToken ct) => Task.CompletedTask;
 
-    public Task SelectAudioTrackAsync(int trackId, CancellationToken ct) => Task.CompletedTask;
+    public Task SelectAudioTrackAsync(int trackId, CancellationToken ct)
+    {
+        CurrentAudioTrackId = trackId;
+        return Task.CompletedTask;
+    }
 
-    public Task SetAudioDelayAsync(long delayMs, CancellationToken ct) => Task.CompletedTask;
+    public Task SetAudioDelayAsync(long delayMs, CancellationToken ct)
+    {
+        AudioDelayMs = delayMs;
+        return Task.CompletedTask;
+    }
 
-    public Task SelectSubtitleTrackAsync(int trackId, CancellationToken ct) => Task.CompletedTask;
+    public Task SelectSubtitleTrackAsync(int trackId, CancellationToken ct)
+    {
+        CurrentSubtitleTrackId = trackId;
+        return Task.CompletedTask;
+    }
 
-    public Task SetSubtitleDelayAsync(long delayMs, CancellationToken ct) => Task.CompletedTask;
+    public Task SetSubtitleDelayAsync(long delayMs, CancellationToken ct)
+    {
+        SubtitleDelayMs = delayMs;
+        return Task.CompletedTask;
+    }
 
     public Task AddSubtitleFileAsync(string localFilePath, CancellationToken ct) => Task.CompletedTask;
 
-    public Task SetSubtitleStyleAsync(SubtitleStyle style, CancellationToken ct) => Task.CompletedTask;
+    public Task SetSubtitleStyleAsync(SubtitleStyle style, CancellationToken ct)
+    {
+        SubtitleStyle = style;
+        return Task.CompletedTask;
+    }
 
     private void Record(string call)
     {
