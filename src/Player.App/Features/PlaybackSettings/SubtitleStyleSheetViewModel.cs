@@ -30,6 +30,7 @@ public sealed partial class SubtitleStyleSheetViewModel : ObservableObject
 
     private readonly IPlayerEngine _engine;
     private readonly IGlobalDefaultsStore _defaults;
+    private readonly ILocalizer _localizer;
     private readonly SemaphoreSlim _applyGate = new(1, 1);
     private CancellationTokenSource? _pending;
     private bool _dirty;
@@ -73,27 +74,28 @@ public sealed partial class SubtitleStyleSheetViewModel : ObservableObject
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
-    public SubtitleStyleSheetViewModel(IPlayerEngine engine, IGlobalDefaultsStore defaults)
+    public SubtitleStyleSheetViewModel(IPlayerEngine engine, IGlobalDefaultsStore defaults, ILocalizer localizer)
     {
         _engine = engine;
         _defaults = defaults;
+        _localizer = localizer;
 
         TextColors = new List<StyleSwatch>
         {
-            new(0xFFFFFFFF, "White"),
-            new(0xFFFFEB3B, "Yellow"),
-            new(0xFF4DD0E1, "Cyan"),
-            new(0xFF8BC34A, "Green"),
-            new(0xFFFF80AB, "Pink"),
-            new(0xFFCCCCCC, "Light gray"),
+            new(0xFFFFFFFF, _localizer["Sheets.Style.ColorWhite"]),
+            new(0xFFFFEB3B, _localizer["Sheets.Style.ColorYellow"]),
+            new(0xFF4DD0E1, _localizer["Sheets.Style.ColorCyan"]),
+            new(0xFF8BC34A, _localizer["Sheets.Style.ColorGreen"]),
+            new(0xFFFF80AB, _localizer["Sheets.Style.ColorPink"]),
+            new(0xFFCCCCCC, _localizer["Sheets.Style.ColorLightGray"]),
         };
 
         OutlineColors = new List<StyleSwatch>
         {
-            new(0xFF000000, "Black"),
-            new(0xFF333333, "Dark gray"),
-            new(0xFF0D1B4C, "Navy"),
-            new(0xFFFFFFFF, "White"),
+            new(0xFF000000, _localizer["Sheets.Style.ColorBlack"]),
+            new(0xFF333333, _localizer["Sheets.Style.ColorDarkGray"]),
+            new(0xFF0D1B4C, _localizer["Sheets.Style.ColorNavy"]),
+            new(0xFFFFFFFF, _localizer["Sheets.Style.ColorWhite"]),
         };
     }
 
@@ -173,7 +175,7 @@ public sealed partial class SubtitleStyleSheetViewModel : ObservableObject
             GlobalDefaults current = await _defaults.GetAsync(CancellationToken.None);
             await _defaults.SaveAsync(current with { SubtitleStyle = CurrentStyle() }, CancellationToken.None);
             ErrorMessage = "";
-            StatusMessage = "Saved as the default style.";
+            StatusMessage = _localizer["Sheets.Style.Saved"];
         }
         catch (Exception ex)
         {
