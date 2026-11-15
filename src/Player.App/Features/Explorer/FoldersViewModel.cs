@@ -173,7 +173,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenRow(FolderRow row)
     {
-        if (_fileOperationRunning || Environment.TickCount64 < _tapGuardUntil)
+        if (_fileOperationRunning)
         {
             return;
         }

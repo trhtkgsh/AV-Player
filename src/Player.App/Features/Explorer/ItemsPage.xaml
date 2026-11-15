@@ -32,14 +32,11 @@
 
         <DataTemplate x:Key="ListItem" x:DataType="explorer:MediaRowViewModel">
             <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto">
-                <Grid.GestureRecognizers>
-                    <TapGestureRecognizer
-                        Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
-                        CommandParameter="{Binding .}" />
-                </Grid.GestureRecognizers>
+                <!-- The tap and the long press come from the behavior: a MAUI tap recognizer would block the long press. -->
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
-                        Command="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsViewModel}"
+                        TapCommand="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
+                        LongPressCommand="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsViewModel}"
                         CommandParameter="{Binding .}" />
                 </Grid.Behaviors>
 
@@ -78,14 +75,10 @@
 
         <DataTemplate x:Key="GridItem" x:DataType="explorer:MediaRowViewModel">
             <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
-                <Grid.GestureRecognizers>
-                    <TapGestureRecognizer
-                        Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
-                        CommandParameter="{Binding .}" />
-                </Grid.GestureRecognizers>
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
-                        Command="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsViewModel}"
+                        TapCommand="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
+                        LongPressCommand="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsViewModel}"
                         CommandParameter="{Binding .}" />
                 </Grid.Behaviors>
 

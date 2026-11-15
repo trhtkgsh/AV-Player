@@ -9,11 +9,7 @@ namespace Player.App.Features.Explorer;
 // Selection mode of the items page: a long press starts it, a tap toggles a file, and the top bar acts on the selection.
 public sealed partial class ItemsViewModel
 {
-    // A tap within this time after a long press is ignored, so the press that starts the mode does not also toggle.
-    private const long LongPressTapGuardMs = 600;
-
     private readonly ExplorerSelection<MediaFileId> _selection = new();
-    private long _tapGuardUntil;
 
     [ObservableProperty]
     private bool _isSelecting;
@@ -50,7 +46,6 @@ public sealed partial class ItemsViewModel
             return;
         }
 
-        _tapGuardUntil = Environment.TickCount64 + LongPressTapGuardMs;
         _selection.Add(row.Item.Id);
         UpdateSelection();
     }

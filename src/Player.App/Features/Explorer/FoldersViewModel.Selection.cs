@@ -9,12 +9,8 @@ namespace Player.App.Features.Explorer;
 // Selection mode of the folders page: a long press on a media folder starts it. The selection stands for the media files in the folders.
 public sealed partial class FoldersViewModel
 {
-    // A tap within this time after a long press is ignored, so the press that starts the mode does not also toggle.
-    private const long LongPressTapGuardMs = 600;
-
     // The selected folders by bucket. Only media folders can be selected; a file-browser container cannot.
     private readonly ExplorerSelection<long> _selection = new();
-    private long _tapGuardUntil;
     private bool _fileOperationRunning;
 
     [ObservableProperty]
@@ -50,7 +46,6 @@ public sealed partial class FoldersViewModel
             return;
         }
 
-        _tapGuardUntil = Environment.TickCount64 + LongPressTapGuardMs;
         _selection.Add(row.Folder!.BucketId);
         UpdateSelection();
     }

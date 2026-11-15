@@ -79,3 +79,10 @@
 - App-side (not pure, for reference): `SelectionOperations` (`FilesAsync`, `ConfirmDeleteAsync`, `TrashAsync`, `MoveAsync`, `CopyAsync`, `ChooseTargetAsync`, `FailureText`); the constructor now takes `IUiSettingsStore`.
 - Texts (EN and HE, in `ExplorerStrings`): `Explorer.ChooseFolder`, `Explorer.Copy`, `Explorer.Move`, `Explorer.OperationCopy`, `Explorer.OperationMove`, `Explorer.SelectAll`, `Explorer.SelectedCount`, `Explorer.SomeNotCopied`, `Explorer.SomeNotDeleted`, `Explorer.SomeNotMoved`, `Explorer.FilesInFolders`, `Explorer.Files.One/Many`, `Explorer.OperationDelete`.
 - Not verified on a device: that `LongClick` coexists with the row's tap and the ⋮ button, and that the 600 ms guard is right. Known gap (from R7-40): queued coordinator items may keep a stale id after rename or delete.
+
+**Long press fix (2026-11-17, R7-42; it wins over the R7-41 text above on the long press and the tap).**
+- Cause: the R7-41 rows had a MAUI `TapGestureRecognizer`. MAUI installs a touch listener on the platform view that takes the touch stream, so Android's `onTouchEvent` never ran and `LongClick` never fired. The release then opened the file.
+- Fix: rows and tiles (items and folders pages, every mode) have no MAUI tap recognizer. `LongPressBehavior` (App, `#if ANDROID`) sets `Clickable` and `LongClickable` on the native view and hooks `Click` (runs `TapCommand`, i.e. `Open` or `OpenRow`) and `LongClick` (runs `LongPressCommand`, i.e. `BeginSelect`, with the row as parameter). It unhooks on detach and on handler change, since recycled rows get new native views. Android sends no `Click` after a `LongClick`, so the 600 ms tap guard was removed from both view models. The ⋮ button is a native button and takes its own clicks. Scrolling cancels both `Click` and `LongClick` on the native side.
+- Behavior properties: `TapCommand`, `LongPressCommand`, `CommandParameter` (the old `Command` is gone). Overlays that block input during a batch keep their MAUI `TapGestureRecognizer`; they are not rows.
+- Pure signatures: unchanged.
+- Not verified on a device: the user's emulator check of the long press, the tap, and the scroll.

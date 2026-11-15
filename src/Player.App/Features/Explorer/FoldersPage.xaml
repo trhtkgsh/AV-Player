@@ -42,15 +42,11 @@
         <DataTemplate x:Key="ListItem" x:DataType="explorer:FolderRow">
 
             <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
-                <Grid.GestureRecognizers>
-                    <TapGestureRecognizer
-                        Command="{Binding OpenRowCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
-                        CommandParameter="{Binding .}" />
-                </Grid.GestureRecognizers>
-
-            <Grid.Behaviors>
+                <!-- The tap and the long press come from the behavior: a MAUI tap recognizer would block the long press. -->
+                <Grid.Behaviors>
                     <explorer:LongPressBehavior
-                        Command="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersViewModel}"
+                        TapCommand="{Binding OpenRowCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                        LongPressCommand="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersViewModel}"
                         CommandParameter="{Binding .}" />
                 </Grid.Behaviors>
 
@@ -77,14 +73,10 @@
 
         <DataTemplate x:Key="GridItem" x:DataType="explorer:FolderRow">
             <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4" Padding="6">
-                <Grid.GestureRecognizers>
-                    <TapGestureRecognizer
-                        Command="{Binding OpenRowCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
-                        CommandParameter="{Binding .}" />
-                </Grid.GestureRecognizers>
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
-                        Command="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersViewModel}"
+                        TapCommand="{Binding OpenRowCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                        LongPressCommand="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersViewModel}"
                         CommandParameter="{Binding .}" />
                 </Grid.Behaviors>
 
