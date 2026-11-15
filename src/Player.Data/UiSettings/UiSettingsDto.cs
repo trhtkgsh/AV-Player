@@ -21,4 +21,13 @@ internal sealed class UiSettingsDto
 	public JsonElement? ExplorerFontScale { get; set; }
 	public JsonElement? IncludeAudioOnlyFolders { get; set; }
 	public JsonElement? LongPressSpeed { get; set; }
+	public JsonElement? OverlayProgressLine { get; set; }
+	public JsonElement? OverlayProgressLineEdge { get; set; }
+	public JsonElement? OverlayClock { get; set; }
+	public JsonElement? OverlayBattery { get; set; }
+	public JsonElement? OverlayTime { get; set; }
+	public JsonElement? OverlayCorner { get; set; }
+	public JsonElement? OverlayMarginDp { get; set; }
+	public JsonElement? OverlayFontSize { get; set; }
+	public JsonElement? OverlayColorArgb { get; set; }
 }

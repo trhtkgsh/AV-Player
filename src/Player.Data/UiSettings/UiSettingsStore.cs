@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Player.Core.Contracts;
 using Player.Core.Models;
@@ -117,6 +118,15 @@ public sealed class UiSettingsStore : IUiSettingsStore
 		ExplorerFontScale = ToElement(value.ExplorerFontScale),
 		IncludeAudioOnlyFolders = ToElement(value.IncludeAudioOnlyFolders),
 		LongPressSpeed = ToElement(value.LongPressSpeed),
+		OverlayProgressLine = ToElement(value.Overlay.ProgressLine),
+		OverlayProgressLineEdge = Name(value.Overlay.ProgressLineEdge),
+		OverlayClock = ToElement(value.Overlay.Clock),
+		OverlayBattery = ToElement(value.Overlay.Battery),
+		OverlayTime = Name(value.Overlay.Time),
+		OverlayCorner = Name(value.Overlay.Corner),
+		OverlayMarginDp = ToElement(value.Overlay.MarginDp),
+		OverlayFontSize = ToElement(value.Overlay.FontSize),
+		OverlayColorArgb = ColorHex(value.Overlay.ColorArgb),
 	};
 
 	private static JsonElement Name<T>(T value) where T : struct, Enum =>
@@ -124,6 +134,10 @@ public sealed class UiSettingsStore : IUiSettingsStore
 
 	private static JsonElement ToElement(int value) =>
 		JsonSerializer.SerializeToElement(value, UiSettingsJsonContext.Default.Int32);
+
+	// The color is stored as eight upper-case hex digits, e.g. "FFFFFFFF".
+	private static JsonElement ColorHex(uint value) =>
+		JsonSerializer.SerializeToElement(value.ToString("X8", CultureInfo.InvariantCulture), UiSettingsJsonContext.Default.String);
 
 	private static JsonElement ToElement(double value) =>
 		JsonSerializer.SerializeToElement(value, UiSettingsJsonContext.Default.Double);
@@ -160,11 +174,31 @@ public sealed class UiSettingsStore : IUiSettingsStore
 			ExplorerFontScale = ParseNumber(dto.ExplorerFontScale, defaults.ExplorerFontScale),
 			IncludeAudioOnlyFolders = ParseBool(dto.IncludeAudioOnlyFolders, defaults.IncludeAudioOnlyFolders),
 			LongPressSpeed = (float)ParseNumber(dto.LongPressSpeed, defaults.LongPressSpeed),
+			Overlay = new PlaybackOverlaySettings
+			{
+				ProgressLine = ParseBool(dto.OverlayProgressLine, defaults.Overlay.ProgressLine),
+				ProgressLineEdge = ParseEnum(dto.OverlayProgressLineEdge, defaults.Overlay.ProgressLineEdge),
+				Clock = ParseBool(dto.OverlayClock, defaults.Overlay.Clock),
+				Battery = ParseBool(dto.OverlayBattery, defaults.Overlay.Battery),
+				Time = ParseEnum(dto.OverlayTime, defaults.Overlay.Time),
+				Corner = ParseEnum(dto.OverlayCorner, defaults.Overlay.Corner),
+				MarginDp = ParseInt(dto.OverlayMarginDp, defaults.Overlay.MarginDp),
+				FontSize = ParseInt(dto.OverlayFontSize, defaults.Overlay.FontSize),
+				ColorArgb = ParseColorHex(dto.OverlayColorArgb, defaults.Overlay.ColorArgb),
+			},
 		};
 	}
 
 	private static int ParseInt(JsonElement? element, int fallback) =>
 		element is { ValueKind: JsonValueKind.Number } value && value.TryGetInt32(out var number)
+			? number
+			: fallback;
+
+	// A missing, wrong-length or non-hex value takes the fallback.
+	private static uint ParseColorHex(JsonElement? element, uint fallback) =>
+		element is { ValueKind: JsonValueKind.String } value
+		&& value.GetString() is { Length: 8 } text
+		&& uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var number)
 			? number
 			: fallback;
 
@@ -238,9 +272,24 @@ public sealed class UiSettingsStore : IUiSettingsStore
 			Layout = Enum.IsDefined(value.Layout) ? value.Layout : defaults.Layout,
 			ExplorerFontScale = NormalizeFontScale(value.ExplorerFontScale),
 			LongPressSpeed = NormalizeLongPressSpeed(value.LongPressSpeed),
+			Overlay = NormalizeOverlay(value.Overlay),
 		};
 
 		return normalized == value ? value : normalized;
+	}
+
+	// Margin and size are clamped to their range; unknown enum values take the default.
+	private static PlaybackOverlaySettings NormalizeOverlay(PlaybackOverlaySettings value)
+	{
+		var defaults = new PlaybackOverlaySettings();
+		return value with
+		{
+			ProgressLineEdge = Enum.IsDefined(value.ProgressLineEdge) ? value.ProgressLineEdge : defaults.ProgressLineEdge,
+			Time = Enum.IsDefined(value.Time) ? value.Time : defaults.Time,
+			Corner = Enum.IsDefined(value.Corner) ? value.Corner : defaults.Corner,
+			MarginDp = Math.Clamp(value.MarginDp, PlaybackOverlaySettings.MinMarginDp, PlaybackOverlaySettings.MaxMarginDp),
+			FontSize = Math.Clamp(value.FontSize, PlaybackOverlaySettings.MinFontSize, PlaybackOverlaySettings.MaxFontSize),
+		};
 	}
 
 	// 0.8 .. 1.6 in steps of 0.1; NaN takes the record default.

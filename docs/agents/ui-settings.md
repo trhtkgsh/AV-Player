@@ -40,6 +40,12 @@
 - New stored fields: `Layout` (List, Grid), `ExplorerFontScale` (0.8 to 1.6), `IncludeAudioOnlyFolders` (default on), `LongPressSpeed` (0.25 to 4.0, default 2.0). `ViewMode` has four values (Folders, Flat, Tree, Favorites).
 - New rows on the Interface page: "Speed while holding the picture", "Size of names", "Show folders with audio only". The view mode and the layout are chosen in the explorer, not here.
 
+**Decisions made for R6-10 (2026-04, spec 12; they win over the text above).**
+- `UiSettings.Overlay` is stored as nine flat keys in the same `ui_settings` row: `OverlayProgressLine`, `OverlayProgressLineEdge`, `OverlayClock`, `OverlayBattery`, `OverlayTime`, `OverlayCorner`, `OverlayMarginDp`, `OverlayFontSize`, `OverlayColorArgb`. Enums are stored by name. Missing or wrong-kind values fall back to the model default; margin and size are clamped; undefined enum names fall back to the default. Older rows load with the defaults.
+- The stored color is any ARGB value, written as eight upper-case hex digits (e.g. "FFFFFFFF"). A missing, wrong-length or non-hex value reads as the default white. The page offers a fixed list of seven colors. A stored value outside the list selects no radio.
+- "Theme accent" is not offered: reading the accent needs the theming store, which is not a read-only contract for this module.
+- The "While the controls are hidden" group sits in the Player section. Switches and radios save at once. Margin and size are sliders that save on release.
+
 **Out of scope.** Playback defaults, theming page content, explorer and HUD reactions to the settings.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

@@ -9,4 +9,5 @@ namespace Player.Data.UiSettingsStorage;
 [JsonSerializable(typeof(bool))]
 [JsonSerializable(typeof(float))]
 [JsonSerializable(typeof(double))]
+[JsonSerializable(typeof(uint))]
 internal sealed partial class UiSettingsJsonContext : JsonSerializerContext;

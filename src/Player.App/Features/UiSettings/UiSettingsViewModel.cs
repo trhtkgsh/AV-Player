@@ -92,6 +92,43 @@ public sealed partial class UiSettingsViewModel : ObservableObject
     private bool _includeAudioOnlyFolders = true;
 
     [ObservableProperty]
+    private bool _overlayProgressLine = true;
+
+    [ObservableProperty]
+    private bool _overlayClock = true;
+
+    [ObservableProperty]
+    private bool _overlayBattery = true;
+
+    // The choices of the quiet display. Each radio button shows one of these through its bool property.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEdgeBottom), nameof(IsEdgeTop))]
+    private OverlayEdge _edgeChoice = OverlayEdge.Bottom;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTimeOff), nameof(IsTimeElapsed), nameof(IsTimeElapsedTotal),
+        nameof(IsTimeRemaining), nameof(IsTimeElapsedRemaining), nameof(IsTimeElapsedTotalRemaining))]
+    private OverlayTimeMode _timeChoice = OverlayTimeMode.ElapsedTotal;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCornerTopLeft), nameof(IsCornerTopRight),
+        nameof(IsCornerBottomLeft), nameof(IsCornerBottomRight))]
+    private OverlayCorner _cornerChoice = OverlayCorner.TopRight;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsColorWhite), nameof(IsColorLightGray), nameof(IsColorYellow),
+        nameof(IsColorGreen), nameof(IsColorCyan), nameof(IsColorOrange), nameof(IsColorRed))]
+    private uint _colorChoice = 0xFFFFFFFF;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OverlayMarginText))]
+    private double _overlayMargin;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OverlaySizeText))]
+    private double _overlaySize = 12;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
     private string? _errorMessage;
 
@@ -116,6 +153,128 @@ public sealed partial class UiSettingsViewModel : ObservableObject
 
     public string NameSizeText =>
         SnapPercent(NameSizePercent).ToString("0", CultureInfo.InvariantCulture) + "%";
+
+    public string OverlayMarginText =>
+        ClampRound(OverlayMargin, PlaybackOverlaySettings.MinMarginDp, PlaybackOverlaySettings.MaxMarginDp)
+            .ToString(CultureInfo.InvariantCulture);
+
+    public string OverlaySizeText =>
+        ClampRound(OverlaySize, PlaybackOverlaySettings.MinFontSize, PlaybackOverlaySettings.MaxFontSize)
+            .ToString(CultureInfo.InvariantCulture);
+
+    public bool IsEdgeBottom
+    {
+        get => EdgeChoice == OverlayEdge.Bottom;
+        set => ChooseEdge(OverlayEdge.Bottom, value);
+    }
+
+    public bool IsEdgeTop
+    {
+        get => EdgeChoice == OverlayEdge.Top;
+        set => ChooseEdge(OverlayEdge.Top, value);
+    }
+
+    public bool IsTimeOff
+    {
+        get => TimeChoice == OverlayTimeMode.None;
+        set => ChooseTime(OverlayTimeMode.None, value);
+    }
+
+    public bool IsTimeElapsed
+    {
+        get => TimeChoice == OverlayTimeMode.Elapsed;
+        set => ChooseTime(OverlayTimeMode.Elapsed, value);
+    }
+
+    public bool IsTimeElapsedTotal
+    {
+        get => TimeChoice == OverlayTimeMode.ElapsedTotal;
+        set => ChooseTime(OverlayTimeMode.ElapsedTotal, value);
+    }
+
+    public bool IsTimeRemaining
+    {
+        get => TimeChoice == OverlayTimeMode.Remaining;
+        set => ChooseTime(OverlayTimeMode.Remaining, value);
+    }
+
+    public bool IsTimeElapsedRemaining
+    {
+        get => TimeChoice == OverlayTimeMode.ElapsedRemaining;
+        set => ChooseTime(OverlayTimeMode.ElapsedRemaining, value);
+    }
+
+    public bool IsTimeElapsedTotalRemaining
+    {
+        get => TimeChoice == OverlayTimeMode.ElapsedTotalRemaining;
+        set => ChooseTime(OverlayTimeMode.ElapsedTotalRemaining, value);
+    }
+
+    public bool IsCornerTopLeft
+    {
+        get => CornerChoice == OverlayCorner.TopLeft;
+        set => ChooseCorner(OverlayCorner.TopLeft, value);
+    }
+
+    public bool IsCornerTopRight
+    {
+        get => CornerChoice == OverlayCorner.TopRight;
+        set => ChooseCorner(OverlayCorner.TopRight, value);
+    }
+
+    public bool IsCornerBottomLeft
+    {
+        get => CornerChoice == OverlayCorner.BottomLeft;
+        set => ChooseCorner(OverlayCorner.BottomLeft, value);
+    }
+
+    public bool IsCornerBottomRight
+    {
+        get => CornerChoice == OverlayCorner.BottomRight;
+        set => ChooseCorner(OverlayCorner.BottomRight, value);
+    }
+
+    public bool IsColorWhite
+    {
+        get => ColorChoice == 0xFFFFFFFF;
+        set => ChooseColor(0xFFFFFFFF, value);
+    }
+
+    public bool IsColorLightGray
+    {
+        get => ColorChoice == 0xFFCCCCCC;
+        set => ChooseColor(0xFFCCCCCC, value);
+    }
+
+    public bool IsColorYellow
+    {
+        get => ColorChoice == 0xFFFFEB3B;
+        set => ChooseColor(0xFFFFEB3B, value);
+    }
+
+    public bool IsColorGreen
+    {
+        get => ColorChoice == 0xFF4CAF50;
+        set => ChooseColor(0xFF4CAF50, value);
+    }
+
+    public bool IsColorCyan
+    {
+        get => ColorChoice == 0xFF4DD0E1;
+        set => ChooseColor(0xFF4DD0E1, value);
+    }
+
+    public bool IsColorOrange
+    {
+        get => ColorChoice == 0xFFFF9800;
+        set => ChooseColor(0xFFFF9800, value);
+    }
+
+    public bool IsColorRed
+    {
+        get => ColorChoice == 0xFFF44336;
+        set => ChooseColor(0xFFF44336, value);
+    }
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
@@ -180,6 +339,15 @@ public sealed partial class UiSettingsViewModel : ObservableObject
             IsLanguageSystem = settings.Language == AppLanguage.System;
             IsLanguageEnglish = settings.Language == AppLanguage.English;
             IsLanguageHebrew = settings.Language == AppLanguage.Hebrew;
+            OverlayProgressLine = settings.Overlay.ProgressLine;
+            EdgeChoice = settings.Overlay.ProgressLineEdge;
+            OverlayClock = settings.Overlay.Clock;
+            OverlayBattery = settings.Overlay.Battery;
+            TimeChoice = settings.Overlay.Time;
+            CornerChoice = settings.Overlay.Corner;
+            OverlayMargin = settings.Overlay.MarginDp;
+            OverlaySize = settings.Overlay.FontSize;
+            ColorChoice = settings.Overlay.ColorArgb;
         }
         finally
         {
@@ -234,6 +402,94 @@ public sealed partial class UiSettingsViewModel : ObservableObject
         NameSizePercent = SnapPercent(NameSizePercent);
         return SaveAsync(current => current with { ExplorerFontScale = SnapPercent(NameSizePercent) / 100 });
     }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task SaveOverlayMargin()
+    {
+        // Snap the slider to the value that is saved, so the thumb shows the stored number.
+        OverlayMargin = ClampRound(OverlayMargin, PlaybackOverlaySettings.MinMarginDp, PlaybackOverlaySettings.MaxMarginDp);
+        return SaveOverlay(overlay => overlay with { MarginDp = (int)OverlayMargin });
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task SaveOverlaySize()
+    {
+        // Snap the slider to the value that is saved, so the thumb shows the stored number.
+        OverlaySize = ClampRound(OverlaySize, PlaybackOverlaySettings.MinFontSize, PlaybackOverlaySettings.MaxFontSize);
+        return SaveOverlay(overlay => overlay with { FontSize = (int)OverlaySize });
+    }
+
+    partial void OnOverlayProgressLineChanged(bool value)
+    {
+        if (!_loading)
+        {
+            _ = SaveOverlay(overlay => overlay with { ProgressLine = value });
+        }
+    }
+
+    partial void OnOverlayClockChanged(bool value)
+    {
+        if (!_loading)
+        {
+            _ = SaveOverlay(overlay => overlay with { Clock = value });
+        }
+    }
+
+    partial void OnOverlayBatteryChanged(bool value)
+    {
+        if (!_loading)
+        {
+            _ = SaveOverlay(overlay => overlay with { Battery = value });
+        }
+    }
+
+    // A radio button that is switched off is ignored: the newly checked one saves.
+    private void ChooseEdge(OverlayEdge value, bool isChosen)
+    {
+        if (!isChosen || _loading || EdgeChoice == value)
+        {
+            return;
+        }
+
+        EdgeChoice = value;
+        _ = SaveOverlay(overlay => overlay with { ProgressLineEdge = value });
+    }
+
+    private void ChooseTime(OverlayTimeMode value, bool isChosen)
+    {
+        if (!isChosen || _loading || TimeChoice == value)
+        {
+            return;
+        }
+
+        TimeChoice = value;
+        _ = SaveOverlay(overlay => overlay with { Time = value });
+    }
+
+    private void ChooseCorner(OverlayCorner value, bool isChosen)
+    {
+        if (!isChosen || _loading || CornerChoice == value)
+        {
+            return;
+        }
+
+        CornerChoice = value;
+        _ = SaveOverlay(overlay => overlay with { Corner = value });
+    }
+
+    private void ChooseColor(uint value, bool isChosen)
+    {
+        if (!isChosen || _loading || ColorChoice == value)
+        {
+            return;
+        }
+
+        ColorChoice = value;
+        _ = SaveOverlay(overlay => overlay with { ColorArgb = value });
+    }
+
+    private Task SaveOverlay(Func<PlaybackOverlaySettings, PlaybackOverlaySettings> change) =>
+        SaveAsync(current => current with { Overlay = change(current.Overlay) });
 
     partial void OnShowClockChanged(bool value)
     {
