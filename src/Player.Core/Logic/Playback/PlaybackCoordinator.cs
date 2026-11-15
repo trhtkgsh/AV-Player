@@ -22,6 +22,7 @@ public sealed partial class PlaybackCoordinator : IPlaybackCoordinator, IDisposa
     private readonly IGlobalDefaultsStore _defaults;
     private readonly TimeProvider _time;
     private readonly IVideoSurface? _videoSurface;
+    private readonly IFolderSettingsStore? _folderSettings;
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
@@ -51,7 +52,8 @@ public sealed partial class PlaybackCoordinator : IPlaybackCoordinator, IDisposa
         IPlaybackStateRecorder recorder,
         IGlobalDefaultsStore defaults,
         TimeProvider timeProvider,
-        IVideoSurface? videoSurface = null)
+        IVideoSurface? videoSurface = null,
+        IFolderSettingsStore? folderSettings = null)
     {
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(stateStore);
@@ -65,6 +67,7 @@ public sealed partial class PlaybackCoordinator : IPlaybackCoordinator, IDisposa
         _defaults = defaults;
         _time = timeProvider;
         _videoSurface = videoSurface;
+        _folderSettings = folderSettings;
         _lifetimeToken = _lifetime.Token;
         _engine.SnapshotChanged += OnSnapshotChanged;
         _defaults.Changed += OnDefaultsChanged;
@@ -342,6 +345,23 @@ public sealed partial class PlaybackCoordinator : IPlaybackCoordinator, IDisposa
         }
     }
 
+    private async Task<FolderSettings?> SafeGetFolderSettingsAsync(long bucketId, CancellationToken ct)
+    {
+        if (_folderSettings is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _folderSettings.GetAsync(bucketId, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsSwallowable(ex, ct))
+        {
+            return null;
+        }
+    }
+
     private async Task<GlobalDefaults?> SafeGetDefaultsAsync(CancellationToken ct)
     {
         try
@@ -395,7 +415,8 @@ public sealed partial class PlaybackCoordinator : IPlaybackCoordinator, IDisposa
             await SafeFlushAsync(token).ConfigureAwait(false);
             var state = await SafeGetStateAsync(item.Id, token).ConfigureAwait(false);
             var defaults = await LoadDefaultsAsync(token).ConfigureAwait(false);
-            var settings = PlaybackSettingsResolver.Resolve(state, defaults);
+            var folder = await SafeGetFolderSettingsAsync(item.BucketId, token).ConfigureAwait(false);
+            var settings = PlaybackSettingsResolver.Resolve(state, defaults, folder);
             token.ThrowIfCancellationRequested();
             try
             {
