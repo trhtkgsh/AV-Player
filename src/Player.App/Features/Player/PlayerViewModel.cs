@@ -23,6 +23,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private UiSettings _settings = new();
     private bool _active;
     private bool _sheetOpening;
+    private bool _returnFromSheet;
     private int _activation;
     private bool _dragging;
     private bool _closing;
@@ -75,6 +76,13 @@ public sealed partial class PlayerViewModel : ObservableObject
         _uiSettings.Changed += OnUiSettingsChanged;
 
         ApplySnapshot(_engine.Snapshot);
+        if (_returnFromSheet)
+        {
+            // Back from a settings sheet: the HUD comes back, the countdown starts again below.
+            _returnFromSheet = false;
+            IsHudVisible = true;
+        }
+
         RestartHideTimer();
     }
 
@@ -210,12 +218,18 @@ public sealed partial class PlayerViewModel : ObservableObject
         _sheetOpening = true;
         try
         {
-            RestartHideTimer();
+            // The sheet covers the HUD: stop the countdown and hide it. ActivateAsync shows it again.
+            CancelHideTimer();
+            IsHudVisible = false;
+            _returnFromSheet = true;
             if (Shell.Current is { } shell) await shell.GoToAsync(route);
         }
         catch (Exception ex)
         {
-            // The route may not exist yet; the sheet is then simply not opened.
+            // The route may not exist yet; the sheet is then simply not opened. Give the user the controls back.
+            _returnFromSheet = false;
+            IsHudVisible = true;
+            RestartHideTimer();
             System.Diagnostics.Debug.WriteLine($"Open {route} failed: {ex}");
         }
         finally
