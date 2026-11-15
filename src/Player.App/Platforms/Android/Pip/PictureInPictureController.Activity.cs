@@ -74,7 +74,7 @@ public sealed partial class PictureInPictureController
     }
 
     private static bool IsAtLeastStarted(Activity activity) =>
-        activity is ILifecycleOwner owner && !owner.Lifecycle.CurrentState.IsAtLeast(Lifecycle.State.Started!);
+        activity is not ILifecycleOwner owner || owner.Lifecycle.CurrentState.IsAtLeast(Lifecycle.State.Started!);
 
     private async Task CloseAsync()
     {
