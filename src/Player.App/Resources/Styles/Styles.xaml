@@ -13,6 +13,12 @@
         <Setter Property="Shell.DisabledColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
         <Setter Property="Shell.UnselectedColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
         <Setter Property="Shell.NavBarHasShadow" Value="False" />
+        <Setter Property="Shell.TabBarBackgroundColor" Value="{DynamicResource ColorSurface}" />
+        <Setter Property="Shell.TabBarForegroundColor" Value="{DynamicResource ColorOnSurface}" />
+        <Setter Property="Shell.TabBarTitleColor" Value="{DynamicResource ColorOnSurface}" />
+        <Setter Property="Shell.TabBarUnselectedColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+        <Setter Property="Shell.TabBarDisabledColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+        <Setter Property="Shell.FlyoutBackgroundColor" Value="{DynamicResource ColorSurface}" />
     </Style>
 
     <Style TargetType="Label">
@@ -60,6 +66,18 @@
         <Setter Property="Color" Value="{DynamicResource ColorAccent}" />
     </Style>
 
+    <Style TargetType="RefreshView">
+        <Setter Property="RefreshColor" Value="{DynamicResource ColorAccent}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource ColorBackground}" />
+    </Style>
+
+    <Style TargetType="SearchBar">
+        <Setter Property="TextColor" Value="{DynamicResource ColorOnSurface}" />
+        <Setter Property="PlaceholderColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+        <Setter Property="CancelButtonColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource ColorSurface}" />
+    </Style>
+
     <Style TargetType="ProgressBar">
         <Setter Property="ProgressColor" Value="{DynamicResource ColorProgress}" />
         <Setter Property="BackgroundColor" Value="{DynamicResource ColorDivider}" />
@@ -73,6 +91,7 @@
 
     <Style TargetType="RadioButton">
         <Setter Property="TextColor" Value="{DynamicResource ColorOnSurface}" />
+        <Setter Property="BorderColor" Value="{DynamicResource ColorAccent}" />
         <Setter Property="BackgroundColor" Value="Transparent" />
         <Setter Property="FontSize" Value="16" />
         <Setter Property="MinimumHeightRequest" Value="44" />
