@@ -17,6 +17,7 @@ public sealed class PlayerGestureHandler
     private const int MaxVolumePercent = 200;
     private const double DefaultBrightness = 0.5;
     private const double MinBrightness = 0.01;
+    private const long ScrubStepMs = 300;
 
     private readonly IGestureSource _gestures;
     private readonly IPlayerEngine _engine;
@@ -39,6 +40,7 @@ public sealed class PlayerGestureHandler
     private bool _resumePending; // a drag ended and its resume is still owed; the next drag takes it over
     private long _scrubTarget; // the newest seek target; the running loop sends it
     private Task _scrubTask = Task.CompletedTask;
+    private CancellationTokenSource _scrubCts = new(); // ends the wait for a picture; replaced at each drag's Began, never disposed
     private bool _verticalActive; // set on Began; cleared on Ended, Cancelled and Detach
     private bool _horizontalActive;
     private bool _pinchActive;
@@ -208,6 +210,8 @@ public sealed class PlayerGestureHandler
                 _seekWasPlaying = snapshot.Status == PlayerStatus.Playing || _resumePending; // an earlier drag's resume is still owed
                 _resumePending = false;
                 if (snapshot.Status == PlayerStatus.Playing) Fire(() => _engine.PauseAsync(CancellationToken.None)); // playback does not run during the drag
+                _scrubCts.Cancel();
+                _scrubCts = new CancellationTokenSource(); // the picture of an older drag's target is no longer waited for
                 PreviewSeek(e);
                 break;
 
@@ -318,10 +322,14 @@ public sealed class PlayerGestureHandler
     {
         if (_seekDuration <= 0) return; // nothing to seek in
 
+        bool first = !_seeking; // the first target of this drag is always sent
         _seeking = true;
         _seekTarget = Math.Clamp(_seekStart + (long)Math.Round(e.DeltaX * SeekMsPerScreenWidth), 0, _seekDuration);
         _osd.Hold(SeekText(_seekStart, _seekTarget));
-        Scrub(_seekTarget);
+
+        // _scrubTarget is the last target sent. A finger that rests sends nothing: the same target is not sent twice.
+        bool edge = (_seekTarget == 0 || _seekTarget == _seekDuration) && _seekTarget != _scrubTarget;
+        if (first || edge || Math.Abs(_seekTarget - _scrubTarget) >= ScrubStepMs) Scrub(_seekTarget);
     }
 
     /// <summary>
@@ -337,21 +345,34 @@ public sealed class PlayerGestureHandler
         if (target is null && !play) return;
 
         int id = _dragId;
-        Fire(() => FinishSeekAsync(target, play, id));
+        CancellationTokenSource scrubCts = _scrubCts; // the drag's own source: a newer drag may already have replaced the field
+        Fire(() => FinishSeekAsync(target, play, id, scrubCts));
     }
 
     /// <summary>
     /// Sends the final target, then resumes only if no newer drag has begun since (<paramref name="id"/> is still
-    /// the current drag). A newer drag takes over the owed resume and resumes at its own end.
+    /// the current drag). A newer drag takes over the owed resume and resumes at its own end. The final seek is
+    /// sent before the resume, and the resume ends its wait for the picture.
     /// </summary>
-    private async Task FinishSeekAsync(long? target, bool play, int id)
+    private async Task FinishSeekAsync(long? target, bool play, int id, CancellationTokenSource scrubCts)
     {
-        if (target is long final) await Scrub(final);
+        scrubCts.Cancel(); // the picture of an older target is no longer waited for
+        await _scrubTask; // never throws
+
+        Task seek = Task.CompletedTask;
+        if (target is long final)
+        {
+            _scrubTarget = final;
+            seek = _engine.SeekAsync(final, CancellationToken.None);
+        }
+
         if (play && id == _dragId)
         {
             _resumePending = false;
             await _engine.PlayAsync(CancellationToken.None);
         }
+
+        await seek;
     }
 
     /// <summary>
@@ -369,14 +390,19 @@ public sealed class PlayerGestureHandler
 
     private async Task SendScrubTargetsAsync()
     {
+        CancellationToken token = _scrubCts.Token;
         long sent = -1; // targets are never negative, so the first pass always sends
         try
         {
             while (sent != _scrubTarget)
             {
                 sent = _scrubTarget;
-                await _engine.SeekAsync(sent, CancellationToken.None);
+                await _engine.SeekAsync(sent, token);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // The wait for the picture was ended by a new drag or by the finish. The seek itself stays sent.
         }
         catch (Exception ex)
         {
