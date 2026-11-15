@@ -146,8 +146,7 @@ public sealed record UiSettings
     public int SkipSeconds { get; init; } = 10;                     // double-tap skip
     public bool ShowClock { get; init; } = true;
     public bool ShowBattery { get; init; } = true;
-    public ExplorerInfoFields ExplorerFields { get; init; } =
-        ExplorerInfoFields.Duration | ExplorerInfoFields.Resolution | ExplorerInfoFields.Size;
+    public ExplorerInfoFields ExplorerFields { get; init; } = ExplorerInfoFields.None;   // see the change log
     public ExplorerViewMode ViewMode { get; init; } = ExplorerViewMode.Folders;
     public SortField SortField { get; init; } = SortField.Name;
     public SortDirection SortDirection { get; init; } = SortDirection.Ascending;
