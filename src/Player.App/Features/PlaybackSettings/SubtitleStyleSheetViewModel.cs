@@ -35,6 +35,7 @@ public sealed partial class SubtitleStyleSheetViewModel : ObservableObject
     private bool _dirty;
     private bool _loading;
     private bool _closing;
+    private bool _lastApplyFailed; // outcome of the latest apply under the gate; written only inside the gate
 
     [ObservableProperty, NotifyPropertyChangedFor(nameof(FontScaleText))]
     private double _fontScale = SubtitleStyle.Default.FontScale;
@@ -250,18 +251,22 @@ public sealed partial class SubtitleStyleSheetViewModel : ObservableObject
         await ApplyIfDirtyAsync(token);
     }
 
-    /// <summary>Applies a pending change now, if there is one. Returns false when the apply failed.</summary>
+    /// <summary>
+    /// Waits for a running apply, then applies a pending change now. Returns false when the apply that ran last,
+    /// or the one started here, failed. Always goes through the gate, so it never returns while an apply is in
+    /// flight. Used by "Save as default".
+    /// </summary>
     private async Task<bool> FlushAsync()
     {
-        if (!_dirty) return true;
-
         CancelPending();
-        return await ApplyIfDirtyAsync(CancellationToken.None);
+        if (!await ApplyIfDirtyAsync(CancellationToken.None)) return false;
+
+        return !_lastApplyFailed;
     }
 
     /// <summary>
     /// Applies the style when a change is still pending. A cancelled change is skipped: its newer change or the
-    /// close applies the newest style. Used by the debounce timer and by Deactivate.
+    /// close applies the newest style. Used by the debounce timer, by Deactivate and by FlushAsync.
     /// </summary>
     private Task<bool> ApplyIfDirtyAsync(CancellationToken token) => ApplyUnderGateAsync(onlyIfDirty: true, token);
 
@@ -270,7 +275,8 @@ public sealed partial class SubtitleStyleSheetViewModel : ObservableObject
 
     /// <summary>
     /// Sends the style to the engine. The gate keeps two applies from overlapping. The style is read after the gate,
-    /// so the newest values are sent. On failure the controls go back to the engine's style.
+    /// so the newest values are sent. On failure the controls go back to the engine's style. The outcome of every
+    /// apply is kept in <see cref="_lastApplyFailed"/>, which FlushAsync reads.
     /// </summary>
     private async Task<bool> ApplyUnderGateAsync(bool onlyIfDirty, CancellationToken token)
     {
@@ -282,11 +288,13 @@ public sealed partial class SubtitleStyleSheetViewModel : ObservableObject
             _dirty = false;
             await _engine.SetSubtitleStyleAsync(CurrentStyle(), CancellationToken.None);
             ErrorMessage = "";
+            _lastApplyFailed = false;
             return true;
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            _lastApplyFailed = true;
             ReadFromStyle(_engine.SubtitleStyle);
             return false;
         }
