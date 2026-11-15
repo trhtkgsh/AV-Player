@@ -277,7 +277,7 @@ public sealed partial class FoldersViewModel : ObservableObject
 
         await shell.GoToAsync(
             ItemsRoute,
-            new Dictionary<string, object> { ["title"] = _localizer["Explorer.AllMedia"] });
+            new Dictionary<string, object>());
     }
 
     private bool IsCurrentLoad(int version) => version == _loadVersion;

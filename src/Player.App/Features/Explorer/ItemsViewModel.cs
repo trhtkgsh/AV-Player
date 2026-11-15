@@ -26,12 +26,14 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private readonly IUiSettingsStore _uiSettings;
     private readonly IPlaybackCoordinator _coordinator;
     private readonly TimeProvider _timeProvider;
+    private readonly ILocalizer _localizer;
 
     private readonly Dictionary<MediaFileId, CancellationTokenSource> _pending = new();
 
     private CancellationTokenSource? _session;
     private CancellationTokenSource? _searchDebounce;
     private long? _bucketId;
+    private string _folderTitle = string.Empty;
     private UiSettings _settings = new();
     private IReadOnlyList<MediaItem> _items = [];
     private Dictionary<MediaFileId, MediaMetadata> _metadata = new();
@@ -79,7 +81,8 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         IPlaybackStateStore stateStore,
         IUiSettingsStore uiSettings,
         IPlaybackCoordinator coordinator,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ILocalizer localizer)
     {
         _library = library;
         _metadataService = metadataService;
@@ -87,17 +90,19 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         _uiSettings = uiSettings;
         _coordinator = coordinator;
         _timeProvider = timeProvider;
+        _localizer = localizer;
     }
 
     public ObservableCollection<MediaRowViewModel> Rows { get; } = new();
 
     private CancellationToken SessionToken => _session?.Token ?? new CancellationToken(canceled: true);
 
-    /// <summary>Navigation parameters: "bucketId" (long, absent means all folders) and "title" (string).</summary>
+    /// <summary>Navigation parameters: "bucketId" (long, absent means all folders) and "title" (string, the folder name).</summary>
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
         _bucketId = query.TryGetValue("bucketId", out var bucket) && bucket is long id ? (long?)id : null;
-        Title = query.TryGetValue("title", out var title) && title is string text ? text : string.Empty;
+        _folderTitle = query.TryGetValue("title", out var title) && title is string text ? text : string.Empty;
+        RebuildTitle();
     }
 
     public async Task ActivateAsync()
@@ -106,6 +111,8 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         _session = new CancellationTokenSource();
         _library.Changed += OnLibraryChanged;
         _uiSettings.Changed += OnSettingsChanged;
+        _localizer.Changed += OnLanguageChanged;
+        RebuildTitle();
         await LoadAsync();
     }
 
@@ -194,17 +201,25 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
                 return;
             }
 
-            var choice = await shell.DisplayActionSheetAsync(
-                "Sort by", "Cancel", null, "Name", "Date added", "Size", "Duration");
-
-            SortField? field = choice switch
+            var choices = new (string Text, SortField Field)[]
             {
-                "Name" => SortField.Name,
-                "Date added" => SortField.DateAdded,
-                "Size" => SortField.Size,
-                "Duration" => SortField.Duration,
-                _ => null,
+                (_localizer["Explorer.SortName"], SortField.Name),
+                (_localizer["Explorer.SortDateAdded"], SortField.DateAdded),
+                (_localizer["Explorer.SortSize"], SortField.Size),
+                (_localizer["Explorer.SortDuration"], SortField.Duration),
             };
+
+            var choice = await shell.DisplayActionSheetAsync(
+                _localizer["Explorer.SortBy"],
+                _localizer["Common.Cancel"],
+                null,
+                choices.Select(c => c.Text).ToArray());
+
+            // A cancelled or dismissed sheet gives no matching text, so no field is chosen.
+            SortField? field = choices
+                .Where(c => c.Text == choice)
+                .Select(c => (SortField?)c.Field)
+                .FirstOrDefault();
 
             if (field is not null)
             {
@@ -478,7 +493,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     {
         _library.Changed -= OnLibraryChanged;
         _uiSettings.Changed -= OnSettingsChanged;
-
+        _localizer.Changed -= OnLanguageChanged;
         _searchDebounce?.Cancel();
         _searchDebounce?.Dispose();
         _searchDebounce = null;
@@ -522,6 +537,12 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
                 ApplySettings(settings);
             }
         });
+
+    private void OnLanguageChanged(object? sender, EventArgs e) => RebuildTitle();
+
+    // All media has its own title; a folder shows its name, which is not translated.
+    private void RebuildTitle() =>
+        Title = _bucketId is null ? _localizer["Explorer.AllMedia"] : _folderTitle;
 
     // Only the load owns IsLoading and IsRefreshing; a failed command reports through ErrorMessage alone.
     private void ReportError(Exception ex) => ErrorMessage = ex.Message;

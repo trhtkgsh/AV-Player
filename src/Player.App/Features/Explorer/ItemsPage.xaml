@@ -3,15 +3,16 @@
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:explorer="clr-namespace:Player.App.Features.Explorer"
+             xmlns:loc="clr-namespace:Player.App.Localization"
              x:DataType="explorer:ItemsViewModel"
              Title="{Binding Title}">
 
     <ContentPage.ToolbarItems>
-        <ToolbarItem Text="Sort" Command="{Binding ChooseSortCommand}" />
+        <ToolbarItem Text="{loc:T Explorer.Sort}" Command="{Binding ChooseSortCommand}" />
     </ContentPage.ToolbarItems>
 
     <Grid RowDefinitions="Auto,*,Auto">
-        <Entry Grid.Row="0" Placeholder="Search" Text="{Binding SearchText, Mode=TwoWay}"
+        <Entry Grid.Row="0" Placeholder="{loc:T Explorer.Search}" Text="{Binding SearchText, Mode=TwoWay}"
                ClearButtonVisibility="WhileEditing" />
 
         <Grid Grid.Row="1">
@@ -38,9 +39,9 @@
                                     <Label Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation" />
                                     <Label Text="{Binding InfoLine}" Style="{StaticResource LabelMuted}" />
                                     <HorizontalStackLayout Spacing="8">
-                                        <Label Text="NEW" IsVisible="{Binding IsNew}"
+                                        <Label Text="{loc:T Explorer.NewTag}" IsVisible="{Binding IsNew}"
                                                TextColor="{DynamicResource ColorAccent}" FontAttributes="Bold" />
-                                        <Label Text="Watched" IsVisible="{Binding IsWatched}"
+                                        <Label Text="{loc:T Explorer.Watched}" IsVisible="{Binding IsWatched}"
                                                TextColor="{DynamicResource ColorWatched}" />
                                     </HorizontalStackLayout>
                                 </VerticalStackLayout>
@@ -53,15 +54,15 @@
             <ActivityIndicator IsRunning="{Binding ShowBusy}" IsVisible="{Binding ShowBusy}"
                                HorizontalOptions="Center" VerticalOptions="Center" />
 
-            <Label Text="No media files" IsVisible="{Binding IsEmpty}"
+            <Label Text="{loc:T Explorer.NoFiles}" IsVisible="{Binding IsEmpty}"
                    HorizontalOptions="Center" VerticalOptions="Center" />
 
             <VerticalStackLayout IsVisible="{Binding PermissionDenied}" Padding="24" Spacing="12"
                                  HorizontalOptions="Fill" VerticalOptions="Center">
-                <Label Text="Ariel Player needs permission to read your video and audio files."
+                <Label Text="{loc:T Explorer.PermissionNeeded}"
                        HorizontalTextAlignment="Center" />
-                <Button Text="Try again" Command="{Binding RetryPermissionCommand}" />
-                <Button Text="Open app settings" Command="{Binding OpenAppSettingsCommand}" />
+                <Button Text="{loc:T Common.TryAgain}" Command="{Binding RetryPermissionCommand}" />
+                <Button Text="{loc:T Explorer.OpenAppSettings}" Command="{Binding OpenAppSettingsCommand}" />
             </VerticalStackLayout>
 
         </Grid>
