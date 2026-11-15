@@ -11,4 +11,5 @@ internal sealed class UiSettingsDto
 	public string? SortField { get; set; }
 	public string? SortDirection { get; set; }
 	public int? NewTagDays { get; set; }
+	public string? Language { get; set; }         // enum name: "System", "English" or "Hebrew"
 }

@@ -16,6 +16,7 @@ public partial class UiSettingsPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        _viewModel.Attach();
         try
         {
             await _viewModel.LoadAsync();
@@ -24,5 +25,11 @@ public partial class UiSettingsPage : ContentPage
         {
             // The view model reports its own errors through ErrorMessage.
         }
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _viewModel.Detach();
     }
 }
