@@ -122,7 +122,7 @@ public sealed class GlobalDefaultsStore : IGlobalDefaultsStore
 		long subtitleDelayMs = Math.Clamp(value.SubtitleDelayMs, MinDelayMs, MaxDelayMs);
 
 		SubtitleStyle? rawStyle = value.SubtitleStyle;
-		SubtitleStyle style = rawStyle ?? SubtitleStyle.Default;
+		SubtitleStyle style = NormalizeStyle(rawStyle ?? SubtitleStyle.Default);
 
 		string? audioLanguage = NormalizeLanguage(value.PreferredAudioLanguage);
 		string? subtitleLanguage = NormalizeLanguage(value.PreferredSubtitleLanguage);
@@ -138,6 +138,24 @@ public sealed class GlobalDefaultsStore : IGlobalDefaultsStore
 		};
 
 		return result == value ? value : result;
+	}
+
+	private static SubtitleStyle NormalizeStyle(SubtitleStyle style)
+	{
+		double fontScale = double.IsFinite(style.FontScale) ? Math.Clamp(style.FontScale, 0.5, 3.0) : 1.0;
+		int outlineThickness = Math.Clamp(style.OutlineThickness, 0, 4);
+		double backgroundOpacity = double.IsFinite(style.BackgroundOpacity) ? Math.Clamp(style.BackgroundOpacity, 0.0, 1.0) : 0.0;
+		double bottomMarginFraction = double.IsFinite(style.BottomMarginFraction) ? Math.Clamp(style.BottomMarginFraction, 0.0, 0.3) : 0.05;
+
+		var result = style with
+		{
+			FontScale = fontScale,
+			OutlineThickness = outlineThickness,
+			BackgroundOpacity = backgroundOpacity,
+			BottomMarginFraction = bottomMarginFraction
+		};
+
+		return result == style ? style : result;
 	}
 
 	private static string? NormalizeLanguage(string? language)
