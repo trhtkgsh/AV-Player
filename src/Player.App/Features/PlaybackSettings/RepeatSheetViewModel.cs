@@ -20,23 +20,26 @@ public sealed partial class RepeatSheetViewModel : ObservableObject
     private readonly IPlaybackCoordinator _coordinator;
     private readonly IPlayerEngine _engine;
     private readonly AbRepeatDraft _draft;
+    private readonly ILocalizer _localizer;
     private bool _active;
     private bool _closing;
 
     [ObservableProperty] private bool _isRepeatNone;
     [ObservableProperty] private bool _isRepeatFile;
     [ObservableProperty] private bool _isRepeatFolder;
-    [ObservableProperty] private string _abText = "Not set";
+    [ObservableProperty] private string _abText;
     [ObservableProperty] private bool _canSetB;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasError))] private string _errorMessage = "";
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
-    public RepeatSheetViewModel(IPlaybackCoordinator coordinator, IPlayerEngine engine, AbRepeatDraft draft)
+    public RepeatSheetViewModel(IPlaybackCoordinator coordinator, IPlayerEngine engine, AbRepeatDraft draft, ILocalizer localizer)
     {
         _coordinator = coordinator;
         _engine = engine;
         _draft = draft;
+        _localizer = localizer;
+        _abText = localizer["Sheets.Repeat.NotSet"];
     }
 
     /// <summary>Called when the sheet appears. Shows the repeat mode and the range in effect, and subscribes.</summary>
@@ -101,7 +104,7 @@ public sealed partial class RepeatSheetViewModel : ObservableObject
         long end = _engine.Snapshot.PositionMs;
         if (end < start + MinLoopLengthMs)
         {
-            ErrorMessage = "B must be at least 1 second after A.";
+            ErrorMessage = _localizer["Sheets.Repeat.BTooShort"];
             return;
         }
 
@@ -113,7 +116,7 @@ public sealed partial class RepeatSheetViewModel : ObservableObject
         }
         catch (ArgumentException)
         {
-            ErrorMessage = "This A-B range is not valid for this file.";
+            ErrorMessage = _localizer["Sheets.Repeat.RangeInvalid"];
         }
         catch (Exception ex)
         {
@@ -199,15 +202,15 @@ public sealed partial class RepeatSheetViewModel : ObservableObject
 
         if (range is not null)
         {
-            AbText = $"A {TimeFormatter.Format(range.StartMs)}  -  B {TimeFormatter.Format(range.EndMs)}";
+            AbText = _localizer.Format("Sheets.Repeat.AbRange", TimeFormatter.Format(range.StartMs), TimeFormatter.Format(range.EndMs));
         }
         else if (draftStart is { } start)
         {
-            AbText = $"A {TimeFormatter.Format(start)}  -  B not set";
+            AbText = _localizer.Format("Sheets.Repeat.AbStartOnly", TimeFormatter.Format(start));
         }
         else
         {
-            AbText = "Not set";
+            AbText = _localizer["Sheets.Repeat.NotSet"];
         }
 
         CanSetB = draftStart is not null;

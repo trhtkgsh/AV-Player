@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:vm="clr-namespace:Player.App.Features.PlaybackSettings"
+    xmlns:loc="clr-namespace:Player.App.Localization"
     x:DataType="vm:SpeedSheetViewModel"
     Shell.PresentationMode="ModalNotAnimated"
     Shell.NavBarIsVisible="False"
@@ -33,7 +34,7 @@
             <Grid ColumnDefinitions="*,Auto">
                 <Label
                     Grid.Column="0"
-                    Text="Speed"
+                    Text="{loc:T Sheets.Speed.Title}"
                     VerticalOptions="Center"
                     TextColor="{DynamicResource ColorHudOnBackground}" />
                 <Label
