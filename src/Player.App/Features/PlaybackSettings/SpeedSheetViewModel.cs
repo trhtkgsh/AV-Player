@@ -39,6 +39,7 @@ public sealed partial class SpeedSheetViewModel : ObservableObject
         float current = _engine.Snapshot.Speed;
         SliderValue = current;
         SpeedText = FormatSpeed(RoundSpeed(current));
+        ErrorMessage = "";
     }
 
     /// <summary>Nothing to unsubscribe in this sheet. Kept for symmetry with the other sheets.</summary>
@@ -84,6 +85,7 @@ public sealed partial class SpeedSheetViewModel : ObservableObject
         {
             await _engine.SetSpeedAsync(speed, CancellationToken.None);
             _recorder.Update(state => state with { Speed = speed });
+            SliderValue = speed; // the thumb snaps to the applied value
             ErrorMessage = "";
         }
         catch (Exception ex)
