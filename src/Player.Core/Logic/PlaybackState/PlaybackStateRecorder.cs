@@ -15,6 +15,9 @@ namespace Player.Core.Logic.StateRecording;
 /// The lifecycle handlers (Backgrounded, Stopping) only queue the write and return, so a caller
 /// that needs the write finished must await <see cref="FlushAsync"/>.
 /// Saves queued before <see cref="Dispose"/> still run.
+/// A save that fails never throws; the file stays dirty and is retried on the next trigger, or
+/// after one debounce interval when no trigger comes. <see cref="FlushAsync"/> makes one more
+/// attempt when a save failed while it waited, then returns even if that fails too.
 /// </summary>
 public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
 {
@@ -91,7 +94,25 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
 
         // Work items never fault, so the only way this throws is ct.
         await tail.WaitAsync(ct).ConfigureAwait(false);
+
+        // A save that failed while we waited gets one more attempt; a second failure is ignored.
+        lock (_gate)
+        {
+            if (_disposed || !HasUnsaved())
+            {
+                return;
+            }
+
+            SaveNow();
+            tail = _tail;
+        }
+
+        await tail.WaitAsync(ct).ConfigureAwait(false);
     }
+
+    // Callers hold _gate.
+    private bool HasUnsaved() =>
+        _track is { Loading: false, IsDirty: true } || _live.Any(t => !t.Superseded && t.IsDirty);
 
     public void Dispose()
     {
@@ -444,6 +465,12 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
             }
 
             Release(track);
+
+            // No later event may come (for instance while paused): retry after one interval.
+            if (!saved && !_disposed && !track.Superseded && track.IsDirty && !track.SaveQueued)
+            {
+                StartTimerIfNone();
+            }
         }
     }
 
