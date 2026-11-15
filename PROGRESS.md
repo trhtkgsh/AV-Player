@@ -144,6 +144,23 @@ Phase 2 scope decisions by the orchestrator:
 | core fix | core-contracts | Fable 5.2 (orchestrator) | 1 | `MediaFileId.ToKey` is culture-invariant (reviewer of P2-02). |
 | P2-T4 | test-writer | Sonnet 5.5 | 1 | merged. 94 tests for `UiSettingsStore`. No product bug. |
 | P2-T5 | test-writer | Sonnet 5.5 | 1 | merged. 174 tests for the subtitle logic. No product bug. |
+| P2-05 | app-skeleton | Haiku 5.5 | 1 | merged. Real stores and the recorder replace the Phase 1 placeholders. Reviewer: approve. Emulator: a file played to 6.7 s, force-stopped and reopened resumed near 6 s, with a progress bar in the list and no NEW tag. |
+| P2-10 | app-skeleton | Haiku 5.5 | 1 | merged. Phase 2 services and pages registered (8 lines, checked by the orchestrator). |
+| P2-11, P2-22 | global-defaults-store | Haiku 5.5 | 4 rounds, 1 | merged. Playback defaults page and default subtitle style page. Reviewer: changes-required twice (quick taps dropped by `[RelayCommand]` on async methods; a reset that lost its error), then approve. |
+| P2-12, P2-23 | ui-settings | Haiku 5.5 | 1, 1 | merged. Interface settings page, settings home, review follow-ups. Reviewer: approve. |
+| P2-13a, P2-13b | playback-settings-ui | Haiku 5.5 | 2, 1 | merged. Speed, repeat and A-B, audio sheets. Reviewer: approve. The modal sheet is see-through over the video (SPIKE finding 18). |
+| P2-13c, P2-32 | playback-settings-ui | Haiku 5.5 | in review | Subtitle sheet and subtitle style sheet. Reviewer: changes-required (a style could be applied twice). Fix round running, with readable panels. |
+| P2-16, P2-20 | player-hud-ui | Haiku 5.5 | 1, 1 | merged. HUD entry points (three icons, speed label), per-file decoder choice, the HUD hides under a sheet. Reviewer: approve. |
+| P2-17 | explorer-ui | Haiku 5.5 | 2 rounds | merged. Settings entry, folder list follows the new-tag age. Reviewer: changes-required (a null value made every settings event reload), approve after the fix. |
+| P2-19 | playback-state-store | Sonnet 5.5 | 1 | merged. A failed save is retried on a timer and by `FlushAsync` (found by the test writer). |
+| P2-21 | theming-engine | Sonnet 5.5 | 1 | merged. Android light/dark mode follows the app theme: popups, dialogs and radio buttons are dark. Gate reviewer: approve. |
+| P2-26 | core-contracts, subtitles-audio | Fable (orchestrator), Sonnet 5.5 | 1 | merged. Contract: `FindSidecarsAsync` returns `SubtitleFile` records with names. |
+| P2-27 | player-engine | Fable 5.2 (orchestrator) | 2 builds | merged. Subtitle style as LibVLC instance options (SPIKE findings 14 to 16): before this no style was applied at all. Text direction automatic. Margin in video pixels. Emulator: all options visible, live style change restarts once and keeps the position. |
+| P2-28 | subtitles-audio | Sonnet 5.5 | 1 | merged. Legacy code page from the file name and from the bytes (a Windows-1255 file showed Latin garbage on an English device). Emulator: Hebrew shown. |
+| P2-30, P2-31 | core-contracts, player-engine, subtitles-audio | Fable (orchestrator), Sonnet 5.5 | in progress | Gate review of the engine: changes-required (an external subtitle chosen by its id was lost on a restart; a style change while paused left a black picture). Gate review of the subtitle service: changes-required (a slow load could reach the next file; a failed restore stopped the policy; replay added the file twice; one bad byte turned UTF-8 into garbage; I/O on the caller's thread). Contract: `AddSubtitleFileAsync` takes a display name, `ExternalSubtitlePath` added. |
+| P2-T1, T2, T3, T6, T7 | test-writer | Sonnet 5.5 | 1 each | merged. Recorder 59 + 11 retry tests, state repository 42, defaults store 60, text encoding and theme brightness 94. No product bug. One finding: a failed save was not retried without a new event (fixed in P2-19). Total: 896 tests. |
+
+Findings on the emulator in Phase 2 that changed the plan: SPIKE findings 14 to 18. Not possible on the platform: an `.ass` or `.ssa` file next to the video is not listed by MediaStore on API 34 for an app with only the media permissions, so it is opened with the file picker.
 
 ## Known gaps carried forward
 
