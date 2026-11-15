@@ -55,7 +55,13 @@ public sealed class FolderSettingsStore : IFolderSettingsStore
 		await _gate.WaitAsync(ct).ConfigureAwait(false);
 		try
 		{
-			var current = _map ?? await LoadAsync(ct).ConfigureAwait(false);
+			var current = _map;
+			if (current is null)
+			{
+				current = await LoadAsync(ct).ConfigureAwait(false);
+				_map = current;
+			}
+
 			if (WithEntry(current, entry) is { } updated)
 			{
 				var json = JsonSerializer.Serialize(ToDto(updated), FolderSettingsJsonContext.Default.DictionaryStringFolderSettingsDto);
