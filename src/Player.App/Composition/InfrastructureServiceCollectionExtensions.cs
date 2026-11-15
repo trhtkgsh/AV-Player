@@ -17,11 +17,7 @@ public static class InfrastructureServiceCollectionExtensions
 		services.AddSingleton<AppLifecycle>();
 		services.AddSingleton<IAppLifecycle>(sp => sp.GetRequiredService<AppLifecycle>());
 
-		// Phase 1 placeholders. Replaced, not extended, in Phase 2.
-		services.AddSingleton<IUiSettingsStore, InMemoryUiSettingsStore>();
-		services.AddSingleton<IGlobalDefaultsStore, InMemoryGlobalDefaultsStore>();
-		services.AddSingleton<IPlaybackStateStore, InMemoryPlaybackStateStore>();
-		services.AddSingleton<IPlaybackStateRecorder, NoOpPlaybackStateRecorder>();
+		// Phase 1 placeholder. Replaced by media-service in Phase 4.
 		services.AddSingleton<IMauiInitializeService, PauseOnBackgroundPlaceholder>();
 
 		return services;
