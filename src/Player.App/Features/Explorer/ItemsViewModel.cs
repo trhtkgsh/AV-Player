@@ -206,7 +206,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     [RelayCommand]
     private async Task Open(MediaRowViewModel row)
     {
-        if (_fileOperationRunning)
+        if (row is null || _fileOperationRunning)
         {
             return;
         }

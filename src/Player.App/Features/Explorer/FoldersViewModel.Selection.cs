@@ -41,7 +41,7 @@ public sealed partial class FoldersViewModel
     [RelayCommand]
     private void BeginSelect(FolderRow row)
     {
-        if (!IsSelectable(row) || _fileOperationRunning)
+        if (row is null || !IsSelectable(row) || _fileOperationRunning)
         {
             return;
         }

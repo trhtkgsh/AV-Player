@@ -41,7 +41,7 @@ public sealed partial class ItemsViewModel
     [RelayCommand]
     private void BeginSelect(MediaRowViewModel row)
     {
-        if (_fileOperationRunning)
+        if (row is null || _fileOperationRunning)
         {
             return;
         }

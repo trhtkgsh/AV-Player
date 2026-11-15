@@ -93,3 +93,10 @@
 - Fix: each page exposes its view model as `ViewModel` (`ItemsPage`, `FoldersPage`). All four row and tile templates bind `TapCommand` and `LongPressCommand` through `Source={x:Reference Page}` with `Path=ViewModel.OpenCommand` (or `OpenRowCommand`, `BeginSelectCommand`). `CommandParameter` stays `{Binding .}`, the row.
 - Pure signatures: unchanged.
 - Not verified on a device: the user's emulator check that the app starts and that the long press enters the mode.
+
+**Row parameter from the view (2026-11-15, R7-44; it fixes the null parameter of R7-43).**
+- Cause: `CommandParameter="{Binding .}"` on the `Behavior` resolved to nothing, because the behavior has no `BindingContext` of its own. `OpenRow` then got null.
+- Fix: `LongPressBehavior` keeps a reference to the element it is attached to. When `Click` or `LongClick` fires, it passes that element's `BindingContext`, which is the row's current item (also right for recycled rows). The `CommandParameter` property and its XAML uses are removed. The ⋮ buttons keep their own `CommandParameter`, which is a normal button binding.
+- `Open`, `OpenRow` and `BeginSelect` (items and folders) return quietly for a null row.
+- Pure signatures: unchanged.
+- Not verified on a device: the user's emulator check that the tap opens the file and that the long press enters the mode.

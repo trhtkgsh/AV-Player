@@ -36,8 +36,7 @@
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
                         TapCommand="{Binding ViewModel.OpenCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}"
-                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}"
-                        CommandParameter="{Binding .}" />
+                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}" />
                 </Grid.Behaviors>
 
                 <!-- The selected row is marked by a tint behind its content. -->
@@ -78,8 +77,7 @@
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
                         TapCommand="{Binding ViewModel.OpenCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}"
-                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}"
-                        CommandParameter="{Binding .}" />
+                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}" />
                 </Grid.Behaviors>
 
                 <BoxView Grid.RowSpan="5" Color="{DynamicResource ColorAccent}" Opacity="0.2"

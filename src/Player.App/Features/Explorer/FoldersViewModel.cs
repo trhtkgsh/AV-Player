@@ -173,7 +173,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenRow(FolderRow row)
     {
-        if (_fileOperationRunning)
+        if (row is null || _fileOperationRunning)
         {
             return;
         }

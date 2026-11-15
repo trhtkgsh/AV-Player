@@ -46,8 +46,7 @@
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
                         TapCommand="{Binding ViewModel.OpenRowCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersPage}"
-                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersPage}"
-                        CommandParameter="{Binding .}" />
+                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersPage}" />
                 </Grid.Behaviors>
 
                 <BoxView Grid.ColumnSpan="4" Color="{DynamicResource ColorAccent}" Opacity="0.2"
@@ -76,8 +75,7 @@
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
                         TapCommand="{Binding ViewModel.OpenRowCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersPage}"
-                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersPage}"
-                        CommandParameter="{Binding .}" />
+                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersPage}" />
                 </Grid.Behaviors>
 
                 <BoxView Grid.RowSpan="4" Color="{DynamicResource ColorAccent}" Opacity="0.2"
