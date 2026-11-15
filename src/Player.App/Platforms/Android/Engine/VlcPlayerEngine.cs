@@ -206,7 +206,7 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             {
                 // A frame reveal in progress must now wait for the clock to pass the new position.
                 _revealFromMs = target;
-                if (_pauseRequested && !_revealingFrame && _hasVideo && _videoEnabled)
+                if (_pauseRequested && !_revealingFrame && _hasVideo && _videoEnabled && _surfaceAttached)
                 {
                     picture = PreviewSeek(target);
                 }

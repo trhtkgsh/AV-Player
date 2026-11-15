@@ -69,8 +69,9 @@ internal sealed class VideoSurfaceController : IVideoSurface
         lock (_sync)
         {
             var container = _container;
+            var height = container?.Height ?? 0;
             _transform = SurfaceGeometry.Clamp(
-                _layoutFormat, container?.Width ?? 0, container?.Height ?? 0, _aspect, transform);
+                _layoutFormat, container?.Width ?? 0, height - Math.Clamp(_topInsetPx, 0, height / 2), _aspect, transform);
         }
 
         Relayout();
@@ -113,6 +114,9 @@ internal sealed class VideoSurfaceController : IVideoSurface
                 _insets = default;
                 insetsCleared = true;
             }
+
+            if (!enabled)
+                _topInsetPx = 0;
         }
 
         if (insetsCleared)
