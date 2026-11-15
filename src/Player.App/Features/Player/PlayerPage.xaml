@@ -30,7 +30,7 @@
         <Border
             HorizontalOptions="Center"
             VerticalOptions="Start"
-            Margin="0,96,0,0"
+            Margin="{Binding OsdMargin}"
             Padding="16,8"
             InputTransparent="True"
             IsVisible="{Binding Osd.IsVisible}"
@@ -50,7 +50,7 @@
         <Border
             HorizontalOptions="Start"
             VerticalOptions="Center"
-            Margin="16,0"
+            Margin="{Binding UnlockMargin}"
             WidthRequest="56"
             HeightRequest="56"
             IsVisible="{Binding IsUnlockVisible}"
@@ -77,79 +77,74 @@
 
             <Grid
                 Grid.Row="0"
-                Padding="8,6"
-                ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto"
-                ColumnSpacing="4"
+                Padding="{Binding TopBarPadding}"
+                RowDefinitions="Auto,Auto"
                 BackgroundColor="{DynamicResource ColorHudBackground}">
-                <controls:HudIconButton
-                    Grid.Column="0"
-                    IconData="M15.5 4 L7.5 12 L15.5 20 L17.2 18.3 L10.9 12 L17.2 5.7 Z"
-                    IconSize="24"
-                    MirrorInRightToLeft="True"
-                    IconColor="{DynamicResource ColorHudOnBackground}"
-                    Command="{Binding CloseCommand}"
-                    SemanticProperties.Description="{loc:T Common.Back}" />
-                <VerticalStackLayout
-                    Grid.Column="1"
-                    VerticalOptions="Center"
-                    Spacing="0">
+                <Label
+                    Grid.Row="0"
+                    LineBreakMode="TailTruncation"
+                    MaxLines="1"
+                    Text="{Binding Title}"
+                    TextColor="{DynamicResource ColorHudOnBackground}" />
+                <Grid
+                    Grid.Row="1"
+                    ColumnDefinitions="*,Auto,Auto,Auto,Auto"
+                    ColumnSpacing="4">
                     <Label
-                        LineBreakMode="TailTruncation"
-                        MaxLines="1"
-                        Text="{Binding Title}"
-                        TextColor="{DynamicResource ColorHudOnBackground}" />
-                    <Label
+                        Grid.Column="0"
+                        VerticalOptions="Center"
                         IsVisible="{Binding ShowStatus}"
                         Text="{Binding StatusText}"
                         FontSize="11"
                         Opacity="0.8"
                         TextColor="{DynamicResource ColorHudOnBackground}" />
-                </VerticalStackLayout>
-                <controls:HudIconButton
-                    Grid.Column="2"
-                    IconData="F0 M4 5 H20 A2 2 0 0 1 22 7 V17 A2 2 0 0 1 20 19 H4 A2 2 0 0 1 2 17 V7 A2 2 0 0 1 4 5 Z M5 10.5 H11 V12.5 H5 Z M13 10.5 H19 V12.5 H13 Z M5 14.5 H9 V16.5 H5 Z M11 14.5 H19 V16.5 H11 Z"
-                    IconSize="22"
-                    WidthRequest="40"
-                    IconColor="{DynamicResource ColorHudOnBackground}"
-                    Command="{Binding OpenSubtitlesCommand}"
-                    SemanticProperties.Description="{loc:T Player.Subtitles}" />
-                <controls:HudIconButton
-                    Grid.Column="3"
-                    IconData="M3 9 H7 L12 4.5 V19.5 L7 15 H3 Z M14.5 8 L15.9 6.6 A7.6 7.6 0 0 1 15.9 17.4 L14.5 16 A5.6 5.6 0 0 0 14.5 8 Z"
-                    IconSize="22"
-                    WidthRequest="40"
-                    IconColor="{DynamicResource ColorHudOnBackground}"
-                    Command="{Binding OpenAudioCommand}"
-                    SemanticProperties.Description="{loc:T Player.Audio}" />
-                <controls:HudIconButton
-                    Grid.Column="4"
-                    IconData="M6 6 H16 V3 L21 7.5 L16 12 V9 H8 V12 H6 Z M18 18 H8 V21 L3 16.5 L8 12 V15 H16 V12 H18 Z"
-                    IconSize="22"
-                    WidthRequest="40"
-                    IconColor="{DynamicResource ColorHudOnBackground}"
-                    Command="{Binding OpenRepeatCommand}"
-                    SemanticProperties.Description="{loc:T Player.Repeat}" />
-                <controls:HudIconButton
-                    Grid.Column="5"
-                    IconData="F0 M3 5 H21 V19 H3 Z M5 7 V17 H19 V7 Z M7 9 H11 V10.5 H8.5 V13 H7 Z M17 15 H13 V13.5 H15.5 V11 H17 Z"
-                    IconSize="22"
-                    WidthRequest="40"
-                    IconColor="{DynamicResource ColorHudOnBackground}"
-                    Command="{Binding CycleAspectCommand}"
-                    SemanticProperties.Description="{loc:T Player.Aspect}" />
-                <controls:HudIconButton
-                    Grid.Column="6"
-                    IconData="F0 M6 10 H18 V21 H6 Z M11 14 H13 V17 H11 Z M8 10 V7 A4 4 0 0 1 16 7 V10 H14 V7 A2 2 0 0 0 10 7 V10 Z"
-                    IconSize="22"
-                    WidthRequest="40"
-                    IconColor="{DynamicResource ColorHudOnBackground}"
-                    Command="{Binding LockCommand}"
-                    SemanticProperties.Description="{loc:T Player.Lock}" />
+                    <Button
+                        Grid.Column="1"
+                        HorizontalOptions="Start"
+                        VerticalOptions="Center"
+                        Text="{Binding SpeedText}"
+                        Command="{Binding OpenSpeedCommand}"
+                        BackgroundColor="Transparent"
+                        TextColor="{DynamicResource ColorHudOnBackground}"
+                        BorderColor="{DynamicResource ColorHudOnBackground}"
+                        BorderWidth="1"
+                        CornerRadius="6"
+                        FontSize="13"
+                        Padding="10,4"
+                        MinimumHeightRequest="32"
+                        HeightRequest="32"
+                        MinimumWidthRequest="52"
+                        SemanticProperties.Hint="{loc:T Player.PlaybackSpeed}" />
+                    <controls:HudIconButton
+                        Grid.Column="2"
+                        IconData="F0 M3 5 H21 V19 H3 Z M5 7 V17 H19 V7 Z M7 9 H11 V10.5 H8.5 V13 H7 Z M17 15 H13 V13.5 H15.5 V11 H17 Z"
+                        IconSize="22"
+                        WidthRequest="40"
+                        IconColor="{DynamicResource ColorHudOnBackground}"
+                        Command="{Binding CycleAspectCommand}"
+                        SemanticProperties.Description="{loc:T Player.Aspect}" />
+                    <controls:HudIconButton
+                        Grid.Column="3"
+                        IconData="M10.5 4 H13.5 V7 H10.5 Z M10.5 10.5 H13.5 V13.5 H10.5 Z M10.5 17 H13.5 V20 H10.5 Z"
+                        IconSize="22"
+                        WidthRequest="40"
+                        IconColor="{DynamicResource ColorHudOnBackground}"
+                        Command="{Binding OpenMenuCommand}"
+                        SemanticProperties.Description="{loc:T Player.Menu}" />
+                    <controls:HudIconButton
+                        Grid.Column="4"
+                        IconData="F0 M6 10 H18 V21 H6 Z M11 14 H13 V17 H11 Z M8 10 V7 A4 4 0 0 1 16 7 V10 H14 V7 A2 2 0 0 0 10 7 V10 Z"
+                        IconSize="22"
+                        WidthRequest="40"
+                        IconColor="{DynamicResource ColorHudOnBackground}"
+                        Command="{Binding LockCommand}"
+                        SemanticProperties.Description="{loc:T Player.Lock}" />
+                </Grid>
             </Grid>
 
             <Grid
                 Grid.Row="2"
-                Padding="12,8"
+                Padding="{Binding BottomBarPadding}"
                 RowDefinitions="Auto,Auto"
                 RowSpacing="6"
                 FlowDirection="LeftToRight"
@@ -176,26 +171,13 @@
                         TextColor="{DynamicResource ColorHudOnBackground}" />
                 </Grid>
 
-                <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto,Auto,*" ColumnSpacing="20">
-                    <Button
-                        Grid.Column="0"
-                        HorizontalOptions="Start"
-                        VerticalOptions="Center"
-                        Text="{Binding SpeedText}"
-                        Command="{Binding OpenSpeedCommand}"
-                        BackgroundColor="Transparent"
-                        TextColor="{DynamicResource ColorHudOnBackground}"
-                        BorderColor="{DynamicResource ColorHudOnBackground}"
-                        BorderWidth="1"
-                        CornerRadius="6"
-                        FontSize="13"
-                        Padding="10,4"
-                        MinimumHeightRequest="32"
-                        HeightRequest="32"
-                        MinimumWidthRequest="52"
-                        SemanticProperties.Hint="{loc:T Player.PlaybackSpeed}" />
+                <Grid
+                    Grid.Row="1"
+                    ColumnDefinitions="Auto,Auto,Auto"
+                    ColumnSpacing="20"
+                    HorizontalOptions="Center">
                     <controls:HudIconButton
-                        Grid.Column="1"
+                        Grid.Column="0"
                         IconData="M6 5 H8.5 V19 H6 Z M19 5 V19 L9.5 12 Z"
                         IconSize="26"
                         WidthRequest="56"
@@ -203,7 +185,7 @@
                         Command="{Binding PreviousCommand}"
                         SemanticProperties.Description="{loc:T Player.Previous}" />
                     <controls:HudIconButton
-                        Grid.Column="2"
+                        Grid.Column="1"
                         IconData="M7 4.5 L19.5 12 L7 19.5 Z"
                         IconSize="36"
                         WidthRequest="64"
@@ -212,7 +194,7 @@
                         Command="{Binding PlayPauseCommand}"
                         SemanticProperties.Description="{loc:T Player.Play}" />
                     <controls:HudIconButton
-                        Grid.Column="2"
+                        Grid.Column="1"
                         IconData="M6.5 5 H10.5 V19 H6.5 Z M13.5 5 H17.5 V19 H13.5 Z"
                         IconSize="36"
                         WidthRequest="64"
@@ -221,30 +203,13 @@
                         Command="{Binding PlayPauseCommand}"
                         SemanticProperties.Description="{loc:T Player.Pause}" />
                     <controls:HudIconButton
-                        Grid.Column="3"
+                        Grid.Column="2"
                         IconData="M15.5 5 H18 V19 H15.5 Z M5 5 L14.5 12 L5 19 Z"
                         IconSize="26"
                         WidthRequest="56"
                         IconColor="{DynamicResource ColorHudOnBackground}"
                         Command="{Binding NextCommand}"
                         SemanticProperties.Description="{loc:T Player.Next}" />
-                    <Button
-                        Grid.Column="4"
-                        HorizontalOptions="End"
-                        VerticalOptions="Center"
-                        Text="{Binding DecoderText}"
-                        Command="{Binding ToggleDecoderCommand}"
-                        BackgroundColor="Transparent"
-                        TextColor="{DynamicResource ColorHudOnBackground}"
-                        BorderColor="{DynamicResource ColorHudOnBackground}"
-                        BorderWidth="1"
-                        CornerRadius="6"
-                        FontSize="13"
-                        Padding="10,4"
-                        MinimumHeightRequest="32"
-                        HeightRequest="32"
-                        MinimumWidthRequest="52"
-                        SemanticProperties.Hint="{loc:T Player.Decoder}" />
                 </Grid>
             </Grid>
         </Grid>

@@ -1,6 +1,7 @@
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Maui;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Devices;
@@ -55,6 +56,12 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _isLocked;
     [ObservableProperty] private bool _isUnlockVisible;
 
+    // The bars and the OSD keep clear of the system bars and a camera cutout (see ApplyInsets).
+    [ObservableProperty] private Thickness _topBarPadding = new(8, 6, 8, 6);
+    [ObservableProperty] private Thickness _bottomBarPadding = new(12, 8, 12, 8);
+    [ObservableProperty] private Thickness _osdMargin = new(0, 96, 0, 0);
+    [ObservableProperty] private Thickness _unlockMargin = new(16, 0, 16, 0);
+
     /// <summary>The on-screen indicator of gesture values.</summary>
     public OsdViewModel Osd { get; }
 
@@ -100,6 +107,8 @@ public sealed partial class PlayerViewModel : ObservableObject
         _uiSettings.Changed += OnUiSettingsChanged;
         _gestureHandler.Attach();
         _surface.SetImmersive(true);
+        _surface.Changed += OnSurfaceChanged;
+        ApplyInsets(_surface.SystemBarInsets);
 
         ApplySnapshot(_engine.Snapshot);
         if (_returnFromSheet)
@@ -120,11 +129,33 @@ public sealed partial class PlayerViewModel : ObservableObject
         _engine.SnapshotChanged -= OnSnapshotChanged;
         _coordinator.Changed -= OnCoordinatorChanged;
         _uiSettings.Changed -= OnUiSettingsChanged;
+        _surface.Changed -= OnSurfaceChanged;
         _gestureHandler.Detach(); // the window stays immersive: a settings sheet may open on top
         CancelUnlockTimer(); // the lock itself stays: a locked screen stays locked in the background
         IsUnlockVisible = false;
         CancelHideTimer();
         StopStatus();
+    }
+
+    /// <summary>
+    /// Keeps the bars and the OSD clear of the system bars and a camera cutout. The bars sit inside the insets;
+    /// the OSD and the unlock button sit inside the left and right insets.
+    /// </summary>
+    private void ApplyInsets(EdgeInsets insets)
+    {
+        TopBarPadding = new Thickness(8 + insets.Left, 6 + insets.Top, 8 + insets.Right, 6);
+        BottomBarPadding = new Thickness(12 + insets.Left, 8, 12 + insets.Right, 8 + insets.Bottom);
+        OsdMargin = new Thickness(insets.Left, 96, insets.Right, 0);
+        UnlockMargin = new Thickness(16 + insets.Left, 0, 16 + insets.Right, 0);
+    }
+
+    private void OnSurfaceChanged(object? sender, EventArgs e)
+    {
+        // The surface may raise this off the UI thread.
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (_active) ApplyInsets(_surface.SystemBarInsets);
+        });
     }
 
     partial void OnPositionMsChanged(double value)
