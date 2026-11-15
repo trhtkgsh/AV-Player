@@ -678,6 +678,7 @@ public sealed partial class FoldersViewModel : ObservableObject
                 break;
 
             case ExplorerViewMode.Tree:
+                TrimTreePath(visible);
                 AddTreeRows(visible);
                 break;
 
@@ -693,6 +694,19 @@ public sealed partial class FoldersViewModel : ObservableObject
         var empty = _loaded && !PermissionDenied && Folders.Count == 0;
         ShowNoFavorites = empty && mode == ExplorerViewMode.Favorites;
         ShowNoFolders = empty && mode != ExplorerViewMode.Favorites;
+    }
+
+    // When the current directory is gone (refresh, library change, audio-only switch), the path goes up
+    // until a directory with children or a media folder is found, or the storage root.
+    private void TrimTreePath(IReadOnlyList<MediaFolder> visible)
+    {
+        while (_treePath.Length > 0
+            && FolderTree.GetChildren(visible, _treePath).Count == 0
+            && CurrentTreeFolder(visible) is null)
+        {
+            var slash = _treePath.LastIndexOf('/');
+            SetTreePath(slash < 0 ? "" : _treePath[..slash]);
+        }
     }
 
     private void AddTreeRows(IReadOnlyList<MediaFolder> visible)
