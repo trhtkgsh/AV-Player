@@ -3,7 +3,7 @@ using Player.Core.Contracts;
 using Player.Core.Models;
 using Player.Data.Database;
 
-namespace Player.Data.UiSettingsStore;
+namespace Player.Data.UiSettingsStorage;
 
 public sealed class UiSettingsStore : IUiSettingsStore
 {
@@ -17,7 +17,7 @@ public sealed class UiSettingsStore : IUiSettingsStore
 
 	private readonly SettingsRepository _settings;
 	private readonly SemaphoreSlim _gate = new(1, 1);
-	private UiSettings? _cache;
+	private volatile UiSettings? _cache;
 
 	public UiSettingsStore(SettingsRepository settings)
 	{
@@ -29,14 +29,13 @@ public sealed class UiSettingsStore : IUiSettingsStore
 
 	public async Task<UiSettings> GetAsync(CancellationToken ct)
 	{
-		ct.ThrowIfCancellationRequested();
-
 		var cached = _cache;
 		if (cached is not null)
 		{
 			return cached;
 		}
 
+		ct.ThrowIfCancellationRequested();
 		await _gate.WaitAsync(ct).ConfigureAwait(false);
 		try
 		{
@@ -66,7 +65,7 @@ public sealed class UiSettingsStore : IUiSettingsStore
 		try
 		{
 			normalized = Normalize(value);
-			var json = JsonSerializer.Serialize(normalized, UiSettingsJsonContext.Default.UiSettings);
+			var json = JsonSerializer.Serialize(ToDto(normalized), UiSettingsJsonContext.Default.UiSettingsDto);
 			await _settings.SetJsonAsync(SettingsKey, json, ct).ConfigureAwait(false);
 			_cache = normalized;
 		}
@@ -88,13 +87,54 @@ public sealed class UiSettingsStore : IUiSettingsStore
 
 		try
 		{
-			return JsonSerializer.Deserialize(json, UiSettingsJsonContext.Default.UiSettings) ?? new UiSettings();
+			var dto = JsonSerializer.Deserialize(json, UiSettingsJsonContext.Default.UiSettingsDto);
+			return FromDto(dto);
 		}
 		catch (JsonException)
 		{
 			return new UiSettings();
 		}
 	}
+
+	private static UiSettingsDto ToDto(UiSettings value) => new()
+	{
+		HudAutoHideSeconds = value.HudAutoHideSeconds,
+		SkipSeconds = value.SkipSeconds,
+		ShowClock = value.ShowClock,
+		ShowBattery = value.ShowBattery,
+		ExplorerFields = value.ExplorerFields.ToString(),
+		ViewMode = value.ViewMode.ToString(),
+		SortField = value.SortField.ToString(),
+		SortDirection = value.SortDirection.ToString(),
+		NewTagDays = value.NewTagDays,
+	};
+
+	// Each field falls back on its own: a missing or unreadable field takes the record default
+	// and never discards the others.
+	private static UiSettings FromDto(UiSettingsDto? dto)
+	{
+		var defaults = new UiSettings();
+		if (dto is null)
+		{
+			return defaults;
+		}
+
+		return new UiSettings
+		{
+			HudAutoHideSeconds = dto.HudAutoHideSeconds ?? defaults.HudAutoHideSeconds,
+			SkipSeconds = dto.SkipSeconds ?? defaults.SkipSeconds,
+			ShowClock = dto.ShowClock ?? defaults.ShowClock,
+			ShowBattery = dto.ShowBattery ?? defaults.ShowBattery,
+			ExplorerFields = ParseEnum(dto.ExplorerFields, defaults.ExplorerFields),
+			ViewMode = ParseEnum(dto.ViewMode, defaults.ViewMode),
+			SortField = ParseEnum(dto.SortField, defaults.SortField),
+			SortDirection = ParseEnum(dto.SortDirection, defaults.SortDirection),
+			NewTagDays = dto.NewTagDays ?? defaults.NewTagDays,
+		};
+	}
+
+	private static T ParseEnum<T>(string? text, T fallback) where T : struct, Enum =>
+		text is not null && Enum.TryParse(text, ignoreCase: true, out T parsed) ? parsed : fallback;
 
 	private void RaiseChanged(UiSettings value)
 	{

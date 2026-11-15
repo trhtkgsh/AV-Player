@@ -1,8 +1,7 @@
 using System.Text.Json.Serialization;
-using Player.Core.Models;
 
-namespace Player.Data.UiSettingsStore;
+namespace Player.Data.UiSettingsStorage;
 
-[JsonSourceGenerationOptions(UseStringEnumConverter = true)]
-[JsonSerializable(typeof(UiSettings))]
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSerializable(typeof(UiSettingsDto))]
 internal sealed partial class UiSettingsJsonContext : JsonSerializerContext;

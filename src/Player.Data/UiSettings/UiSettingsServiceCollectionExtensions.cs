@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Player.Core.Contracts;
 
-namespace Player.Data.UiSettingsStore;
+namespace Player.Data.UiSettingsStorage;
 
 public static class UiSettingsServiceCollectionExtensions
 {
