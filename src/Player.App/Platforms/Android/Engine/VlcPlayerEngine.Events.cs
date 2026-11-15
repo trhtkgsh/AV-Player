@@ -18,6 +18,84 @@ public sealed partial class VlcPlayerEngine
     private int _formatChecks;
     private const long FirstReportedTime = -1;
     private static readonly TimeSpan RevealTimeout = TimeSpan.FromSeconds(2);
+
+    // The LibVLC 3 build for Android takes a third argument, "fast": seek to the key frame at or before
+    // the position instead of decoding up to the position itself. LibVLCSharp 3 does not pass it, so with
+    // MediaPlayer.Time the choice was whatever the argument register happened to hold (seen on the
+    // emulator: the same seek was exact in one build and fast in another). A LibVLC that takes two
+    // arguments ignores the third.
+    [System.Runtime.InteropServices.DllImport("libvlc", EntryPoint = "libvlc_media_player_set_time",
+        CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern void NativeSetTime(
+        IntPtr player, long timeMs,
+        [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.I1)] bool fast);
+
+    private static void SetTime(MediaPlayer player, long timeMs, bool fast) =>
+        NativeSetTime(player.NativeReference, timeMs, fast);
+
+    // An exact seek decodes from the key frame up to the position; far behind a key frame that takes
+    // seconds on a slow device. The wait must outlast it, or a caller that keeps seeking would never
+    // see a picture.
+    private static readonly TimeSpan SeekPictureTimeout = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan ExactSeekDelay = TimeSpan.FromMilliseconds(350);
+    private const string PrerollEndMessage = "end of video preroll";
+    private const string BufferingDoneMessage = "Stream buffering done (";
+
+    // LibVLC buffers its cache length (about one second) plus the stretch it must decode and drop before
+    // the position. Up to this length there is nothing to drop (a fast seek, or a position on a key
+    // frame) and no preroll message follows: the picture comes within a moment of the buffering.
+    private const int ShortBufferMs = 1500;
+    private static readonly TimeSpan ShortBufferSettle = TimeSpan.FromMilliseconds(150);
+    private TaskCompletionSource? _seekPicture;   // engine thread only: the newest paused seek whose picture is awaited
+    private long? _previewTarget;                 // engine thread only: a paused position shown by its key frame so far
+    private int _previewId;
+
+    private Task PreviewSeek(long target)
+    {
+        SetTime(_player!, target, fast: true);
+        _previewTarget = target;
+        var id = ++_previewId;
+        _ = Task.Delay(ExactSeekDelay).ContinueWith(
+            _ => PostEvent(() => ExactSeek(id)), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+        return ExpectSeekPicture();
+    }
+
+    /// <summary>The finger rests: show the picture of the position itself.</summary>
+    private void ExactSeek(int id)
+    {
+        if (id != _previewId || _previewTarget is not { } target || !_pauseRequested || _revealingFrame
+            || !Live || _status == PlayerStatus.Opening)
+            return;
+
+        _previewTarget = null;
+        SetTime(_player!, target, fast: false);
+    }
+
+    /// <summary>The wait of an older seek ends at once: LibVLC drops its picture for the newer one.</summary>
+    private Task ExpectSeekPicture()
+    {
+        SeekPictureShown();
+        var pending = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _seekPicture = pending;
+        CompleteLater(pending, SeekPictureTimeout);
+        return pending.Task;
+    }
+
+    private void SeekPictureShown()
+    {
+        _seekPicture?.TrySetResult();
+        _seekPicture = null;
+    }
+
+    private void SeekBuffered(int bufferedMs)
+    {
+        if (_seekPicture is { } pending && bufferedMs <= ShortBufferMs)
+            CompleteLater(pending, ShortBufferSettle);
+    }
+
+    private static void CompleteLater(TaskCompletionSource pending, TimeSpan delay) =>
+        _ = Task.Delay(delay).ContinueWith(
+            _ => pending.TrySetResult(), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
     private volatile bool _revealingFrame;
     private long _revealFromMs;
     private int _revealId;
@@ -163,7 +241,7 @@ public sealed partial class VlcPlayerEngine
             // seconds. A seek to the current position flushes and resyncs it from the last key frame.
             // The last published position is used: LibVLC can still report the time from before a
             // seek that was issued a moment ago, and this resync must not undo that seek.
-            player.Time = _positionMs;
+            SetTime(player, _positionMs, fast: false);
 
             // The requested state decides, not only the reported one: a pause that was just requested
             // may not have been reported yet, and it would leave the new decoder with a black picture.
@@ -370,7 +448,7 @@ public sealed partial class VlcPlayerEngine
             if (_seekOnStart is { } seek)
             {
                 _seekOnStart = null;
-                player.Time = seek;
+                SetTime(player, seek, fast: false);
                 _positionMs = seek;
             }
         }
@@ -542,6 +620,25 @@ public sealed partial class VlcPlayerEngine
             global::Android.Util.Log.Warn(Tag, $"libvlc: {message}");
         else if (Diagnostics)
             global::Android.Util.Log.Debug(Tag, $"libvlc [{e.Level}] {e.Module}: {message}");
+
+        // The first picture of a new position: LibVLC has no event for it, only this debug message
+        // (the pictures before the position are decoded and dropped, the "preroll").
+        if (message.StartsWith(PrerollEndMessage, StringComparison.Ordinal))
+        {
+            PostEvent(SeekPictureShown);
+            return;
+        }
+
+        // "Stream buffering done (1040 ms in 12 ms)": the first number is the length that was buffered.
+        if (message.StartsWith(BufferingDoneMessage, StringComparison.Ordinal))
+        {
+            var rest = message.AsSpan(BufferingDoneMessage.Length);
+            var end = rest.IndexOf(' ');
+            if (end > 0 && int.TryParse(rest[..end], System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out var bufferedMs))
+                PostEvent(() => SeekBuffered(bufferedMs));
+            return;
+        }
 
         // The only reliable signal of the decoder really in use (docs/SPIKE.md finding 4).
         if (!message.StartsWith(marker, StringComparison.Ordinal))
