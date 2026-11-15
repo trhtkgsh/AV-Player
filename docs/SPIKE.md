@@ -54,6 +54,14 @@ Findings 5-8 mean the product should not rely on the stock `LibVLCSharp.MAUI.Vid
 
 Evidence: `docs/evidence/phase1/`.
 
+### Findings added in Phase 2 (emulator API 34, 2026-11-15)
+
+14. **Subtitle renderer options are read from the LibVLC instance, not from the media.** The video output and its text renderer belong to the media player object, and the input's `:option` values are not inherited by them. `:freetype-color`, `:freetype-bold`, `:sub-margin` and the others given as media options changed nothing at all (the Phase 1 code did this, and no style was ever applied). Given to `new LibVLC(...)` as `--option` they all work. So a style change means a new LibVLC instance and a new player, and the engine recreates both when the style differs. Evidence: `docs/evidence/phase2/01-subtitle-style-and-rtl.png`.
+15. **Hebrew punctuation needs `--freetype-text-direction=2`.** The default paragraph direction is left to right, so the full stop of a Hebrew sentence was drawn on the right. With direction 2 (automatic) the line is laid out right to left and mixed Hebrew, Latin and digits come out in the right order.
+16. **Option names and units that work in 3.6.5:** `--sub-text-scale` (percent) for the size; `--freetype-color` and `--freetype-outline-color` (RGB as an integer); `--freetype-outline-thickness` (0, 2, 4 or 6); `--freetype-background-opacity` (0 to 255); `--freetype-bold`; `--sub-margin` in pixels of the video, measured up from LibVLC's own bottom position (200 on a 720p video moved the text up by about 200 video pixels). The margin therefore needs the video height before the instance exists; the engine takes it from the known format or from `MediaMetadataRetriever`.
+17. **MediaStore shows `.srt` files to an app that holds only the media permissions, but not `.ass`.** On API 34 `ep2.srt` has `media_type = 5` (subtitle) and `application/x-subrip`; `vertical.ass` has `media_type = 0` and `application/octet-stream` and is invisible. Sidecar discovery therefore works for `.srt`; an `.ass` or `.ssa` file must be opened with the file picker. Not checked on other API levels.
+18. **A modal Shell page with a transparent background is see-through over the video,** and the playback goes on behind it. The player page gets `OnDisappearing` when the modal opens and `OnAppearing` when it closes. The in-player settings sheets are built this way.
+
 ## Go / no-go
 
 **GO for LibVLCSharp (LibVLC 3) as the engine. The Media3 fallback is not needed.**

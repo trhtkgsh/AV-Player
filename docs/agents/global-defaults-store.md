@@ -12,7 +12,9 @@
 
 **Inputs.** docs/specs/05, docs/ARCHITECTURE.md section 4 (`settings` row `global_defaults`), docs/specs/07 (token keys), docs/CONTRACTS.md.
 
-**Deliverables.** `GlobalDefaultsStore` (Player.Data), `GlobalDefaultsPage` + ViewModel, `DefaultSubtitleStylePage` + ViewModel, `AddGlobalDefaults()` DI extension (in Player.Data) and `AddGlobalDefaultsUi()` (in the feature folder) that registers the route `settings/defaults`.
+**Deliverables.** `GlobalDefaultsStore` (Player.Data), `GlobalDefaultsPage` + ViewModel, `DefaultSubtitleStylePage` + ViewModel, `AddGlobalDefaults()` DI extension (in Player.Data) and `AddGlobalDefaultsUi()` (in the feature folder) that registers the routes `settings-defaults` and `settings-subtitle-style`.
+
+**Decisions made in Phase 2 (they win over the steps below).** Route names are flat (no `/`). Namespaces: `Player.Data.GlobalDefaultsStorage` and `Player.App.Features.DefaultsSettings`, because a namespace named like the model type hides it. The store reads and writes a private DTO with nullable fields and merges it onto `new GlobalDefaults()`: the JSON source generator would reset missing fields. The page does not show `Aspect` (Phase 3), `BackgroundAudio` and `PictureInPictureOnLeave` (Phase 4); it keeps their stored values.
 
 **Steps.**
 1. `GetAsync`: read the row with key `global_defaults`, deserialize with System.Text.Json, return `new GlobalDefaults()` when missing or invalid. Cache the value in memory after the first read.
