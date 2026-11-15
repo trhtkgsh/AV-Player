@@ -9,6 +9,9 @@ public partial class FoldersPage : ContentPage
     private readonly FoldersViewModel _viewModel;
     private readonly BackButtonBehavior _browseBack;
 
+    // The rows' behaviors bind their tap and long-press commands through the page: a Behavior has no ancestor to search.
+    public FoldersViewModel ViewModel => _viewModel;
+
     public FoldersPage(FoldersViewModel viewModel)
     {
         InitializeComponent();

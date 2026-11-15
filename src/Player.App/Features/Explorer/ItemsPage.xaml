@@ -35,8 +35,8 @@
                 <!-- The tap and the long press come from the behavior: a MAUI tap recognizer would block the long press. -->
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
-                        TapCommand="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
-                        LongPressCommand="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsViewModel}"
+                        TapCommand="{Binding ViewModel.OpenCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}"
+                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}"
                         CommandParameter="{Binding .}" />
                 </Grid.Behaviors>
 
@@ -77,8 +77,8 @@
             <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
-                        TapCommand="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
-                        LongPressCommand="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsViewModel}"
+                        TapCommand="{Binding ViewModel.OpenCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}"
+                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}"
                         CommandParameter="{Binding .}" />
                 </Grid.Behaviors>
 

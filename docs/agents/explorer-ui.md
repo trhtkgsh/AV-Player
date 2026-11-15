@@ -86,3 +86,10 @@
 - Behavior properties: `TapCommand`, `LongPressCommand`, `CommandParameter` (the old `Command` is gone). Overlays that block input during a batch keep their MAUI `TapGestureRecognizer`; they are not rows.
 - Pure signatures: unchanged.
 - Not verified on a device: the user's emulator check of the long press, the tap, and the scroll.
+
+**Long press bindings (2026-11-15, R7-43; it fixes the R7-42 crash).**
+- Crash: the R7-42 behaviors bound `Source={RelativeSource AncestorType=...}`. A `Behavior` is not in the visual tree, so the ancestor search fails at start ("not a superclass of Element").
+- Also wrong in R7-41 and R7-42: `Source={x:Reference Page}` with `Path=BeginSelectCommand`. The page has no such property (the commands are on the view model), so the long-press command was null and did nothing.
+- Fix: each page exposes its view model as `ViewModel` (`ItemsPage`, `FoldersPage`). All four row and tile templates bind `TapCommand` and `LongPressCommand` through `Source={x:Reference Page}` with `Path=ViewModel.OpenCommand` (or `OpenRowCommand`, `BeginSelectCommand`). `CommandParameter` stays `{Binding .}`, the row.
+- Pure signatures: unchanged.
+- Not verified on a device: the user's emulator check that the app starts and that the long press enters the mode.
