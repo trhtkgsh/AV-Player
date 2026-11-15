@@ -167,7 +167,7 @@ public sealed class UiSettingsStoreTests : TempDatabaseTestBase
     [Fact]
     public async Task GetAsync_StoredExplorerFieldsWithUndefinedBit_KeepsOnlyDefinedFlags()
     {
-        var value = await LoadRawAsync("{\"ExplorerFields\":\"33\"}");
+        var value = await LoadRawAsync("{\"SchemaVersion\":2,\"ExplorerFields\":\"33\"}");
 
         Assert.Equal(ExplorerInfoFields.Duration, value.ExplorerFields);
     }
