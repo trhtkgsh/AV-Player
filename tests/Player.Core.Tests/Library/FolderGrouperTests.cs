@@ -105,4 +105,56 @@ public sealed class FolderGrouperTests
 
         Assert.Empty(result);
     }
+
+    private static MediaItem Audio(long id, long bucketId = 10) =>
+        TestData.Item(id, bucketId: bucketId) with { Kind = MediaKind.Audio };
+
+    [Fact]
+    public void Group_FolderWithOnlyAudioItems_IsAudioOnly()
+    {
+        var items = new List<MediaItem> { Audio(1), Audio(2) };
+
+        var folder = Assert.Single(Group(items));
+
+        Assert.True(folder.AudioOnly);
+    }
+
+    [Fact]
+    public void Group_FolderWithOnlyVideoItems_IsNotAudioOnly()
+    {
+        var items = new List<MediaItem> { TestData.Item(1), TestData.Item(2) };
+
+        var folder = Assert.Single(Group(items));
+
+        Assert.False(folder.AudioOnly);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Group_MixedFolder_IsNotAudioOnlyWhateverTheOrder(bool audioFirst)
+    {
+        var items = audioFirst
+            ? new List<MediaItem> { Audio(1), TestData.Item(2) }
+            : new List<MediaItem> { TestData.Item(1), Audio(2) };
+
+        var folder = Assert.Single(Group(items));
+
+        Assert.False(folder.AudioOnly);
+    }
+
+    [Fact]
+    public void Group_AudioOnlyIsDecidedPerFolder()
+    {
+        var items = new List<MediaItem>
+        {
+            Audio(1, bucketId: 10),
+            TestData.Item(2, bucketId: 20),
+        };
+
+        var result = Group(items);
+
+        Assert.True(Assert.Single(result, f => f.BucketId == 10).AudioOnly);
+        Assert.False(Assert.Single(result, f => f.BucketId == 20).AudioOnly);
+    }
 }

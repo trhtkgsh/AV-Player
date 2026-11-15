@@ -1,3 +1,4 @@
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Player.Core.Contracts;
@@ -7,7 +8,7 @@ namespace Player.App.Features.InterfaceSettings;
 
 /// <summary>
 /// The interface settings page. Every save starts from the stored record, so the fields this page
-/// does not show (view mode, sort, skip length, battery) keep their stored values.
+/// does not show (view mode, sort, layout) keep their stored values.
 /// </summary>
 public sealed partial class UiSettingsViewModel : ObservableObject
 {
@@ -15,6 +16,10 @@ public sealed partial class UiSettingsViewModel : ObservableObject
     private const int HudMaxSeconds = 10;
     private const int NewTagMinDays = 1;
     private const int NewTagMaxDays = 30;
+    private const double MinLongPressSpeed = 0.25;
+    private const double MaxLongPressSpeed = 4.0;
+    private const double MinNameSizePercent = 80;
+    private const double MaxNameSizePercent = 160;
 
     // The values of the skip length slider, in seconds, ascending.
     private static readonly int[] SkipOptions = [5, 10, 15, 30, 60];
@@ -76,6 +81,17 @@ public sealed partial class UiSettingsViewModel : ObservableObject
     private bool _showPath;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LongPressSpeedText))]
+    private double _longPressSpeed = 2.0;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NameSizeText))]
+    private double _nameSizePercent = 100;
+
+    [ObservableProperty]
+    private bool _includeAudioOnlyFolders = true;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
     private string? _errorMessage;
 
@@ -93,6 +109,13 @@ public sealed partial class UiSettingsViewModel : ObservableObject
 
     public string NewTagDaysText =>
         _localizer.Plural("Interface.Days", ClampRound(NewTagDays, NewTagMinDays, NewTagMaxDays));
+
+    // Technical values, not localized: the invariant culture.
+    public string LongPressSpeedText =>
+        SnapSpeed(LongPressSpeed).ToString("0.0#", CultureInfo.InvariantCulture) + "x";
+
+    public string NameSizeText =>
+        SnapPercent(NameSizePercent).ToString("0", CultureInfo.InvariantCulture) + "%";
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
@@ -151,6 +174,9 @@ public sealed partial class UiSettingsViewModel : ObservableObject
             NewTagDays = settings.NewTagDays;
             SkipIndex = NearestSkipIndex(settings.SkipSeconds);
             ShowBattery = settings.ShowBattery;
+            LongPressSpeed = settings.LongPressSpeed;
+            NameSizePercent = Math.Round(settings.ExplorerFontScale * 100, MidpointRounding.AwayFromZero);
+            IncludeAudioOnlyFolders = settings.IncludeAudioOnlyFolders;
             IsLanguageSystem = settings.Language == AppLanguage.System;
             IsLanguageEnglish = settings.Language == AppLanguage.English;
             IsLanguageHebrew = settings.Language == AppLanguage.Hebrew;
@@ -193,6 +219,22 @@ public sealed partial class UiSettingsViewModel : ObservableObject
         });
     }
 
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task SaveLongPressSpeed()
+    {
+        // Snap the slider to the value that is saved, so the thumb shows the stored number.
+        LongPressSpeed = SnapSpeed(LongPressSpeed);
+        return SaveAsync(current => current with { LongPressSpeed = (float)SnapSpeed(LongPressSpeed) });
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task SaveNameSize()
+    {
+        // Snap the slider to the value that is saved, so the thumb shows the stored number.
+        NameSizePercent = SnapPercent(NameSizePercent);
+        return SaveAsync(current => current with { ExplorerFontScale = SnapPercent(NameSizePercent) / 100 });
+    }
+
     partial void OnShowClockChanged(bool value)
     {
         if (!_loading)
@@ -206,6 +248,14 @@ public sealed partial class UiSettingsViewModel : ObservableObject
         if (!_loading)
         {
             _ = SaveAsync(current => current with { ShowBattery = value });
+        }
+    }
+
+    partial void OnIncludeAudioOnlyFoldersChanged(bool value)
+    {
+        if (!_loading)
+        {
+            _ = SaveAsync(current => current with { IncludeAudioOnlyFolders = value });
         }
     }
 
@@ -304,4 +354,12 @@ public sealed partial class UiSettingsViewModel : ObservableObject
 
     private static int ClampRound(double value, int min, int max) =>
         Math.Clamp((int)Math.Round(value, MidpointRounding.AwayFromZero), min, max);
+
+    // Steps of 0.25 from 0.25x to 4.0x.
+    private static double SnapSpeed(double value) =>
+        Math.Clamp(Math.Round(value * 4, MidpointRounding.AwayFromZero) / 4, MinLongPressSpeed, MaxLongPressSpeed);
+
+    // Steps of 10% from 80% to 160%.
+    private static double SnapPercent(double value) =>
+        Math.Clamp(Math.Round(value / 10, MidpointRounding.AwayFromZero) * 10, MinNameSizePercent, MaxNameSizePercent);
 }

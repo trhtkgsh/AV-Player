@@ -29,7 +29,9 @@ public readonly record struct PointerSample(int Id, double X, double Y);
 /// <param name="TouchSlop">Movement in pixels that turns a tap candidate into a drag.</param>
 /// <param name="DoubleTapWindowMs">Longest time from the first tap's release to the second touch.</param>
 /// <param name="DoubleTapDistance">Largest distance in pixels between the two touch-down points.</param>
+/// <param name="LongPressMs">Time a single pointer must stay down without passing the slop to become a long press.</param>
 public sealed record GestureClassifierOptions(
     double TouchSlop = 16,
     long DoubleTapWindowMs = 300,
-    double DoubleTapDistance = 100);
+    double DoubleTapDistance = 100,
+    long LongPressMs = 500);

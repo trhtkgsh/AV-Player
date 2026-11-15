@@ -1,6 +1,7 @@
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Maui;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Devices;
@@ -29,6 +30,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private UiSettings _settings = new();
     private bool _active;
     private bool _sheetOpening;
+    private bool _menuOpen;
     private bool _returnFromSheet;
     private int _activation;
     private bool _dragging;
@@ -53,6 +55,12 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private bool _isLocked;
     [ObservableProperty] private bool _isUnlockVisible;
+
+    // The bars and the OSD keep clear of the system bars and a camera cutout (see ApplyInsets).
+    [ObservableProperty] private Thickness _topBarPadding = new(8, 6, 8, 6);
+    [ObservableProperty] private Thickness _bottomBarPadding = new(12, 8, 12, 8);
+    [ObservableProperty] private Thickness _osdMargin = new(0, 96, 0, 0);
+    [ObservableProperty] private Thickness _unlockMargin = new(16, 0, 16, 0);
 
     /// <summary>The on-screen indicator of gesture values.</summary>
     public OsdViewModel Osd { get; }
@@ -99,6 +107,9 @@ public sealed partial class PlayerViewModel : ObservableObject
         _uiSettings.Changed += OnUiSettingsChanged;
         _gestureHandler.Attach();
         _surface.SetImmersive(true);
+        _surface.SetSystemBarsVisible(IsHudVisible); // the bars show exactly while the controls show
+        _surface.Changed += OnSurfaceChanged;
+        ApplyInsets(_surface.SystemBarInsets);
 
         ApplySnapshot(_engine.Snapshot);
         if (_returnFromSheet)
@@ -119,11 +130,39 @@ public sealed partial class PlayerViewModel : ObservableObject
         _engine.SnapshotChanged -= OnSnapshotChanged;
         _coordinator.Changed -= OnCoordinatorChanged;
         _uiSettings.Changed -= OnUiSettingsChanged;
+        _surface.Changed -= OnSurfaceChanged;
         _gestureHandler.Detach(); // the window stays immersive: a settings sheet may open on top
         CancelUnlockTimer(); // the lock itself stays: a locked screen stays locked in the background
         IsUnlockVisible = false;
         CancelHideTimer();
         StopStatus();
+    }
+
+    /// <summary>
+    /// Keeps the bars and the OSD clear of the system bars and a camera cutout. The bars sit inside the insets;
+    /// the OSD and the unlock button sit inside the left and right insets.
+    /// </summary>
+    private void ApplyInsets(EdgeInsets insets)
+    {
+        TopBarPadding = new Thickness(8 + insets.Left, 6 + insets.Top, 8 + insets.Right, 6);
+        BottomBarPadding = new Thickness(12 + insets.Left, 8, 12 + insets.Right, 8 + insets.Bottom);
+        OsdMargin = new Thickness(insets.Left, 96, insets.Right, 0);
+        UnlockMargin = new Thickness(16 + insets.Left, 0, 16 + insets.Right, 0);
+    }
+
+    private void OnSurfaceChanged(object? sender, EventArgs e)
+    {
+        // The surface may raise this off the UI thread.
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (_active) ApplyInsets(_surface.SystemBarInsets);
+        });
+    }
+
+    partial void OnIsHudVisibleChanged(bool value)
+    {
+        // The system bars follow the controls: visible exactly while the controls are visible.
+        _surface.SetSystemBarsVisible(value);
     }
 
     partial void OnPositionMsChanged(double value)
@@ -171,6 +210,53 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     [RelayCommand]
     private Task OpenSubtitlesAsync() => OpenSheetAsync("player-subtitles");
+
+    /// <summary>
+    /// The menu of the controls: Subtitles, Audio track, Repeat and the decoder. The controls stay visible while
+    /// the sheet is open, and a second tap while it is open is ignored. Never throws.
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenMenuAsync()
+    {
+        if (_menuOpen) return;
+        _menuOpen = true;
+        CancelHideTimer();
+
+        string subtitles = _localizer["Player.Subtitles"];
+        string audio = _localizer["Player.AudioTrack"];
+        string repeat = _localizer["Player.Repeat"];
+        string decoder = _localizer.Format("Player.MenuDecoder", DecoderText);
+        string? choice = null;
+        try
+        {
+            if (Shell.Current is { } shell)
+            {
+                choice = await shell.DisplayActionSheetAsync(
+                    _localizer["Player.Menu"],
+                    _localizer["Common.Cancel"],
+                    null,
+                    subtitles,
+                    audio,
+                    repeat,
+                    decoder);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Menu failed: {ex}");
+        }
+        finally
+        {
+            _menuOpen = false;
+        }
+
+        // A cancelled or dismissed sheet gives no matching text: the controls simply count down again.
+        if (choice == subtitles) await OpenSubtitlesAsync();
+        else if (choice == audio) await OpenAudioAsync();
+        else if (choice == repeat) await OpenRepeatAsync();
+        else if (choice == decoder) await ToggleDecoderAsync();
+        else RestartHideTimer();
+    }
 
     [RelayCommand]
     private void ToggleHud()
@@ -411,9 +497,9 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     private void RestartHideTimer()
     {
-        CancelHideTimer();
-        if (!_active || IsLocked) return;
+        if (!_active || IsLocked || _menuOpen) return; // the menu's action sheet keeps the controls up
 
+        CancelHideTimer();
         var cts = new CancellationTokenSource();
         _hideCts = cts;
         _ = HideAfterDelayAsync(cts.Token);
