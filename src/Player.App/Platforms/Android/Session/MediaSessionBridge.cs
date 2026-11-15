@@ -20,6 +20,7 @@ namespace Player.App.MediaControls;
 public sealed partial class MediaSessionBridge : IMediaSessionBridge
 {
     internal const string Tag = "ArielSession";
+    internal const string CloseActionId = "com.arielplayer.app.session.CLOSE";
     private const string SessionTag = "ArielPlayer";
     private const int DefaultSkipSeconds = 10;
     private const int MaxArtworkPixels = 1024;
@@ -28,6 +29,7 @@ public sealed partial class MediaSessionBridge : IMediaSessionBridge
     private readonly IPlaybackCoordinator _coordinator;
     private readonly IMediaMetadataService _metadata;
     private readonly IUiSettingsStore _uiSettings;
+    private readonly ILocalizer _localizer;
     private readonly MultiPressDetector _buttons;
     private readonly SessionPublishGate _gate;
     private readonly SemaphoreSlim _syncGate = new(1, 1);
@@ -45,12 +47,14 @@ public sealed partial class MediaSessionBridge : IMediaSessionBridge
         IPlaybackCoordinator coordinator,
         IMediaMetadataService metadata,
         IUiSettingsStore uiSettings,
+        ILocalizer localizer,
         TimeProvider time)
     {
         _engine = engine;
         _coordinator = coordinator;
         _metadata = metadata;
         _uiSettings = uiSettings;
+        _localizer = localizer;
         _gate = new SessionPublishGate(time);
         _buttons = new MultiPressDetector(time, OnButtonDecision);
     }
@@ -67,6 +71,7 @@ public sealed partial class MediaSessionBridge : IMediaSessionBridge
 
         _engine.SnapshotChanged += OnSnapshotChanged;
         _coordinator.Changed += OnCoordinatorChanged;
+        _localizer.Changed += OnLanguageChanged;
         if (_coordinator.Current is not null)
         {
             ScheduleSync();
@@ -114,6 +119,19 @@ public sealed partial class MediaSessionBridge : IMediaSessionBridge
     }
 
     private void OnCoordinatorChanged(object? sender, EventArgs e) => ScheduleSync();
+
+    // UI thread: leave it at once. The state is built again so the name of the close action follows the language.
+    private void OnLanguageChanged(object? sender, EventArgs e) => _ = Task.Run(() =>
+    {
+        try
+        {
+            PublishState(_engine.Snapshot, force: true);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Tag, $"Publishing the state after a language change failed: {ex}");
+        }
+    });
 
     private void ScheduleSync() => _ = Task.Run(SyncAsync);
 
@@ -188,7 +206,7 @@ public sealed partial class MediaSessionBridge : IMediaSessionBridge
             _artwork = null;
             _availability = QueueAvailability.None;
             _gate.Reset();
-            session.SetPlaybackState(BuildState(SessionState.Empty));
+            session.SetPlaybackState(BuildState(SessionState.Empty, hasItem: false));
             session.SetMetadata(null);
             session.Active = false;
             _active = false;
@@ -358,12 +376,12 @@ public sealed partial class MediaSessionBridge : IMediaSessionBridge
                 return;
             }
 
-            session.SetPlaybackState(BuildState(state));
+            session.SetPlaybackState(BuildState(state, hasItem: current is not null));
             Log.Debug(Tag, $"State published: {state.State} {state.PositionMs} ms x{state.Speed} actions={state.Actions}");
         }
     }
 
-    private static AndroidPlaybackState BuildState(SessionState state)
+    private AndroidPlaybackState BuildState(SessionState state, bool hasItem)
     {
         var code = state.State switch
         {
@@ -381,6 +399,16 @@ public sealed partial class MediaSessionBridge : IMediaSessionBridge
         if (state.Error is not null)
         {
             builder.SetErrorMessage(state.Error);
+        }
+
+        if (hasItem)
+        {
+            // From Android 13 the system draws the buttons from this state, so the close button is a custom action.
+            var close = new AndroidPlaybackState.CustomAction.Builder(
+                CloseActionId,
+                _localizer["Session.Close"],
+                global::Android.Resource.Drawable.IcMenuCloseClearCancel).Build();
+            builder.AddCustomAction(close);
         }
 
         return builder.Build()!;
