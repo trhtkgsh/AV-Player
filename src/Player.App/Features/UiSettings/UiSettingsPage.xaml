@@ -38,6 +38,14 @@
                     DragCompletedCommand="{Binding SaveSkipLengthCommand}" />
 
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{loc:T Interface.LongPressSpeed}" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding LongPressSpeedText}" VerticalOptions="Center" />
+            </Grid>
+            <Slider Minimum="0.25" Maximum="4"
+                    Value="{Binding LongPressSpeed, Mode=TwoWay}"
+                    DragCompletedCommand="{Binding SaveLongPressSpeedCommand}" />
+
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
                 <Label Grid.Column="0" Text="{loc:T Interface.ShowClock}" VerticalOptions="Center" />
                 <Switch Grid.Column="1" IsToggled="{Binding ShowClock, Mode=TwoWay}" />
             </Grid>
@@ -47,6 +55,19 @@
             </Grid>
 
             <Label Text="{loc:T Interface.FileList}" Style="{StaticResource LabelSection}" Margin="0,16,0,0" />
+
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{loc:T Interface.NameSize}" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding NameSizeText}" VerticalOptions="Center" />
+            </Grid>
+            <Slider Minimum="80" Maximum="160"
+                    Value="{Binding NameSizePercent, Mode=TwoWay}"
+                    DragCompletedCommand="{Binding SaveNameSizeCommand}" />
+
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{loc:T Interface.ShowAudioOnlyFolders}" VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding IncludeAudioOnlyFolders, Mode=TwoWay}" />
+            </Grid>
 
             <Label Text="{loc:T Interface.DetailsShown}" />
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="Auto,*">
