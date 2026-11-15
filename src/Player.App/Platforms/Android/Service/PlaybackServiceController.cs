@@ -41,13 +41,17 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
 
     private PlaybackService? _service;
     private bool _starting;
-    private bool _videoOff;          // this class switched the picture off for background audio
     private bool _hasFocus;
+    private bool _focusRequested;    // the focus was asked for at least once since it was last given up
     private bool _resumeOnGain;      // playback was paused by a short loss of the audio focus
     private AudioFocusRequestClass? _focusRequest;
+    private FocusListener? _focusListener;
     private NoisyReceiver? _noisy;
     private bool _idleArmed;
     private int _idleToken;
+
+    private readonly object _commandsLock = new();
+    private Task _commands = Task.CompletedTask;   // under _commandsLock: the tail of the command chain
 
     public PlaybackServiceController(
         IPlayerEngine engine,
@@ -114,7 +118,6 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
 
             // Android requires the notification within five seconds of the start, wanted or not.
             EnterForeground(service);
-            RegisterNoisyReceiver();
         }
 
         if (_coordinator.Current is null)
@@ -150,16 +153,13 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
 
         _service = null;
         _running = false;
-        UnregisterNoisyReceiver();
     }
 
-    /// <summary>The app was removed from the recent apps list: playback ends with it.</summary>
-    internal void OnTaskRemoved()
-    {
-        ClosePlayback();
-        StopService();
-        AbandonFocus();
-    }
+    /// <summary>
+    /// The app was removed from the recent apps list: playback ends with it. The service stops when the
+    /// close has gone through (the state is written first), which keeps the process alive until then.
+    /// </summary>
+    internal void OnTaskRemoved() => ClosePlayback();
 
     private void ClosePlayback() => Fire(async ct =>
     {
@@ -223,7 +223,18 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
         }
         catch (Exception ex)
         {
+            // Without the notification Android ends the app five seconds after the start: give up the service.
             AndroidLog.Warn(Tag, $"The service could not enter the foreground: {ex}");
+            _service = null;
+            _running = false;
+            try
+            {
+                service.StopSelf();
+            }
+            catch (Exception stop)
+            {
+                AndroidLog.Warn(Tag, $"Stopping the service failed: {stop}");
+            }
         }
     }
 
@@ -235,7 +246,6 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
 
         _service = null;
         _running = false;
-        UnregisterNoisyReceiver();
         try
         {
             service.StopForeground(Android.App.StopForegroundFlags.Remove);
@@ -300,11 +310,21 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
                 }
 
                 EnsureService();
+                RegisterNoisyReceiver();
                 break;
 
             case PlayerStatus.Idle:
             case PlayerStatus.Error:
-                _videoOff = false;
+                StopService();
+                AbandonFocus();
+                UnregisterNoisyReceiver();
+
+                // The engine keeps the switch across files: the next file must open with its picture.
+                Fire(ct => _engine.SetVideoEnabledAsync(true, ct));
+                return;
+
+            case PlayerStatus.Ended when !_lifecycle.IsForeground:
+                // Nothing more will play and nobody is looking: the service is not needed.
                 StopService();
                 AbandonFocus();
                 return;
@@ -325,33 +345,36 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
         if (_coordinator.Current is null)
             return;
 
-        var status = _engine.Snapshot.Status;
-        if (!_backgroundAudio)
+        // The timer itself checks that nothing plays when it runs out.
+        ArmIdleStop();
+        Fire(async ct =>
         {
-            Fire(_engine.PauseAsync);
-            ArmIdleStop();
-        }
-        else if (status is PlayerStatus.Playing or PlayerStatus.Opening)
-        {
-            // The sound goes on; nothing is decoded for a picture that nobody sees.
-            _videoOff = true;
-            Fire(ct => _engine.SetVideoEnabledAsync(false, ct));
-        }
-        else
-        {
-            ArmIdleStop();
-        }
+            bool audio;
+            try
+            {
+                audio = (await _defaults.GetAsync(ct).ConfigureAwait(false)).BackgroundAudio;
+                _backgroundAudio = audio;
+            }
+            catch (Exception ex)
+            {
+                audio = _backgroundAudio;
+                AndroidLog.Warn(Tag, $"The playback defaults could not be read: {ex}");
+            }
 
-        Fire(_recorder.FlushAsync);
+            // With background audio the sound goes on, and nothing is decoded for a picture that nobody
+            // sees (also for a file that starts later, from the notification or a headset).
+            if (audio)
+                await _engine.SetVideoEnabledAsync(false, ct).ConfigureAwait(false);
+            else
+                await _engine.PauseAsync(ct).ConfigureAwait(false);
+
+            await _recorder.FlushAsync(ct).ConfigureAwait(false);
+        });
     }
 
     private void OnForegrounded()
     {
         CancelIdleStop();
-        if (!_videoOff)
-            return;
-
-        _videoOff = false;
         Fire(ct => _engine.SetVideoEnabledAsync(true, ct));
     }
 
@@ -398,14 +421,17 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
 
         try
         {
-            // "Can duck" is not handled here: from API 26 the system lowers the volume itself.
+            // "Can duck" is not handled here: from API 26 the system lowers the volume of the app's
+            // audio track itself for a short sound of another app.
+            _focusListener ??= new FocusListener(this);
             _focusRequest ??= new AudioFocusRequestClass.Builder(AudioFocus.Gain)
                 .SetAudioAttributes(new AudioAttributes.Builder()
                     .SetUsage(AudioUsageKind.Media)!
                     .SetContentType(AudioContentType.Movie)!
                     .Build()!)!
-                .SetOnAudioFocusChangeListener(new FocusListener(this), _handler)!
+                .SetOnAudioFocusChangeListener(_focusListener, _handler)!
                 .Build()!;
+            _focusRequested = true;
             _hasFocus = audio.RequestAudioFocus(_focusRequest) == AudioFocusRequest.Granted;
         }
         catch (Exception ex)
@@ -417,13 +443,18 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
         return _hasFocus;
     }
 
+    /// <summary>
+    /// Also after a short loss: Android keeps the request in its list until it is given up, and would
+    /// call the listener again later.
+    /// </summary>
     private void AbandonFocus()
     {
         _resumeOnGain = false;
-        if (!_hasFocus || _focusRequest is null)
+        _hasFocus = false;
+        if (!_focusRequested || _focusRequest is null)
             return;
 
-        _hasFocus = false;
+        _focusRequested = false;
         try
         {
             (AndroidApp.Context.GetSystemService(Context.AudioService) as AudioManager)
@@ -515,18 +546,29 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
             MainThread.BeginInvokeOnMainThread(action);
     }
 
-    /// <summary>Runs a command of the engine or the coordinator off the UI thread. Never throws.</summary>
-    private static void Fire(Func<CancellationToken, Task> command) => _ = Task.Run(async () =>
+    /// <summary>
+    /// Runs a command of the engine or the coordinator off the UI thread, after the commands sent before
+    /// it (a pause must not overtake the play that was sent first). Never throws.
+    /// </summary>
+    private void Fire(Func<CancellationToken, Task> command)
     {
-        try
+        lock (_commandsLock)
         {
-            await command(CancellationToken.None).ConfigureAwait(false);
+            var previous = _commands;
+            _commands = Task.Run(async () =>
+            {
+                await previous.ConfigureAwait(false);
+                try
+                {
+                    await command(CancellationToken.None).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    AndroidLog.Warn(Tag, $"A playback command failed: {ex}");
+                }
+            });
         }
-        catch (Exception ex)
-        {
-            AndroidLog.Warn(Tag, $"A playback command failed: {ex}");
-        }
-    });
+    }
 
     private sealed class FocusListener(PlaybackServiceController owner)
         : Java.Lang.Object, AudioManager.IOnAudioFocusChangeListener
