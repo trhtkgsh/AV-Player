@@ -472,12 +472,22 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
                 }
 
                 // The All files list leaves out the files of audio-only folders while the setting is off.
-                if (_bucketId is null && !settings.IncludeAudioOnlyFolders)
+                // The newest stored settings decide, not the ones read at the start of the load.
+                if (_bucketId is null)
                 {
-                    audioOnly = await ReadAudioOnlyBucketsAsync(settings.NewTagDays, ct);
+                    var decision = await _uiSettings.GetAsync(ct);
                     if (!IsCurrentLoad(version))
                     {
                         return;
+                    }
+
+                    if (!decision.IncludeAudioOnlyFolders)
+                    {
+                        audioOnly = await ReadAudioOnlyBucketsAsync(settings.NewTagDays, ct);
+                        if (!IsCurrentLoad(version))
+                        {
+                            return;
+                        }
                     }
                 }
             }
