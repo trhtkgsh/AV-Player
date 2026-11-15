@@ -109,17 +109,24 @@ public sealed class Localizer : ILocalizer
     {
         try
         {
-            var stored = await _settings.GetAsync(ct).ConfigureAwait(false);
-            ct.ThrowIfCancellationRequested();
+            AppLanguage? stored = null;
+            try
+            {
+                stored = (await _settings.GetAsync(ct).ConfigureAwait(false)).Language;
+                ct.ThrowIfCancellationRequested();
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                LogOnce("init:" + ex.GetType().Name, $"Reading the language failed, the System rule stays: {ex.Message}");
+            }
 
             // A change that arrived while the store was read is newer than the stored value.
-            Interlocked.CompareExchange(ref _requested, (int)stored.Language, NoChoice);
-            await ApplyAsync(force: true).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (!ct.IsCancellationRequested)
-        {
-            LogOnce("init:" + ex.GetType().Name, $"Reading the language failed, the System rule stays: {ex.Message}");
-            await ApplyAsync(force: false).ConfigureAwait(false);
+            if (stored is { } language)
+            {
+                Interlocked.CompareExchange(ref _requested, (int)language, NoChoice);
+            }
+
+            await ApplyAsync(force: stored is not null).ConfigureAwait(false);
         }
         finally
         {
@@ -304,7 +311,29 @@ public sealed class Localizer : ILocalizer
             }
         }
 
-        Changed?.Invoke(this, EventArgs.Empty);
+        RaiseChanged();
+    }
+
+    // One failing subscriber must not stop the others.
+    private void RaiseChanged()
+    {
+        if (Changed is not { } handlers)
+        {
+            return;
+        }
+
+        foreach (var handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                ((EventHandler)handler)(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                LogOnce("changed:" + handler.Method.DeclaringType?.FullName + "." + handler.Method.Name,
+                    $"A Changed subscriber failed: {ex}");
+            }
+        }
     }
 
     // Application.PageAppearing is the only app-wide signal from inside these paths that a window shows a page.
