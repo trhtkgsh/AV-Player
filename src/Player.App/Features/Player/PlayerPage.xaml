@@ -29,6 +29,26 @@
             VerticalOptions="Center"
             IsRunning="{Binding IsOpening}" />
 
+        <!-- (c2) On-screen indicator of gesture values: centered, about a third from the top, never catches input. -->
+        <Border
+            HorizontalOptions="Center"
+            VerticalOptions="Start"
+            Margin="0,96,0,0"
+            Padding="16,8"
+            InputTransparent="True"
+            IsVisible="{Binding Osd.IsVisible}"
+            BackgroundColor="{DynamicResource ColorHudBackground}"
+            Stroke="Transparent"
+            StrokeThickness="0"
+            StrokeShape="RoundRectangle 12">
+            <Label
+                FlowDirection="LeftToRight"
+                FontSize="20"
+                HorizontalTextAlignment="Center"
+                Text="{Binding Osd.Text}"
+                TextColor="{DynamicResource ColorHudOnBackground}" />
+        </Border>
+
         <!-- (d) HUD. Only the top and bottom bars have a background and catch input; the middle lets taps through. -->
         <Grid IsVisible="{Binding IsHudVisible}" RowDefinitions="Auto,*,Auto">
 

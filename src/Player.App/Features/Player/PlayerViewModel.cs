@@ -46,6 +46,9 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _showClock;
     [ObservableProperty] private string _clockText = "";
 
+    /// <summary>The on-screen indicator of gesture values.</summary>
+    public OsdViewModel Osd { get; }
+
     /// <summary>True while the play icon is shown; the pause icon is shown while playing.</summary>
     public bool ShowPlayIcon => !IsPlaying;
 
@@ -61,6 +64,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _uiSettings = uiSettings;
         _recorder = recorder;
         _localizer = localizer;
+        Osd = new OsdViewModel();
     }
 
     /// <summary>Called when the page appears. Reads the settings once, then subscribes and starts the timers.</summary>
