@@ -14,7 +14,19 @@
     </ContentPage.ToolbarItems>
 
     <ContentPage.Resources>
+        <!-- The ⋮ button: no border, transparent, muted, with a touch area of 44 x 44. -->
+        <Style x:Key="OptionsButton" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="BorderWidth" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="TextColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="MinimumWidthRequest" Value="44" />
+            <Setter Property="MinimumHeightRequest" Value="44" />
+        </Style>
+
         <DataTemplate x:Key="ListItem" x:DataType="explorer:FolderRow">
+
             <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
                 <Grid.GestureRecognizers>
                     <TapGestureRecognizer
@@ -33,7 +45,7 @@
                        FontAttributes="Bold" VerticalOptions="Center" />
                 <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="3" Text="⋮" IsVisible="{Binding HasOptions}"
                         SemanticProperties.Description="{loc:T Explorer.FolderOptions}"
-                        Style="{StaticResource ButtonQuiet}" Padding="10,0" VerticalOptions="Center"
+                        Style="{StaticResource OptionsButton}" VerticalOptions="Center"
                         Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
                         CommandParameter="{Binding .}" />
             </Grid>
@@ -47,15 +59,21 @@
                         CommandParameter="{Binding .}" />
                 </Grid.GestureRecognizers>
 
-                <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
-                    <Path Grid.Column="0" Data="M3 6 H10 L12 8 H21 V19 H3 Z" Aspect="Uniform" HeightRequest="56"
-                          HorizontalOptions="Center" Fill="{DynamicResource ColorOnSurfaceMuted}" />
-                    <Button Grid.Column="1" Text="⋮" IsVisible="{Binding HasOptions}" VerticalOptions="Start"
+                <!-- The symbol and the ⋮ button share one cell: the button sits in the top-end corner of the symbol row. -->
+                <Grid Grid.Row="0">
+                    <Path Data="M3 6 H10 L12 8 H21 V19 H3 Z" Aspect="Uniform" WidthRequest="72" HeightRequest="56"
+                          HorizontalOptions="Center" VerticalOptions="Center">
+                        <Path.Fill>
+                            <SolidColorBrush Color="{DynamicResource ColorOnSurfaceMuted}" />
+                        </Path.Fill>
+                    </Path>
+                    <Button Text="⋮" IsVisible="{Binding HasOptions}" HorizontalOptions="End" VerticalOptions="Start"
                             SemanticProperties.Description="{loc:T Explorer.FolderOptions}"
-                            Style="{StaticResource ButtonQuiet}" Padding="10,0"
+                            Style="{StaticResource OptionsButton}"
                             Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
                             CommandParameter="{Binding .}" />
                 </Grid>
+
 
                 <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
                     <Label Grid.Column="0" Text="★" IsVisible="{Binding Favorite}" TextColor="{DynamicResource ColorOnSurfaceMuted}" />
