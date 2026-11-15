@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
+using Player.Core.Contracts;
 
 namespace Player.App.Features.InterfaceSettings;
 
@@ -9,6 +10,7 @@ public static class UiSettingsUiServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.AddSingleton<IStringSource, InterfaceStrings>();
         services.AddTransient<SettingsHomeViewModel>();
         services.AddTransient<SettingsHomePage>();
         services.AddTransient<UiSettingsViewModel>();
