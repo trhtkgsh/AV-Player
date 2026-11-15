@@ -4,7 +4,11 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 
 ## Current phase
 
-Phase 5, revision 2 (`docs/specs/13-owner-requests-r7.md`): in work since 2026-11-15 20:21, after the
+Phase 5, revision 2 (`docs/specs/13-owner-requests-r7.md`): built on 2026-11-15, waits for the owner's
+device test. APK: `artifacts/AVPlayer-phase5-r2.apk` (Release, built from main at e61152d, 109,413,152 bytes,
+three ABIs, SHA-256 CABD3CCE0B1CE98FFF2F86317C3019896FF86B621A8736B0EEC36C5244A6DC4E, label "AV Player",
+application id and signing certificate unchanged, no network permission). Checklist:
+`docs/qa/phase-5-r2-checklist.md` (78 items). It follows the
 owner's report on the Phase 5 APK (table "Owner report on 2026-11-15 20:21" below).
 
 Before that: Phase 5 with the quiet display (`docs/specs/12-playback-overlay.md`): built on 2026-11-15, waits for the
@@ -497,6 +501,26 @@ Verification, emulator only (Pixel 7 AVD, API 36, x86_64; Debug, then a smoke ru
 Not verified: API 34 and lower (API 29 and 26-28 paths were never run); the time choices other than the default, the line at the top, the switches, the other corners and colors on screen; Picture-in-Picture with the display; the minute tick; invalid and duplicate names on screen (unit tests cover the rules; the duplicate query was not run); the resume position after a rename as a number; rename or delete of the playing file; rotation during Android's dialog; grid tiles; everything on a phone. The fixes after the reviews of R6-20, P5-10 and P5-20 had no second review.
 
 Known limits: a subtitle file next to a renamed video keeps its old name; the playback queue can hold a renamed or deleted item; thumbnails are computed again after a rename; rotation during Android's dialog can report "cancelled" for a change that happened.
+
+## Phase 5 revision 2 (2026-11-15, owner requests 18 to 31, spec 13)
+
+| Task | Agent | Result |
+|---|---|---|
+| R7-01, R7-02 | core-contracts (orchestrator) | merged. Settings fields, `FormatCorner`, move and copy in `IFileOperations`, `CompletedCount`. |
+| R7-10 | ui-settings | merged, not reviewed. Store keys, `SchemaVersion` 2 (an older row reads the explorer details as None until the next save), page rows. |
+| R7-20 to R7-22 | player-hud-ui | merged. Review: changes required (screen kept on without a picture; the restart answer not tied to the file), fixed, not reviewed again. Bottom bar 80 units. The restart question cannot be closed from code: its answer is ignored when the page was left. |
+| R7-30, R7-31 | file-ops | merged. Review: changes required (API 28 and lower: a failed copy could delete an existing file; a subtitle refusal turned a finished move into Cancelled), fixed, not reviewed again. |
+| R7-40 to R7-45 | explorer-ui | merged. The long press needed three rounds (the first hook never fired, the second crashed at start, the third crashed on a tap; found on the emulator). Review: changes required (stale selection after a search, double start, Back during an operation), fixed, not reviewed again. |
+| R7-50 | global-defaults-store | merged, not reviewed. One choice with three values. |
+| R7-60 | app-skeleton | merged, not reviewed. Name and icon; the splash background stays black. |
+| R7-T0 to R7-T2 | test-writer (Sonnet 5.5) | merged. Tests: 2024 pass (1378 Core, 646 Data). |
+| R7-QA | device-qa | `docs/qa/phase-5-r2-checklist.md`, 78 items. |
+
+Verification, emulator only (Pixel 7 AVD, API 36; Debug builds, then a smoke run of the Release APK): name and green icon; name-only rows; Small list and Small grid (three tiles), also in Hebrew; long press on file and folder rows enters the selection mode without opening, taps toggle, Back leaves; ⋮ menu with four actions; copy of one file and of two files (the subtitle is copied); move of one file with one Android dialog for the video and its subtitle, the Watched mark follows; a selected folder moved: two videos moved, the audio file refused by Android with the message; delete with the subtitle in the same dialog; delete of two selected files; "Keep playing the sound": Home gives no small window and the position runs on; the keep-screen-on flag: on while playing in the player and in the small window, off when paused and after Home with sound only; the restart question with No; a middle double tap pauses; times and clock/battery in separate corners; the lower bar.
+
+Not verified: everything on a phone; API 34 and lower; whether the screen really stays lit past the timeout (only the window flag was read); Yes in the restart question; the settings page rows for thickness and corners on screen and their effect; a declined move dialog; Cancel during a copy and a large copy; a name clash in the target; long press on tiles and scrolling against it; the selection with a search filter; Back during an operation; the one-time switch of the details on a real older installation (unit tests only); the seek bar's touch zone; TalkBack.
+
+Known limits: move and copy only into folders that already hold media, no new folder; Android refuses some kinds of files in some folders; a declined move dialog ends without a message; the playback queue can hold a moved, renamed or deleted item; thumbnails are computed again after a move.
 
 ## Known gaps carried forward
 
