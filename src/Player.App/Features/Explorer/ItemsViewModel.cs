@@ -31,6 +31,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private readonly IPlaybackStateStore _stateStore;
     private readonly IUiSettingsStore _uiSettings;
     private readonly IPlaybackCoordinator _coordinator;
+    private readonly IFileOperations _fileOperations;
     private readonly TimeProvider _timeProvider;
     private readonly ILocalizer _localizer;
 
@@ -101,6 +102,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         IPlaybackStateStore stateStore,
         IUiSettingsStore uiSettings,
         IPlaybackCoordinator coordinator,
+        IFileOperations fileOperations,
         TimeProvider timeProvider,
         ILocalizer localizer)
     {
@@ -109,6 +111,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         _stateStore = stateStore;
         _uiSettings = uiSettings;
         _coordinator = coordinator;
+        _fileOperations = fileOperations;
         _timeProvider = timeProvider;
         _localizer = localizer;
     }

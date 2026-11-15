@@ -44,6 +44,14 @@
 - The view modes are four direct buttons in a row under the title: "Folders", "Browser", "Favorites", "All files". There is no "View" menu.
 - Choosing a default speed for a folder (a value or the general default) clears the own speed of every file of that folder (`IPlaybackStateStore`), so the folder's speed applies to all of them; a later choice in the player wins for that file again. Also uses `IPlaybackStateStore.SaveAsync`.
 
+**Decisions made in P5-20 (2026-11-15; they win over the text above).**
+- File rows and tiles open options with the same three-dot button as folders (no long press). Options: "Rename" and "Delete" (`ItemsViewModel.File.cs`).
+- Rename prompts with the base name only; the extension is re-added. Validation is in `FileNameRules` (Core/Logic/Explorer). A problem shows its message and re-asks with the typed text; the same name closes quietly.
+- Delete wording: "Move {0} to the trash?" on Android 11 and later, otherwise "Delete {0}?" (`DeviceInfo`, so no Android types in the module).
+- Success updates the list in place (`MediaListEdits`), with no reload. Cancelled does nothing; Denied and Failed show a short message with the error.
+- If the file is the one in playback (including background audio or PiP), playback is closed through `IPlaybackCoordinator.CloseAsync` before the operation.
+- Per-file state and metadata are keyed by `MediaFileId` (includes date-modified), so a rename orphans them. Not migrated here; decision for the orchestrator.
+
 **Out of scope.** MediaStore access, thumbnail decoding, file operations, the player page, settings pages.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

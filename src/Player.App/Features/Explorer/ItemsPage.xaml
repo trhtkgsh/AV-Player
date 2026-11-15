@@ -13,8 +13,19 @@
     </ContentPage.ToolbarItems>
 
     <ContentPage.Resources>
+        <!-- The ⋮ button: no border, transparent, muted, with a touch area of 44 x 44 (as on the folder rows). -->
+        <Style x:Key="OptionsButton" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="BorderWidth" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="TextColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="MinimumWidthRequest" Value="44" />
+            <Setter Property="MinimumHeightRequest" Value="44" />
+        </Style>
+
         <DataTemplate x:Key="ListItem" x:DataType="explorer:MediaRowViewModel">
-            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*">
+            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto">
                 <Grid.GestureRecognizers>
                     <TapGestureRecognizer
                         Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
@@ -39,6 +50,11 @@
                                TextColor="{DynamicResource ColorWatched}" />
                     </HorizontalStackLayout>
                 </VerticalStackLayout>
+
+                <Button Grid.Column="2" Text="⋮" SemanticProperties.Description="{loc:T Explorer.FileOptions}"
+                        Style="{StaticResource OptionsButton}" VerticalOptions="Center"
+                        Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
+                        CommandParameter="{Binding .}" />
             </Grid>
         </DataTemplate>
 
@@ -53,6 +69,12 @@
                 <Image Grid.Row="0" Source="{Binding ThumbnailPath}" HorizontalOptions="Fill"
                        HeightRequest="{Binding ThumbnailHeight}"
                        Aspect="AspectFill" BackgroundColor="{DynamicResource ColorSurface}" />
+                <!-- The ⋮ button sits in the top-end corner of the thumbnail, as on the folder tiles. -->
+                <Button Grid.Row="0" Text="⋮" HorizontalOptions="End" VerticalOptions="Start"
+                        SemanticProperties.Description="{loc:T Explorer.FileOptions}"
+                        Style="{StaticResource OptionsButton}"
+                        Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
+                        CommandParameter="{Binding .}" />
                 <ProgressBar Grid.Row="1" Progress="{Binding Progress}" IsVisible="{Binding HasProgress}" />
                 <Label Grid.Row="2" Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation" Margin="6,0"
                        FontSize="{Binding NameFontSize}" />
