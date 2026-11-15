@@ -29,22 +29,16 @@ public partial class App : Application
 
 	private async void StartAsync(Window window)
 	{
-		try
+		// Both run at once. The shell waits for them at most 5 seconds, so a stuck initializer cannot keep the
+		// splash page on screen forever. A late result still applies when it finishes.
+		var themeTask = InitializeThemeAsync();
+		var languageTask = InitializeLanguageAsync();
+		var initialization = Task.WhenAll(themeTask, languageTask);
+		var timeout = Task.Delay(TimeSpan.FromSeconds(5));
+		var winner = await Task.WhenAny(initialization, timeout);
+		if (winner != initialization)
 		{
-			await _themeService.InitializeAsync(CancellationToken.None);
-		}
-		catch (Exception ex)
-		{
-			Debug.WriteLine($"Theme initialization failed: {ex}");
-		}
-
-		try
-		{
-			await _localizer.InitializeAsync(CancellationToken.None);
-		}
-		catch (Exception ex)
-		{
-			Debug.WriteLine($"Localization initialization failed: {ex}");
+			Debug.WriteLine("Theme or language initialization did not finish in 5 seconds; the shell is shown anyway.");
 		}
 
 		try
@@ -57,6 +51,37 @@ public partial class App : Application
 			throw;
 		}
 
-		_localizer.ApplyFlowDirection(window);
+		try
+		{
+			_localizer.ApplyFlowDirection(window);
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine($"Applying the flow direction after the shell failed: {ex}");
+		}
+
+		async Task InitializeThemeAsync()
+		{
+			try
+			{
+				await _themeService.InitializeAsync(CancellationToken.None);
+			}
+			catch (Exception ex)
+			{
+				Debug.WriteLine($"Theme initialization failed: {ex}");
+			}
+		}
+
+		async Task InitializeLanguageAsync()
+		{
+			try
+			{
+				await _localizer.InitializeAsync(CancellationToken.None);
+			}
+			catch (Exception ex)
+			{
+				Debug.WriteLine($"Localization initialization failed: {ex}");
+			}
+		}
 	}
 }
