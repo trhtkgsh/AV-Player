@@ -16,6 +16,7 @@ public partial class DefaultSubtitleStylePage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        _viewModel.Activate();
         try
         {
             await _viewModel.LoadAsync();
@@ -24,5 +25,11 @@ public partial class DefaultSubtitleStylePage : ContentPage
         {
             // The page keeps the values it already shows.
         }
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _viewModel.Deactivate();
     }
 }

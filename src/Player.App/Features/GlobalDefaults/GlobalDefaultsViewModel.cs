@@ -21,6 +21,7 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
     private const long MaxDelayMs = 5000;
 
     private readonly IGlobalDefaultsStore _store;
+    private readonly ILocalizer _localizer;
 
     // True while LoadAsync copies the stored record into the properties: no property change saves then.
     private bool _loading;
@@ -37,6 +38,18 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isDecoderSoftware;
+
+    [ObservableProperty]
+    private bool _isAspectFit;
+
+    [ObservableProperty]
+    private bool _isAspectStretch;
+
+    [ObservableProperty]
+    private bool _isAspectCrop;
+
+    [ObservableProperty]
+    private bool _isAspectOriginal;
 
     [ObservableProperty]
     private bool _isRepeatNone;
@@ -73,9 +86,10 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasError;
 
-    public GlobalDefaultsViewModel(IGlobalDefaultsStore store)
+    public GlobalDefaultsViewModel(IGlobalDefaultsStore store, ILocalizer localizer)
     {
         _store = store;
+        _localizer = localizer;
     }
 
     public string SpeedText => Speed.ToString("0.00", CultureInfo.InvariantCulture) + "x";
@@ -94,6 +108,10 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
             Speed = stored.Speed;
             IsDecoderHardware = stored.Decoder == DecoderMode.Hardware;
             IsDecoderSoftware = stored.Decoder == DecoderMode.Software;
+            IsAspectFit = stored.Aspect == AspectMode.Fit;
+            IsAspectStretch = stored.Aspect == AspectMode.Stretch;
+            IsAspectCrop = stored.Aspect == AspectMode.Crop;
+            IsAspectOriginal = stored.Aspect == AspectMode.Original;
             IsRepeatNone = stored.Repeat == RepeatMode.None;
             IsRepeatFile = stored.Repeat == RepeatMode.File;
             IsRepeatFolder = stored.Repeat == RepeatMode.Folder;
@@ -159,6 +177,46 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
         }
 
         _ = SaveAsync(d => d with { Decoder = DecoderMode.Software });
+    }
+
+    partial void OnIsAspectFitChanged(bool value)
+    {
+        if (_loading || !value)
+        {
+            return;
+        }
+
+        _ = SaveAsync(d => d with { Aspect = AspectMode.Fit });
+    }
+
+    partial void OnIsAspectStretchChanged(bool value)
+    {
+        if (_loading || !value)
+        {
+            return;
+        }
+
+        _ = SaveAsync(d => d with { Aspect = AspectMode.Stretch });
+    }
+
+    partial void OnIsAspectCropChanged(bool value)
+    {
+        if (_loading || !value)
+        {
+            return;
+        }
+
+        _ = SaveAsync(d => d with { Aspect = AspectMode.Crop });
+    }
+
+    partial void OnIsAspectOriginalChanged(bool value)
+    {
+        if (_loading || !value)
+        {
+            return;
+        }
+
+        _ = SaveAsync(d => d with { Aspect = AspectMode.Original });
     }
 
     partial void OnIsRepeatNoneChanged(bool value)
@@ -267,16 +325,18 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
             }
 
             var confirmed = await shell.DisplayAlertAsync(
-                "Reset", "Reset all playback defaults?", "Reset", "Cancel");
+                _localizer["Common.Reset"],
+                _localizer["Defaults.ResetAllConfirm"],
+                _localizer["Common.Reset"],
+                _localizer["Common.Cancel"]);
             if (!confirmed)
             {
                 return;
             }
 
-            // The three fields this page does not show keep their stored values.
+            // Reset restores the record defaults. The two fields this page does not show keep their stored values.
             if (await SaveAsync(stored => new GlobalDefaults
             {
-                Aspect = stored.Aspect,
                 BackgroundAudio = stored.BackgroundAudio,
                 PictureInPictureOnLeave = stored.PictureInPictureOnLeave,
             }))

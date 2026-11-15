@@ -24,25 +24,27 @@ public sealed partial class DefaultSubtitleStyleViewModel : ObservableObject
     private const double MinBottomMarginFraction = 0.0;
     private const double MaxBottomMarginFraction = 0.30;
 
-    private static readonly (string Name, uint Argb)[] TextPalette =
+    // The key of each swatch name is in the string source; the colors are not texts.
+    private static readonly (string Key, uint Argb)[] TextPalette =
     {
-        ("White", 0xFFFFFFFF),
-        ("Yellow", 0xFFFFEB3B),
-        ("Cyan", 0xFF4DD0E1),
-        ("Green", 0xFF8BC34A),
-        ("Pink", 0xFFFF80AB),
-        ("Light gray", 0xFFCCCCCC),
+        ("Defaults.Style.Color.White", 0xFFFFFFFF),
+        ("Defaults.Style.Color.Yellow", 0xFFFFEB3B),
+        ("Defaults.Style.Color.Cyan", 0xFF4DD0E1),
+        ("Defaults.Style.Color.Green", 0xFF8BC34A),
+        ("Defaults.Style.Color.Pink", 0xFFFF80AB),
+        ("Defaults.Style.Color.LightGray", 0xFFCCCCCC),
     };
 
-    private static readonly (string Name, uint Argb)[] OutlinePalette =
+    private static readonly (string Key, uint Argb)[] OutlinePalette =
     {
-        ("Black", 0xFF000000),
-        ("Dark gray", 0xFF333333),
-        ("Navy", 0xFF0D1B4C),
-        ("White", 0xFFFFFFFF),
+        ("Defaults.Style.Color.Black", 0xFF000000),
+        ("Defaults.Style.Color.DarkGray", 0xFF333333),
+        ("Defaults.Style.Color.Navy", 0xFF0D1B4C),
+        ("Defaults.Style.Color.White", 0xFFFFFFFF),
     };
 
     private readonly IGlobalDefaultsStore _store;
+    private readonly ILocalizer _localizer;
 
     // True while the stored style is copied into the properties: no property change saves then.
     private bool _loading;
@@ -81,18 +83,19 @@ public sealed partial class DefaultSubtitleStyleViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasError;
 
-    public DefaultSubtitleStyleViewModel(IGlobalDefaultsStore store)
+    public DefaultSubtitleStyleViewModel(IGlobalDefaultsStore store, ILocalizer localizer)
     {
         _store = store;
+        _localizer = localizer;
         TextColors = CreateSwatches(TextPalette);
         OutlineColors = CreateSwatches(OutlinePalette);
         MarkSelected(TextColors, TextColorArgb);
         MarkSelected(OutlineColors, OutlineColorArgb);
     }
 
-    public IReadOnlyList<ColorSwatch> TextColors { get; }
+    public IReadOnlyList<ColorSwatch> TextColors { get; private set; }
 
-    public IReadOnlyList<ColorSwatch> OutlineColors { get; }
+    public IReadOnlyList<ColorSwatch> OutlineColors { get; private set; }
 
     public string FontScaleText => FontScale.ToString("0%", CultureInfo.InvariantCulture);
 
@@ -135,6 +138,34 @@ public sealed partial class DefaultSubtitleStyleViewModel : ObservableObject
     partial void OnOutlineColorArgbChanged(uint value)
     {
         MarkSelected(OutlineColors, value);
+    }
+
+    /// <summary>Called when the page appears. Follows the language while the page is shown and refreshes the swatch names once.</summary>
+    public void Activate()
+    {
+        _localizer.Changed -= OnLocalizerChanged;
+        _localizer.Changed += OnLocalizerChanged;
+        RefreshSwatches();
+    }
+
+    /// <summary>Called when the page disappears. Stops following the language, so the singleton localizer does not keep this ViewModel alive.</summary>
+    public void Deactivate()
+    {
+        _localizer.Changed -= OnLocalizerChanged;
+    }
+
+    // The swatch names are set when the swatches are created, so they are rebuilt in the new language.
+    // The selection is kept by MarkSelected.
+    private void OnLocalizerChanged(object? sender, EventArgs e) => RefreshSwatches();
+
+    private void RefreshSwatches()
+    {
+        TextColors = CreateSwatches(TextPalette);
+        OutlineColors = CreateSwatches(OutlinePalette);
+        MarkSelected(TextColors, TextColorArgb);
+        MarkSelected(OutlineColors, OutlineColorArgb);
+        OnPropertyChanged(nameof(TextColors));
+        OnPropertyChanged(nameof(OutlineColors));
     }
 
     partial void OnBoldChanged(bool value)
@@ -285,8 +316,8 @@ public sealed partial class DefaultSubtitleStyleViewModel : ObservableObject
     private static double Step(double value, double delta, double min, double max) =>
         Math.Clamp(Math.Round(value + delta, 2, MidpointRounding.AwayFromZero), min, max);
 
-    private static IReadOnlyList<ColorSwatch> CreateSwatches((string Name, uint Argb)[] palette) =>
-        palette.Select(entry => new ColorSwatch(entry.Argb, entry.Name)).ToList();
+    private IReadOnlyList<ColorSwatch> CreateSwatches((string Key, uint Argb)[] palette) =>
+        palette.Select(entry => new ColorSwatch(entry.Argb, _localizer[entry.Key])).ToList();
 
     private static void MarkSelected(IReadOnlyList<ColorSwatch> swatches, uint argb)
     {

@@ -3,23 +3,24 @@
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:Player.App.Features.DefaultsSettings"
+             xmlns:loc="clr-namespace:Player.App.Localization"
              x:DataType="local:DefaultSubtitleStyleViewModel"
-             Title="Subtitle style">
+             Title="{loc:T Defaults.SubtitleStyle}">
 
     <ScrollView>
         <VerticalStackLayout Padding="16" Spacing="8">
 
-            <Label Text="Applies to text subtitles (for example .srt). Subtitles in the ASS format keep their own style."
+            <Label Text="{loc:T Defaults.Style.Note}"
                    Style="{StaticResource LabelMuted}" />
 
-            <Label Text="Text size" />
+            <Label Text="{loc:T Defaults.Style.TextSize}" />
             <HorizontalStackLayout Spacing="8">
                 <Label Text="{Binding FontScaleText}" VerticalOptions="Center" />
-                <Button Text="Smaller" Style="{StaticResource ButtonQuiet}" Command="{Binding FontScaleDownCommand}" />
-                <Button Text="Larger" Style="{StaticResource ButtonQuiet}" Command="{Binding FontScaleUpCommand}" />
+                <Button Text="{loc:T Defaults.Style.Smaller}" Style="{StaticResource ButtonQuiet}" Command="{Binding FontScaleDownCommand}" />
+                <Button Text="{loc:T Defaults.Style.Larger}" Style="{StaticResource ButtonQuiet}" Command="{Binding FontScaleUpCommand}" />
             </HorizontalStackLayout>
 
-            <Label Text="Text color" />
+            <Label Text="{loc:T Defaults.Style.TextColor}" />
             <HorizontalStackLayout BindableLayout.ItemsSource="{Binding TextColors}" Spacing="10">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="local:ColorSwatch">
@@ -42,7 +43,7 @@
                 </BindableLayout.ItemTemplate>
             </HorizontalStackLayout>
 
-            <Label Text="Outline color" />
+            <Label Text="{loc:T Defaults.Style.OutlineColor}" />
             <HorizontalStackLayout BindableLayout.ItemsSource="{Binding OutlineColors}" Spacing="10">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="local:ColorSwatch">
@@ -65,33 +66,33 @@
                 </BindableLayout.ItemTemplate>
             </HorizontalStackLayout>
 
-            <Label Text="Outline thickness" />
+            <Label Text="{loc:T Defaults.Style.OutlineThickness}" />
             <HorizontalStackLayout Spacing="8">
                 <Label Text="{Binding OutlineThicknessText}" VerticalOptions="Center" />
-                <Button Text="Thinner" Style="{StaticResource ButtonQuiet}" Command="{Binding OutlineThinnerCommand}" />
-                <Button Text="Thicker" Style="{StaticResource ButtonQuiet}" Command="{Binding OutlineThickerCommand}" />
+                <Button Text="{loc:T Defaults.Style.Thinner}" Style="{StaticResource ButtonQuiet}" Command="{Binding OutlineThinnerCommand}" />
+                <Button Text="{loc:T Defaults.Style.Thicker}" Style="{StaticResource ButtonQuiet}" Command="{Binding OutlineThickerCommand}" />
             </HorizontalStackLayout>
 
-            <Label Text="Background" />
+            <Label Text="{loc:T Defaults.Style.Background}" />
             <HorizontalStackLayout Spacing="8">
                 <Label Text="{Binding BackgroundOpacityText}" VerticalOptions="Center" />
-                <Button Text="Lighter" Style="{StaticResource ButtonQuiet}" Command="{Binding BackgroundLighterCommand}" />
-                <Button Text="Darker" Style="{StaticResource ButtonQuiet}" Command="{Binding BackgroundDarkerCommand}" />
+                <Button Text="{loc:T Defaults.Style.Lighter}" Style="{StaticResource ButtonQuiet}" Command="{Binding BackgroundLighterCommand}" />
+                <Button Text="{loc:T Defaults.Style.Darker}" Style="{StaticResource ButtonQuiet}" Command="{Binding BackgroundDarkerCommand}" />
             </HorizontalStackLayout>
 
             <Grid ColumnDefinitions="*,Auto">
-                <Label Text="Bold" VerticalOptions="Center" />
+                <Label Text="{loc:T Defaults.Style.Bold}" VerticalOptions="Center" />
                 <Switch Grid.Column="1" IsToggled="{Binding Bold, Mode=TwoWay}" />
             </Grid>
 
-            <Label Text="Distance from the bottom" />
+            <Label Text="{loc:T Defaults.Style.BottomMargin}" />
             <HorizontalStackLayout Spacing="8">
                 <Label Text="{Binding BottomMarginText}" VerticalOptions="Center" />
-                <Button Text="Lower" Style="{StaticResource ButtonQuiet}" Command="{Binding BottomMarginLowerCommand}" />
-                <Button Text="Higher" Style="{StaticResource ButtonQuiet}" Command="{Binding BottomMarginHigherCommand}" />
+                <Button Text="{loc:T Defaults.Style.Lower}" Style="{StaticResource ButtonQuiet}" Command="{Binding BottomMarginLowerCommand}" />
+                <Button Text="{loc:T Defaults.Style.Higher}" Style="{StaticResource ButtonQuiet}" Command="{Binding BottomMarginHigherCommand}" />
             </HorizontalStackLayout>
 
-            <Button Text="Reset style" Style="{StaticResource ButtonQuiet}" Command="{Binding ResetStyleCommand}" />
+            <Button Text="{loc:T Defaults.Style.Reset}" Style="{StaticResource ButtonQuiet}" Command="{Binding ResetStyleCommand}" />
 
             <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
                    TextColor="{DynamicResource ColorDanger}" />
