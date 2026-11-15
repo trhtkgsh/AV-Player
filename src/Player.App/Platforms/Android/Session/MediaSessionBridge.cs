@@ -185,6 +185,7 @@ public sealed class MediaSessionBridge : IMediaSessionBridge
                 return;
             }
 
+            var oldArtwork = _artwork;
             _metaItem = null;
             _artwork = null;
             _availability = QueueAvailability.None;
@@ -193,6 +194,7 @@ public sealed class MediaSessionBridge : IMediaSessionBridge
             session.SetMetadata(null);
             session.Active = false;
             _active = false;
+            ReleaseArtwork(oldArtwork);
             Log.Debug(Tag, "Media session inactive");
         }
     }
@@ -213,11 +215,13 @@ public sealed class MediaSessionBridge : IMediaSessionBridge
             if (_metaItem?.Id != item.Id)
             {
                 changed = true;
+                var oldArtwork = _artwork;
                 _metaItem = item;
                 _metaDurationMs = 0;
                 _artwork = null;
                 _gate.Reset();
                 PublishMetadataLocked();
+                ReleaseArtwork(oldArtwork);
             }
 
             PublishState(_engine.Snapshot, force: true);
@@ -245,9 +249,11 @@ public sealed class MediaSessionBridge : IMediaSessionBridge
             {
                 if (_metaItem?.Id != item.Id || _session is null)
                 {
+                    ReleaseArtwork(artwork); // Never published: nobody else holds it.
                     return;
                 }
 
+                var oldArtwork = _artwork;
                 _artwork = artwork;
                 if (_metaDurationMs <= 0)
                 {
@@ -255,11 +261,32 @@ public sealed class MediaSessionBridge : IMediaSessionBridge
                 }
 
                 PublishMetadataLocked();
+                ReleaseArtwork(oldArtwork);
             }
         }
         catch (Exception ex)
         {
             Log.Warn(Tag, $"Loading the cached metadata failed: {ex.Message}");
+        }
+    }
+
+    // Called only after the metadata that replaces the bitmap was set (SetMetadata is a synchronous call and the system
+    // keeps its own copy), so the session no longer reads it.
+    private static void ReleaseArtwork(Bitmap? bitmap)
+    {
+        if (bitmap is null)
+        {
+            return;
+        }
+
+        try
+        {
+            bitmap.Recycle();
+            bitmap.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(Tag, $"Releasing the artwork failed: {ex.Message}");
         }
     }
 
