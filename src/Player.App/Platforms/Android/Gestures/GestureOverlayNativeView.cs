@@ -8,7 +8,8 @@ namespace Player.App.Gestures;
 
 /// <summary>
 /// Native touch catcher. It consumes every touch inside its bounds, hands the raw pointers to the
-/// <see cref="GestureSource"/> and schedules the tick that reports a single tap after the double-tap window.
+/// <see cref="GestureSource"/> and schedules the tick that reports a single tap after the double-tap window
+/// and the long press after its delay (the tick is rescheduled from <c>NextTickMs</c> on every event).
 /// </summary>
 internal sealed class GestureOverlayNativeView : AndroidView
 {

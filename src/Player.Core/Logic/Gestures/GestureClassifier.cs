@@ -8,7 +8,7 @@ namespace Player.Core.Logic.Gestures;
 /// </summary>
 public sealed class GestureClassifier
 {
-    private enum State { Idle, Candidate, Drag, Pinch, Dead }
+    private enum State { Idle, Candidate, Drag, Pinch, LongPress, Dead }
 
     private readonly Action<GestureEvent> _sink;
 
@@ -20,6 +20,7 @@ public sealed class GestureClassifier
 
     private ScreenSide _side;
     private double _downX, _downY;
+    private long _downTimeMs;
     private bool _sequenceLocked;
     private bool _secondTap;
 
@@ -69,10 +70,27 @@ public sealed class GestureClassifier
     }
 
     /// <summary>
-    /// The time at which <see cref="Tick"/> must be called to report the waiting single tap,
-    /// or null when no tap is waiting. Same time base as the events.
+    /// The time at which <see cref="Tick"/> must be called: the end of the double-tap window of the waiting
+    /// single tap, or the long-press time of the touch that is down and still a tap candidate, whichever is
+    /// earlier. Null when nothing waits. Same time base as the events.
     /// </summary>
-    public long? NextTickMs => _pending is { } p && !_secondTap ? p.UpTimeMs + Options.DoubleTapWindowMs : null;
+    public long? NextTickMs
+    {
+        get
+        {
+            var tap = PendingDueMs;
+            var press = LongPressDueMs;
+            if (tap is null)
+                return press;
+
+            return press is null ? tap : Math.Min(tap.Value, press.Value);
+        }
+    }
+
+    private long? PendingDueMs => _pending is { } p && !_secondTap ? p.UpTimeMs + Options.DoubleTapWindowMs : null;
+
+    private long? LongPressDueMs =>
+        _state == State.Candidate && !_sequenceLocked ? _downTimeMs + Options.LongPressMs : null;
 
     /// <summary>Drops any pending tap and any active gesture without reporting anything.</summary>
     public void Reset()
@@ -81,11 +99,16 @@ public sealed class GestureClassifier
         EndTouch();
     }
 
-    /// <summary>Reports the waiting single tap once the double-tap window has passed.</summary>
+    /// <summary>
+    /// Reports the waiting single tap once the double-tap window has passed, and the long press once the
+    /// touch has been down for <see cref="GestureClassifierOptions.LongPressMs"/> without passing the slop.
+    /// </summary>
     public void Tick(long nowMs)
     {
-        if (NextTickMs is { } due && nowMs >= due)
+        if (PendingDueMs is { } tapDue && nowMs >= tapDue)
             FlushPending();
+
+        CheckLongPress(nowMs);
     }
 
     /// <summary>
@@ -97,18 +120,21 @@ public sealed class GestureClassifier
         switch (action)
         {
             case PointerAction.Down: OnDown(pointerId, x, y, timeMs); break;
-            case PointerAction.PointerDown: OnPointerDown(pointerId, x, y); break;
+            case PointerAction.PointerDown: OnPointerDown(pointerId, x, y, timeMs); break;
             case PointerAction.Move:
                 if (IndexOf(pointerId) >= 0)
                 {
                     SetPosition(pointerId, x, y);
-                    OnMoved();
+                    OnMoved(timeMs);
                 }
 
                 break;
             case PointerAction.PointerUp: OnPointerUp(pointerId, x, y, timeMs); break;
             case PointerAction.Up: OnUp(pointerId, x, y, timeMs); break;
-            case PointerAction.Cancel: OnCancel(); break;
+            case PointerAction.Cancel:
+                CheckLongPress(timeMs);
+                OnCancel();
+                break;
         }
     }
 
@@ -126,7 +152,7 @@ public sealed class GestureClassifier
         }
 
         if (any)
-            OnMoved();
+            OnMoved(timeMs);
     }
 
     private void OnDown(int id, double x, double y, long timeMs)
@@ -155,17 +181,22 @@ public sealed class GestureClassifier
         _ys[0] = y;
         _downX = x;
         _downY = y;
+        _downTimeMs = timeMs;
         _side = SideOf(x);
         _state = State.Candidate;
     }
 
-    private void OnPointerDown(int id, double x, double y)
+    private void OnPointerDown(int id, double x, double y, long timeMs)
     {
         if (_count != 1 || IndexOf(id) >= 0)
             return; // a third pointer, or a stray event: ignored for the whole touch
 
+        CheckLongPress(timeMs);
         switch (_state)
         {
+            case State.LongPress:
+                Emit(LongPressEvent(GesturePhase.Cancelled));
+                break;
             case State.Candidate when _sequenceLocked:
                 _state = State.Dead;
                 return;
@@ -189,13 +220,16 @@ public sealed class GestureClassifier
         Began(PinchEvent(GesturePhase.Began));
     }
 
-    private void OnMoved()
+    private void OnMoved(long timeMs)
     {
         switch (_state)
         {
             case State.Candidate:
                 if (_count != 1 || Distance(_xs[0], _ys[0], _downX, _downY) <= Options.TouchSlop)
+                {
+                    CheckLongPress(timeMs);
                     break;
+                }
 
                 if (_sequenceLocked)
                 {
@@ -254,8 +288,12 @@ public sealed class GestureClassifier
         if (IndexOf(id) >= 0)
             SetPosition(id, x, y);
 
+        CheckLongPress(timeMs);
         switch (_state)
         {
+            case State.LongPress:
+                Emit(LongPressEvent(GesturePhase.Ended));
+                break;
             case State.Candidate when _sequenceLocked:
                 Emit(TapEvent(GestureKind.Tap, _xs[0], _ys[0], _side));
                 break;
@@ -281,6 +319,9 @@ public sealed class GestureClassifier
     {
         switch (_state)
         {
+            case State.LongPress:
+                Emit(LongPressEvent(GesturePhase.Cancelled));
+                break;
             case State.Drag:
                 Emit(DragEvent(GesturePhase.Cancelled));
                 break;
@@ -292,6 +333,24 @@ public sealed class GestureClassifier
         // A tap that was waiting for its double stays pending; Tick reports it.
         EndTouch();
     }
+
+    /// <summary>
+    /// Turns the touch into a long press when it has been down long enough and is still inside the slop.
+    /// A tap waiting for its double is reported first, as before a drag.
+    /// </summary>
+    private void CheckLongPress(long nowMs)
+    {
+        if (LongPressDueMs is not { } due || nowMs < due || _count != 1
+            || Distance(_xs[0], _ys[0], _downX, _downY) > Options.TouchSlop)
+            return;
+
+        FlushSecondTap();
+        _state = State.LongPress;
+        Emit(LongPressEvent(GesturePhase.Began));
+    }
+
+    private GestureEvent LongPressEvent(GesturePhase phase) =>
+        new(GestureKind.LongPress, phase, _side, 0, 0, 1, _downX / SafeWidth, _downY / SafeHeight);
 
     private void EndTouch()
     {
