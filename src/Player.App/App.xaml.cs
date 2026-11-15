@@ -19,15 +19,15 @@ public partial class App : Application
 
 	protected override Window CreateWindow(IActivationState? activationState)
 	{
-		// Runs synchronously up to its first real await, so the tokens exist before the first page is created.
-		InitializeTheme();
-		InitializeLocalization();
-		var window = new Window(new AppShell());
+		// A plain splash page until the saved theme and language are applied. The shell is created in StartAsync,
+		// so the first real page is never built with the default theme or the wrong language.
+		var window = new Window(new ContentPage { BackgroundColor = Colors.Black });
 		_localizer.ApplyFlowDirection(window);
+		StartAsync(window);
 		return window;
 	}
 
-	private async void InitializeTheme()
+	private async void StartAsync(Window window)
 	{
 		try
 		{
@@ -37,10 +37,7 @@ public partial class App : Application
 		{
 			Debug.WriteLine($"Theme initialization failed: {ex}");
 		}
-	}
 
-	private async void InitializeLocalization()
-	{
 		try
 		{
 			await _localizer.InitializeAsync(CancellationToken.None);
@@ -49,5 +46,17 @@ public partial class App : Application
 		{
 			Debug.WriteLine($"Localization initialization failed: {ex}");
 		}
+
+		try
+		{
+			window.Page = new AppShell();
+		}
+		catch (Exception ex)
+		{
+			Debug.WriteLine($"Creating the app shell failed: {ex}");
+			throw;
+		}
+
+		_localizer.ApplyFlowDirection(window);
 	}
 }
