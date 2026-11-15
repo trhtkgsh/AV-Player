@@ -152,6 +152,13 @@ public sealed partial class PlayerViewModel : ObservableObject
         CancelUnlockTimer(); // the lock itself stays: a locked screen stays locked in the background
         IsUnlockVisible = false;
         CancelHideTimer();
+        if (_pip.IsActive)
+        {
+            // The page disappears into Picture-in-Picture; Changed may not arrive before the page is gone.
+            _pipActive = true;
+            IsHudVisible = false;
+            _surface.SetSystemBarsVisible(false);
+        }
         StopStatus();
     }
 
@@ -288,9 +295,11 @@ public sealed partial class PlayerViewModel : ObservableObject
         RestartHideTimer();
     }
 
-    /// <summary>While locked: shows the unlock button for 3 seconds. A new call restarts the 3 seconds.</summary>
+    /// <summary>While locked: shows the unlock button for 3 seconds. A new call restarts the 3 seconds. Not in Picture-in-Picture.</summary>
     public void ShowUnlockButton()
     {
+        if (_pipActive) return;
+
         IsUnlockVisible = true;
         CancelUnlockTimer();
         var cts = new CancellationTokenSource();
@@ -400,13 +409,21 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
     }
 
-    /// <summary>Starts Picture-in-Picture. A refusal or a failure does nothing visible. Never throws.</summary>
+    /// <summary>
+    /// Starts Picture-in-Picture. The controls go away before the call, so the small window never shows them. A
+    /// refusal or a failure brings them back and does nothing else visible. Never throws.
+    /// </summary>
     [RelayCommand]
     private async Task EnterPipAsync()
     {
+        CancelHideTimer();
+        IsHudVisible = false;
+        _surface.SetSystemBarsVisible(false);
+
+        bool entered = false;
         try
         {
-            bool entered = await _pip.EnterAsync(CancellationToken.None);
+            entered = await _pip.EnterAsync(CancellationToken.None);
             if (!entered) System.Diagnostics.Debug.WriteLine("Picture-in-Picture was refused.");
         }
         catch (Exception ex)
@@ -414,7 +431,11 @@ public sealed partial class PlayerViewModel : ObservableObject
             System.Diagnostics.Debug.WriteLine($"Picture-in-Picture failed: {ex}");
         }
 
-        RestartHideTimer(); // when it started the controls are already off; otherwise they count down again
+        if (!entered && !_pipActive)
+        {
+            IsHudVisible = true; // the controls the user tapped come back
+            RestartHideTimer();
+        }
     }
 
     private async Task RunAsync(Func<Task> action)
