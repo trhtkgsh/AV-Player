@@ -100,5 +100,13 @@ internal sealed class VideoSurfaceContainer : ViewGroup, ISurfaceHolderCallback
         Post(() => _controller.RefreshInsets(this));
     }
 
+    // The activity puts the theme's bar look back when it resumes; the focus comes after that.
+    public override void OnWindowFocusChanged(bool hasWindowFocus)
+    {
+        base.OnWindowFocusChanged(hasWindowFocus);
+        if (hasWindowFocus)
+            _controller.WindowFocused(this);
+    }
+
     private static int Pixels(double value) => Math.Max(1, (int)Math.Round(value));
 }
