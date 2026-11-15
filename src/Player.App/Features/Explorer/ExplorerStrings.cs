@@ -19,7 +19,7 @@ internal sealed class ExplorerStrings : IStringSource
         ["Explorer.NoFiles"] = new("No media files", "לא נמצאו קבצי מדיה"),
         ["Explorer.NoFolders"] = new("No media folders found", "לא נמצאו תיקיות מדיה"),
         ["Explorer.OpenAppSettings"] = new("Open app settings", "פתח את הגדרות האפליקציה"),
-        ["Explorer.PermissionNeeded"] = new("Ariel Player needs permission to read your video and audio files.", "Ariel Player צריך הרשאה לקרוא את קובצי הווידאו והשמע שלך."),
+        ["Explorer.PermissionNeeded"] = new("Ariel Player needs permission to read your video and audio files.", "Ariel Player צריך הרשאה לקרוא את קבצי הווידאו והשמע שלך."),
         ["Explorer.Search"] = new("Search", "חיפוש"),
         ["Explorer.SettingsFailed"] = new("Settings could not be opened.", "לא ניתן לפתוח את ההגדרות."),
         ["Explorer.Sort"] = new("Sort", "מיון"),
