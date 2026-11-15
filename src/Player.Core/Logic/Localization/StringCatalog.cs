@@ -48,14 +48,15 @@ public sealed class StringCatalog
         TryGet(key, languageCode, out var text) ? text : $"[{key}]";
 
     /// <summary>
-    /// The text of a key in a language. Any code other than "he" gives English. A text that is null (a default
-    /// <see cref="LocalizedText"/>) counts as unknown.
+    /// The text of a key in a language. Any code other than "he" gives English. A Hebrew text that is null or
+    /// empty falls back to the English text (a missing translation shows in English). A key whose texts are
+    /// both null (a default <see cref="LocalizedText"/>) counts as unknown.
     /// </summary>
     public bool TryGet(string key, string languageCode, out string text)
     {
         if (key is not null && _texts.TryGetValue(key, out var entry))
         {
-            var found = IsHebrew(languageCode) ? entry.Hebrew : entry.English;
+            var found = IsHebrew(languageCode) && !string.IsNullOrEmpty(entry.Hebrew) ? entry.Hebrew : entry.English;
             if (found is not null)
             {
                 text = found;

@@ -470,42 +470,123 @@ public sealed class StringCatalogTests
     }
 
     [Fact]
-    public void Get_NullHebrewAndSetEnglish_ReturnsTextInEnglishAndBracketedKeyInHebrew()
+    public void Get_NullHebrewAndSetEnglish_ReturnsEnglishTextInBothLanguages()
     {
-        // Current rule: a null text counts as unknown, there is no fallback from Hebrew to English.
+        // A missing translation shows in English.
         var catalog = RawCatalog("Key.HeMissing", new LocalizedText("Only English", null!));
 
         Assert.Equal("Only English", catalog.Get("Key.HeMissing", "en"));
-        Assert.Equal("[Key.HeMissing]", catalog.Get("Key.HeMissing", "he"));
+        Assert.Equal("Only English", catalog.Get("Key.HeMissing", "he"));
     }
 
     [Fact]
-    public void TryGet_NullHebrewAndSetEnglish_TrueInEnglishFalseInHebrew()
+    public void TryGet_NullHebrewAndSetEnglish_TrueWithEnglishTextInBothLanguages()
     {
         var catalog = RawCatalog("Key.HeMissing", new LocalizedText("Only English", null!));
 
         Assert.True(catalog.TryGet("Key.HeMissing", "en", out var english));
         Assert.Equal("Only English", english);
-        Assert.False(catalog.TryGet("Key.HeMissing", "he", out var hebrew));
-        Assert.Equal(string.Empty, hebrew);
+        Assert.True(catalog.TryGet("Key.HeMissing", "he", out var hebrew));
+        Assert.Equal("Only English", hebrew);
     }
 
     [Fact]
-    public void Format_NullHebrewAndSetEnglish_FormatsEnglishAndBracketsKeyInHebrew()
+    public void Format_NullHebrewAndSetEnglish_FormatsEnglishTextInBothLanguages()
     {
         var catalog = RawCatalog("Key.HeMissing", new LocalizedText("Value {0}", null!));
 
         Assert.Equal("Value 7", catalog.Format("Key.HeMissing", "en", 7));
-        Assert.Equal("[Key.HeMissing]", catalog.Format("Key.HeMissing", "he", 7));
+        Assert.Equal("Value 7", catalog.Format("Key.HeMissing", "he", 7));
     }
 
     [Fact]
-    public void Get_NullEnglishAndSetHebrew_ReturnsBracketedKeyInEnglishAndTextInHebrew()
+    public void Get_EmptyHebrewAndSetEnglish_ReturnsEnglishTextInHebrew()
     {
+        var catalog = RawCatalog("Key.HeEmpty", new LocalizedText("Only English", string.Empty));
+
+        Assert.Equal("Only English", catalog.Get("Key.HeEmpty", "he"));
+        Assert.Equal("Only English", catalog.Get("Key.HeEmpty", "en"));
+    }
+
+    [Fact]
+    public void TryGet_EmptyHebrewAndSetEnglish_TrueWithEnglishTextInHebrew()
+    {
+        var catalog = RawCatalog("Key.HeEmpty", new LocalizedText("Only English", string.Empty));
+
+        Assert.True(catalog.TryGet("Key.HeEmpty", "he", out var text));
+        Assert.Equal("Only English", text);
+    }
+
+    [Fact]
+    public void Format_EmptyHebrewAndSetEnglish_FormatsEnglishTextInHebrew()
+    {
+        var catalog = RawCatalog("Key.HeEmpty", new LocalizedText("Value {0}", string.Empty));
+
+        Assert.Equal("Value 7", catalog.Format("Key.HeEmpty", "he", 7));
+    }
+
+    [Fact]
+    public void Plural_EmptyHebrewAndSetEnglish_UsesEnglishTextInHebrew()
+    {
+        var catalog = new StringCatalog(
+        [
+            new RawStringSource("Files.One", new LocalizedText("1 file", string.Empty)),
+            new RawStringSource("Files.Many", new LocalizedText("{0} files", string.Empty)),
+        ]);
+
+        Assert.Equal("1 file", catalog.Plural("Files", "he", 1));
+        Assert.Equal("5 files", catalog.Plural("Files", "he", 5));
+    }
+
+    [Fact]
+    public void Plural_NullHebrewAndSetEnglish_UsesEnglishTextInHebrew()
+    {
+        var catalog = new StringCatalog(
+        [
+            new RawStringSource("Files.One", new LocalizedText("1 file", null!)),
+            new RawStringSource("Files.Many", new LocalizedText("{0} files", null!)),
+        ]);
+
+        Assert.Equal("1 file", catalog.Plural("Files", "he", 1));
+        Assert.Equal("5 files", catalog.Plural("Files", "he", 5));
+    }
+
+    [Fact]
+    public void Get_SetHebrewAndSetEnglish_HebrewLanguageStillReturnsHebrew()
+    {
+        var catalog = RawCatalog("Key.Both", new LocalizedText("English", "עברית"));
+
+        Assert.Equal("עברית", catalog.Get("Key.Both", "he"));
+    }
+
+    [Fact]
+    public void Get_NullEnglishAndSetHebrew_ReturnsBracketedKeyInEnglishAndHebrewTextInHebrew()
+    {
+        // Pins the current behavior: there is no fallback from English to Hebrew.
         var catalog = RawCatalog("Key.EnMissing", new LocalizedText(null!, "רק עברית"));
 
         Assert.Equal("[Key.EnMissing]", catalog.Get("Key.EnMissing", "en"));
         Assert.Equal("רק עברית", catalog.Get("Key.EnMissing", "he"));
+    }
+
+    [Fact]
+    public void Get_EmptyEnglishAndSetHebrew_ReturnsEmptyStringInEnglishAndHebrewTextInHebrew()
+    {
+        // Pins the current behavior: an empty English text is a text (not unknown), so English gives "".
+        var catalog = RawCatalog("Key.EnEmpty", new LocalizedText(string.Empty, "רק עברית"));
+
+        Assert.Equal(string.Empty, catalog.Get("Key.EnEmpty", "en"));
+        Assert.Equal("רק עברית", catalog.Get("Key.EnEmpty", "he"));
+    }
+
+    [Fact]
+    public void Get_EmptyHebrewAndEmptyEnglish_ReturnsEmptyStringInBothLanguages()
+    {
+        // Pins the current behavior: empty Hebrew falls back to English, and an empty English is returned as is.
+        var catalog = RawCatalog("Key.BothEmpty", new LocalizedText(string.Empty, string.Empty));
+
+        Assert.Equal(string.Empty, catalog.Get("Key.BothEmpty", "en"));
+        Assert.Equal(string.Empty, catalog.Get("Key.BothEmpty", "he"));
     }
 
     [Fact]
