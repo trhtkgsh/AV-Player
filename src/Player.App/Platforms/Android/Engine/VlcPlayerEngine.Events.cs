@@ -14,6 +14,7 @@ public sealed partial class VlcPlayerEngine
     private volatile VideoFormat? _format;
 
     private const int RevealAdvanceMs = 120;
+    private const long FirstReportedTime = -1;
     private static readonly TimeSpan RevealTimeout = TimeSpan.FromSeconds(2);
     private volatile bool _revealingFrame;
     private long _revealFromMs;
@@ -126,21 +127,23 @@ public sealed partial class VlcPlayerEngine
             // may not have been reported yet, and it would leave the new decoder with a black picture.
             // Never while opening: the first running event still has the start settings to apply.
             if (_status == PlayerStatus.Paused || (_pauseRequested && _status == PlayerStatus.Playing))
-                BeginFrameReveal(player);
+                BeginFrameReveal(player, _positionMs);
         }
     }
 
     /// <summary>
-    /// Shows a picture for a paused input whose video track was just selected again.
+    /// Shows a picture for a paused input whose video track was just selected again, or that started paused.
     /// LibVLC 3 has no reliable way to draw one frame in that state: the new decoder is not paused
     /// although the input is, so the first picture races the stopped clock (black about one time in
     /// eight), stepping a frame aborts on the assertion "p_owner->paused", and a restart with
-    /// :start-paused stays black. So the input runs muted until its clock has moved, then pauses again.
+    /// :start-paused draws nothing. So the input runs muted until its clock has moved, then pauses again.
     /// The reported status stays Paused the whole time.
     /// </summary>
-    private void BeginFrameReveal(MediaPlayer player)
+    /// <param name="fromMs">The position the clock must pass, or <see cref="FirstReportedTime"/>.</param>
+    private void BeginFrameReveal(MediaPlayer player, long fromMs)
     {
-        _revealFromMs = _positionMs;
+        Trace($"frame reveal begins from {fromMs}");
+        _revealFromMs = fromMs;
         _revealingFrame = true;
         player.Mute = true;
         player.SetPause(false);
@@ -163,6 +166,7 @@ public sealed partial class VlcPlayerEngine
             return;
 
         _revealingFrame = false;
+        Trace($"frame reveal ends, pause={pause}");
         if (_player is not { } player)
             return;
 
@@ -236,10 +240,13 @@ public sealed partial class VlcPlayerEngine
             var time = e.Time;
             PostEvent(() =>
             {
+                _clockStarted = true;
                 if (_revealingFrame)
                 {
                     // The clock has moved past the resync point, so that picture is on screen.
-                    if (time - _revealFromMs >= RevealAdvanceMs)
+                    if (_revealFromMs == FirstReportedTime)
+                        _revealFromMs = time;
+                    else if (time - _revealFromMs >= RevealAdvanceMs)
                         EndFrameReveal(pause: true);
                     return;
                 }
@@ -272,10 +279,13 @@ public sealed partial class VlcPlayerEngine
             return;
 
         _status = status;
-        if (status == PlayerStatus.Paused)
+
+        // An input that has not run yet reports the time 0, whatever its start position is.
+        if (status == PlayerStatus.Paused && _clockStarted)
             _positionMs = Math.Max(0, player.Time);
 
-        var firstEvent = _settingsPending;
+        if (Diagnostics)
+            Trace($"running: status={status} first={_settingsPending} clock={_clockStarted} time={player.Time} position={_positionMs}");
         if (_settingsPending)
         {
             _settingsPending = false;
@@ -312,11 +322,13 @@ public sealed partial class VlcPlayerEngine
         UpdateVideoOutput();
 
         // An input that starts paused draws nothing (docs/SPIKE.md finding 12): a restart of a paused
-        // file (decoder switch, subtitle style) would leave a black picture until Play.
-        if (firstEvent && status == PlayerStatus.Paused && _pauseRequested && !_revealingFrame
-            && !_startedWithoutVideo && _item!.Kind == MediaKind.Video && Live)
+        // file (decoder switch, subtitle style) would keep the old picture, or none, until Play.
+        // LibVLC reports such an input as Playing and then Paused, so the clock tells the case apart.
+        if (status == PlayerStatus.Paused && _pauseRequested && !_clockStarted && !_revealTried && !_revealingFrame
+            && !_startedWithoutVideo && _videoEnabled && _surfaceAttached && _item!.Kind == MediaKind.Video && Live)
         {
-            BeginFrameReveal(player);
+            _revealTried = true;
+            BeginFrameReveal(player, FirstReportedTime);
         }
 
         if (Live)

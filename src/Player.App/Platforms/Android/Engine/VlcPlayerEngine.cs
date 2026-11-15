@@ -74,6 +74,8 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     private bool _waitingForSurface;
     private bool _startedWithoutVideo;
     private bool _settingsPending;
+    private bool _clockStarted;              // the current input has reported a time
+    private bool _revealTried;               // a first picture was already requested for the current input
     private int? _savedVideoTrack;
 
     private int _generation;
@@ -97,12 +99,15 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     private bool Live =>
         !_waitingForSurface && _status is PlayerStatus.Opening or PlayerStatus.Playing or PlayerStatus.Paused;
 
-    /// <summary>LibVLC reports no time until the input plays, so the requested position is used while opening.</summary>
+    /// <summary>
+    /// LibVLC reports no time until the clock of an input has run (an input that starts paused reports 0),
+    /// so the requested position is used until then.
+    /// </summary>
     private long CurrentPositionMs
     {
         get
         {
-            var time = _status == PlayerStatus.Opening ? -1 : _player?.Time ?? -1;
+            var time = _status == PlayerStatus.Opening || !_clockStarted ? -1 : _player?.Time ?? -1;
             return time >= 0 ? time : _positionMs;
         }
     }
@@ -341,6 +346,8 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         Halt();
         _status = PlayerStatus.Opening;
         _positionMs = _startMs = startMs;
+        _clockStarted = false;
+        _revealTried = false;
         _error = null;
         _actualDecoder = null;
 
