@@ -15,10 +15,10 @@ public sealed class MultiPressDetector : IDisposable
 
     private readonly Action<MediaButtonAction> _decided;
     private readonly TimeProvider _time;
-    private readonly ITimer _timer;
     private readonly object _gate = new();
+    private ITimer? _timer;
     private int _count;
-    private long _lastPress;
+    private long _generation;
     private bool _disposed;
 
     public MultiPressDetector(TimeProvider time, Action<MediaButtonAction> decided, TimeSpan? window = null)
@@ -28,7 +28,6 @@ public sealed class MultiPressDetector : IDisposable
         Window = window ?? DefaultWindow;
         _time = time;
         _decided = decided;
-        _timer = time.CreateTimer(OnTimer, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
     }
 
     /// <summary>The longest gap between two presses of one group.</summary>
@@ -45,17 +44,18 @@ public sealed class MultiPressDetector : IDisposable
                 return;
             }
 
-            _lastPress = _time.GetTimestamp();
+            _generation++;
             _count++;
+            DisarmLocked();
             if (_count >= MaxPresses)
             {
                 _count = 0;
-                _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                 decision = Map(MaxPresses);
             }
             else
             {
-                _timer.Change(Window, Timeout.InfiniteTimeSpan);
+                // Every arming is its own timer and carries its generation: a firing of an older arming is stale.
+                _timer = _time.CreateTimer(OnTimer, _generation, Window, Timeout.InfiniteTimeSpan);
             }
         }
 
@@ -71,9 +71,14 @@ public sealed class MultiPressDetector : IDisposable
         {
             _disposed = true;
             _count = 0;
+            DisarmLocked();
         }
+    }
 
-        _timer.Dispose();
+    private void DisarmLocked()
+    {
+        _timer?.Dispose();
+        _timer = null;
     }
 
     private void OnTimer(object? state)
@@ -81,14 +86,15 @@ public sealed class MultiPressDetector : IDisposable
         MediaButtonAction? decision = null;
         lock (_gate)
         {
-            // A callback that was queued before a later press re-armed the timer is stale: the later arming fires again.
-            if (_disposed || _count == 0 || _time.GetElapsedTime(_lastPress) < Window)
+            // A firing of an older arming (a press came after it) is stale; the newer arming fires on its own.
+            if (_disposed || _count == 0 || state is not long armed || armed != _generation)
             {
                 return;
             }
 
             decision = Map(_count);
             _count = 0;
+            DisarmLocked();
         }
 
         if (decision is { } action)
