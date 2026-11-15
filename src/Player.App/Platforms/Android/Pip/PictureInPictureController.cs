@@ -35,7 +35,9 @@ public sealed partial class PictureInPictureController : IPictureInPictureContro
     private readonly ILocalizer _localizer;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _gate = new();
-    private (bool Playing, VideoFormat? Format, bool OnLeave)? _lastKey;
+    // What the system was really given. Set on the main thread after SetPictureInPictureParams, never before.
+    private (bool Playing, VideoFormat? Format, bool OnLeave)? _appliedKey;
+    private int _updatePending;
     private volatile bool _leaveSetting;
     private volatile bool _paramsApplied;
     private volatile bool _isActive;
@@ -163,7 +165,7 @@ public sealed partial class PictureInPictureController : IPictureInPictureContro
         }
     }
 
-    /// <summary>Called from any thread. Posts one update to the main thread when something that matters changed.</summary>
+    /// <summary>Called from any thread. Posts one update to the main thread when the system's params are out of date.</summary>
     private void RequestUpdate()
     {
         try
@@ -173,18 +175,19 @@ public sealed partial class PictureInPictureController : IPictureInPictureContro
                 return;
             }
 
-            var key = (_engine.Snapshot.Status == PlayerStatus.Playing, _binding.Format, _leaveSetting);
+            var key = CurrentKey();
             lock (_gate)
             {
-                if (_lastKey == key)
+                if (_appliedKey == key)
                 {
                     return;
                 }
-
-                _lastKey = key;
             }
 
-            MainThread.BeginInvokeOnMainThread(UpdateParams);
+            if (Interlocked.Exchange(ref _updatePending, 1) == 0)
+            {
+                MainThread.BeginInvokeOnMainThread(UpdateParams);
+            }
         }
         catch (Exception ex)
         {
@@ -192,16 +195,43 @@ public sealed partial class PictureInPictureController : IPictureInPictureContro
         }
     }
 
+    private (bool Playing, VideoFormat? Format, bool OnLeave) CurrentKey() =>
+        (_engine.Snapshot.Status == PlayerStatus.Playing, _binding.Format, _leaveSetting);
+
     // ---- Params ----
 
-    /// <summary>Main thread. Hands the current icon, ratio and auto-enter flag to the system.</summary>
+    /// <summary>Main thread. Forgets what was applied and applies the params again (a new activity, a PiP mode change).</summary>
+    private void ApplyParamsAgain()
+    {
+        lock (_gate)
+        {
+            _appliedKey = null;
+        }
+
+        UpdateParams();
+    }
+
+    /// <summary>
+    /// Main thread. Hands the current icon, ratio and auto-enter flag to the system. The key is stored only
+    /// after the system has the params: with no activity at hand the next event or activity tries again.
+    /// </summary>
     private void UpdateParams()
     {
+        Interlocked.Exchange(ref _updatePending, 0);
         try
         {
             if (_disposed || !IsSupported)
             {
                 return;
+            }
+
+            var key = CurrentKey();
+            lock (_gate)
+            {
+                if (_appliedKey == key)
+                {
+                    return;
+                }
             }
 
             var activity = GetActivity();
@@ -211,14 +241,17 @@ public sealed partial class PictureInPictureController : IPictureInPictureContro
             }
 
             // With no video there is nothing to show in a window: switch auto-enter off once, then leave the system alone.
-            var hasVideo = _binding.Format is not null;
-            if (!hasVideo && !_paramsApplied)
+            var hasVideo = key.Format is not null;
+            if (hasVideo || _paramsApplied)
             {
-                return;
+                _paramsApplied = hasVideo;
+                activity.SetPictureInPictureParams(BuildParams(activity));
             }
 
-            _paramsApplied = hasVideo;
-            activity.SetPictureInPictureParams(BuildParams(activity));
+            lock (_gate)
+            {
+                _appliedKey = key;
+            }
         }
         catch (Exception ex)
         {

@@ -35,7 +35,12 @@ public sealed partial class PictureInPictureController
 
             // Out of PiP. Expanded to full screen: the activity is started or resumed and playback goes on.
             // Dismissed: the activity is finishing, destroyed or below started.
-            EndPictureInPicture(closePlayback: activity.IsFinishing || activity.IsDestroyed || !IsAtLeastStarted(activity));
+            var closing = activity.IsFinishing || activity.IsDestroyed || !IsAtLeastStarted(activity);
+            EndPictureInPicture(closePlayback: closing);
+            if (!closing)
+            {
+                ApplyParamsAgain();
+            }
         }
         catch (Exception ex)
         {
@@ -136,7 +141,7 @@ public sealed partial class PictureInPictureController
         _session++;
         RegisterReceiver();
         RaiseChanged();
-        UpdateParams();
+        ApplyParamsAgain();
     }
 
     /// <summary>
@@ -193,6 +198,9 @@ public sealed partial class PictureInPictureController
         if (_activity is null || !_activity.TryGetTarget(out var current) || !ReferenceEquals(current, activity))
         {
             _activity = new WeakReference<Activity>(activity);
+
+            // A new activity has none of the params yet.
+            ApplyParamsAgain();
         }
     }
 
@@ -211,7 +219,11 @@ public sealed partial class PictureInPictureController
     {
         try
         {
-            await _coordinator.CloseAsync(CancellationToken.None).ConfigureAwait(false);
+            await _coordinator.CloseAsync(_lifetime.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Disposed.
         }
         catch (Exception ex)
         {
