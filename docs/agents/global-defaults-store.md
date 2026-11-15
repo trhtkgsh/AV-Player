@@ -31,6 +31,8 @@
 
 **Decisions made in Phase 3 (orchestrator).** The "Aspect" row (Fit, Stretch, Crop, 100%) is shown now and "Reset all to defaults" covers it. `BackgroundAudio` and `PictureInPictureOnLeave` stay hidden until Phase 4. Texts come from `DefaultsStrings` (spec 10).
 
+**Decisions made in Phase 4 (orchestrator).** The section "Background" shows "Keep playing sound in the background" (`BackgroundAudio`) and "Picture-in-Picture when leaving the player" (`PictureInPictureOnLeave`), both off by default; "Reset all to defaults" covers them. Turning the first one on asks for the notification permission (MAUI `Permissions.PostNotifications`); the answer is ignored.
+
 **Out of scope.** The resolver (core-contracts). Per-file state. UI settings. Applying defaults to playback (playback-coordinator).
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

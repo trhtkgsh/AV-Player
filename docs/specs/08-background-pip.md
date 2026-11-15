@@ -23,6 +23,18 @@ Contracts: `IPlaybackServiceController`, `IPictureInPictureController`, `IMediaS
 - Device: enter and leave PiP 10 times, rotate in PiP, use each PiP action.
 - Device: force-stop during background play, reopen: position was saved.
 
+## Decisions made while building Phase 4 (orchestrator, 2026-11-15)
+
+- **Close button (requirement 1).** On API 26 to 32 it is an action of the notification. From API 33 Android draws the media notification from the media session, so the close button is a custom action of the session. Where Android lets the user swipe the notification away (while paused), that also closes playback; this was not run on a device.
+- **Stop (requirement 2).** The service stops when playback is closed (Back in the player, the close button, the dismissed Picture-in-Picture window, the app removed from the recent apps list) or after 10 minutes without playing in the background. It does not stop when a file ends in the background: the next file or a repeat may follow, and a stopped service cannot start again from the background.
+- **Background (requirement 3).** "Leaves the foreground" means the activity is stopped. Picture-in-Picture is not that: the activity is only paused there. With the setting on, the picture is switched off in the background whatever the status, and on again when the app returns.
+- **Can duck (requirement 4).** Left to Android, which lowers the app's volume itself from API 26. To check on the phone.
+- **Becoming noisy (requirement 5).** The receiver follows playback (registered while a file plays), not the service.
+- **Notification permission (requirement 6).** Asked by the defaults page each time "Keep playing sound in the background" is turned on; Android shows its dialog only while it may.
+- **Picture-in-Picture alone (requirements 3 and 7).** When only "Picture-in-Picture when leaving the player" is on, a playing video goes to the small window on leave and keeps playing: Picture-in-Picture wins over "pause on leave" as well.
+- **Closing the small window (requirement 8).** Android gives no "dismissed" callback and the order of its callbacks differs between versions; the controller treats a stop without a return to the full screen as a dismissal, except when the screen is off or the device is locked.
+- **Both settings off.** Leaving the app pauses playback, as before Phase 4. Both settings are off by default.
+
 ## Out of scope
 
 Lock-screen artwork beyond the cached thumbnail, sleep timer, casting, Android Auto.

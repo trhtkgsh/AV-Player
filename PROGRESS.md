@@ -4,7 +4,23 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 
 ## Current phase
 
-Phase 3, revision 2: built on 2026-11-15, waits for the owner's device test. Phase 4 does not start before it.
+Phase 4 with the third revision: built on 2026-11-15, waits for the owner's device test. Phase 5 does not start
+before it. On 2026-11-15 16:18 the owner reported on `ArielPlayer-phase3-r2.apk` (Samsung Galaxy A55,
+Android 17, One UI 9): four items to fix (table "Owner feedback on 2026-11-15 (revision 2 APK)" below), the
+three readings of the requests approved, the long-press speed and the language default confirmed. He did not
+say which other items of the list were run. His instruction: "continue with the fixes and go straight to
+Phase 4, then we will check everything". So the gate of revision 2 is not closed by a full device pass: the
+four items are fixed, Phase 4 is built on top, and one device test covers both (owner decision, recorded below).
+
+Phase 4 APK: `artifacts/ArielPlayer-phase4.apk` (Release, built from main at a661014 on 2026-11-15,
+108,316,550 bytes, arm64-v8a, armeabi-v7a and x86_64,
+SHA-256 3118441DAB07E4F92191199694EFBB0937F812D1F090DBDB2BF7851803BDD0FE, same signing certificate; installs
+over the app on the phone and keeps its data). New permissions: `FOREGROUND_SERVICE`,
+`FOREGROUND_SERVICE_MEDIA_PLAYBACK` and `POST_NOTIFICATIONS` (the playback service and its notification).
+No network permission. Checklist: `docs/qa/phase-4-checklist.md` (51 items, then the regression lists). What
+was run and what was not is in "Phase 4 verification" below.
+
+Earlier: Phase 3, revision 2 was built on 2026-11-15 for the owner's eleven requests.
 The owner tested `ArielPlayer-phase3.apk` on the phone and wrote "so far I have found no faults", with eleven
 new requests and the instruction to sort them by the order of the phases. He did not say that the whole
 checklist was run, so the Phase 3 gate is recorded as "no faults reported", not as a full checklist pass. The
@@ -87,6 +103,15 @@ The owner's order is kept in the first column. "Phase" is the phase whose module
 | 6 | The seek gesture shows a still picture of the target in real time, without playing. | 3 | R3-7 | The drag pauses, seeks while the finger moves (only the newest target is sent), and continues on release. | Done, emulator. Speed on long files with far-apart key frames is not measured: only the phone can tell. |
 | 10 (gesture) | Holding a finger on the video plays faster; the earlier speed returns when the finger lifts. | 3 | R3-8 | `GestureKind.LongPress` after half a second; the speed is not saved for the file. | Done, emulator. |
 
+## Owner feedback on 2026-11-15 (revision 2 APK, Samsung Galaxy A55, Android 17, One UI 9)
+
+| # | Feedback | What was found | What was done | State |
+|---|---|---|---|---|
+| 8 | The default speed of a folder does not work. | Not reproduced as such: on the emulator with the same APK a folder's speed applied to never-played files, to played files and after "Next". It did not apply to a file whose speed had once been chosen in the player: the file's own speed won (the rule of spec 11, R2-1). That is the likely cause on the phone; it is not confirmed, the owner gave no steps. | R4-10: the newest choice wins. Choosing a folder's default speed clears the own speed of every file of that folder. | Fixed for that cause, verified on the emulator (FIX-1 to FIX-3). If it still fails on the phone, the steps are needed. |
+| 9 | All the kinds of folder display must be direct buttons, not a menu. | The four modes were in a "View" menu. | R4-10: a row of four buttons under the title: "Folders", "Browser", "Favorites", "All files". | Done, emulator, English and Hebrew (FIX-4, FIX-5, FIX-12). |
+| 10 | The still picture in the seek drag must be the picture of the target time, not of the start; PLR-11 to PLR-13: the picture does not change in the drag. | Reproduced with a 2 minute 1080p file whose key frames are 10 s apart: the picture stayed on the start frame during the whole drag. Two causes (SPIKE findings 29 and 30): the drag sent a seek for every finger movement and LibVLC drops the picture of a seek when the next one arrives; and LibVLCSharp does not pass LibVLC's "fast seek" argument, so the seek kind was chance. My earlier check used 12 to 20 second files with a key frame every second or two, where it happened to work. | R4-01, R4-20, R4-21: a paused seek is a fast seek at once and the exact seek when the finger rests; the engine completes a paused seek when its picture is shown; the drag sends a new target only 300 ms of video apart. | Fixed, verified on the emulator with that file in the Release build (FIX-7 to FIX-9). The phone decides how smooth it is on real films. |
+| 11 | The video may reach Android's top bar but must not pass it. | In revision 2 the picture used the whole window, also under the status bar (my reading of "the picture never moves"). | R4-02: the picture area starts below the status bar, shown or hidden, also when zoomed. | Done; measured in landscape on API 34 (picture rows 66 to 1079 with the controls hidden, shown and hidden). Crop, Stretch and zoom were not run. |
+
 ## Gates
 
 | Phase | Build | Tests | Reviewer | Owner device test | Status |
@@ -95,8 +120,8 @@ The owner's order is kept in the first column. "Phase" is the phase whose module
 | 1 | green (Debug and Release) | 349 pass (307 Core, 42 Data) | every merged task approved, except P1-27 (tests only, Sonnet, checked by the orchestrator) | passed on 2026-11-15 (owner report: all checklist items pass) | PASSED |
 | 2 | green (Debug and Release) | 900 pass (662 Core, 238 Data) | every merged task approved; engine and subtitle service had a gate review and a second round | passed on 2026-11-15 (owner report: Samsung Galaxy A55, 0 failed items, ARM-1 and ARM-2 pass) | PASSED |
 | 3 | green (Debug and Release) | 1340 pass (989 Core, 351 Data) | every merged task approved; engine, surface, gestures, theming, localization and coordinator had a gate review | 2026-11-15: "no faults found so far" (full checklist run not stated); eleven requests, see spec 11 | superseded by revision 2 |
-| 3, revision 2 | green (Debug and Release) | 1634 pass (1104 Core, 530 Data) | every merged product task approved; R3-T2 (tests only, Sonnet) checked by the orchestrator | pending (`docs/qa/phase-3-r2-checklist.md`) | built, waiting for the owner |
-| 4 | - | - | - | - | not started |
+| 3, revision 2 | green (Debug and Release) | 1634 pass (1104 Core, 530 Data) | every merged product task approved; R3-T2 (tests only, Sonnet) checked by the orchestrator | 2026-11-15: four items reported (fixed in revision 3), three readings approved; a full run of the list was not stated | not closed on its own: tested together with Phase 4 by the owner's decision |
+| 4 (with revision 3) | green (Debug and Release) | 1728 pass (1198 Core, 530 Data) | every merged product task approved; engine, surface, media service, session and Picture-in-Picture had a gate review (two or three rounds each); P4-T1 (tests only, Sonnet) checked by the orchestrator | pending (`docs/qa/phase-4-checklist.md`) | built, waiting for the owner |
 | 5 | - | - | - | - | not started |
 
 ## Section 9 checklist
@@ -342,6 +367,44 @@ Run by the orchestrator, on emulators only (x86_64). No physical device was used
 
 Not verified at all in this round: the seek preview on a long file with far-apart key frames (the test files are 12 to 20 seconds); the long press by a real finger (a still finger moves a little; the slop decides); a real camera hole in landscape (the emulators report no cutout); the bars on Samsung's One UI; grid thumbnails on a folder with hundreds of files; folder options and favorites with a real library; the Hebrew texts on a Hebrew phone; items EXP-13, EXP-15, EXP-18, EXP-21, EXP-23, SET-3 to SET-7, PLR-5, PLR-9, PLR-13, PLR-15 to PLR-18 of the checklist, which were not run as written.
 
+## Phase 4 and revision 3 task log (2026-11-15)
+
+Scope decisions by the orchestrator (details in spec 08 and spec 09, "Decisions made while building Phase 4"):
+- The service is a thin Android service; a controller singleton decides on the UI thread and sends its commands in one ordered chain.
+- "Foreground" for `IAppLifecycle` is "started", so Picture-in-Picture counts as foreground.
+- The service is not stopped when a file ends in the background (it could not start again from there).
+- From API 33 the close button of the media control is a custom action of the session.
+- Picture-in-Picture wins over "pause on leave" when only its setting is on.
+- A folder's default speed clears the own speeds of the folder's files (owner feedback 8).
+- No new agent. `media-service` is the orchestrator's own code (Fable), as are the engine and surface changes.
+
+| Task | Agent | Model | Result |
+|---|---|---|---|
+| R4-01, R4-03 | player-engine | Fable 5.2 (orchestrator) | merged. Owner feedback 10. Seeks name their kind (fast or exact) through the native function; a paused seek is fast at once, exact after 350 ms, and completes when its picture is shown. Gate review: approve; follow-up: no picture wait without a surface. |
+| R4-02, R4-03 | video-surface | Fable 5.2 (orchestrator) | merged. Owner feedback 11. The picture area starts below the status bar. Gate review: approve; follow-ups: pan limits use the same area, the inset is cleared with player mode. |
+| R4-10 | explorer-ui | Haiku 5.5 | merged. Owner feedback 8 and 9. Four direct view buttons; a folder's speed clears the own speeds of its files. Reviewer: approve. |
+| R4-20, R4-21 | player-hud-ui | Haiku 5.5 | merged. Paced seek drag; Picture-in-Picture button; controls hidden in the small window; the page leaves itself after a close from outside. Reviewer: changes-required (a finished older drag could disturb a newer one; a stale cancellation token lost the first target of a new drag; a failed leave left Back dead), approve after R4-21. |
+| P4-01, P4-02, P4-03 | media-service | Fable 5.2 (orchestrator) | merged. Playback service, notification, audio focus, headphones receiver, background audio. Gate review, three rounds: changes-required (the picture stayed switched off for the next file after a close in the background), fixed in P4-02 with ten more notes; changes-required again (my new rule stopped the service at every file end in the background, which would have broken lists and repeat from API 31), fixed in P4-03; approve. |
+| P4-10, P4-11, P4-12 | media-session-bt | Sonnet 5.5 | merged. Media session, state mapper, publish gate, multi-press detector, close action. Gate review: changes-required (a press group could be lost when the timer fired a moment early, turning a later single press into "next"), approve after P4-11; P4-12 approve. |
+| P4-20 to P4-23 | pip | Sonnet 5.5 | merged. Picture-in-Picture controller. Gate review, three rounds: changes-required (the close rule was inverted; the decision depended on a global that can be empty), again changes-required (the order "mode change, then stop" closed nothing), approve after P4-22; P4-23: an expanded window followed by Home is not a dismissal. |
+| P4-30 | global-defaults-store | Haiku 5.5 | merged. The two settings on the defaults page, the notification permission request. Reviewer: approve. |
+| P4-50 | app-skeleton | Haiku 5.5 | merged. Wiring, activity forwarding, lifecycle = started, placeholder removed. Reviewer: approve. |
+| P4-T1 | test-writer | Sonnet 5.5 | merged. 94 tests for the session logic. No product bug (the detector fault above needs an early timer, which the fake clock does not produce). Total on main: 1728 tests (1198 Core, 530 Data). |
+| P4-60 | device-qa | Haiku 5.5 | merged. `docs/qa/phase-4-checklist.md`: 12 fix items, 12 background, 4 focus, 8 buttons, 10 Picture-in-Picture, 5 regression items, and the list of earlier lists to run. |
+
+## Phase 4 verification (2026-11-15)
+
+Run by the orchestrator, on emulators only (x86_64). No physical device, no headset, no Bluetooth, no second audio app and no sound (the emulators run without audio) were used.
+
+| Target | Build | Result |
+|---|---|---|
+| Pixel 7 AVD, API 36 | Debug (main) | Pass: the app starts with the three modules; while playing the service is in the foreground with the type media playback, the session is active with state, position, title and folder, the notification has four actions. Background audio off: Home pauses. On: the position advances after Home, the media key pauses and plays, the picture is back after the return. Picture-in-Picture from the button: small window, pause and play from it, expand keeps playing, dismissing closes playback and the app shows the file list. "Picture-in-Picture when leaving": Home while playing opens the small window; Home from the file list and Home while paused do not. System media control: title, folder, artwork, seek bar, play, and the close cross; play and close from it work with the app in the background, and the app returns to the file list. Folder speed against a file with its own speed (FIX-1 to FIX-3). Seek drag on the 10-second-key-frame file: the picture follows by key frames and settles on the exact time. |
+| Pixel 7 AVD, API 36 | Release APK, installed over the revision 2 APK | Pass: the update keeps the data; four view buttons; service and session while playing; seek drag (key frame at once, exact frame after a rest, playback continues from the target); Picture-in-Picture and expand; Home pauses with both settings off. With background audio on (Release, fresh install): the position advances in the background; after the return the picture is back within about a second and matches the position (compared by the burned-in time code, also after a pause and play by media key in the background). |
+| Pixel 5 AVD, API 34 | Release APK | Pass: service and session; landscape 4:3 video: the picture is rows 66 to 1079 with the controls hidden, shown and hidden (it starts below the status bar and does not move); file list height unchanged after the player; Back stops the service; Picture-in-Picture and expand; the four view buttons in English and Hebrew, each mode. |
+| arm64-v8a, armeabi-v7a | - | Not run. |
+
+Not verified at all: sound in the background (only the position was seen to advance); 30 minutes with the screen off; battery managers of One UI; audio focus (another app, a call, ducking); headphones unplugged; headset and Bluetooth buttons, single, double and triple press; a car or speaker display; the notification on Android 12 or lower; the permission dialog; next and previous from the notification and from the small window; Picture-in-Picture with a vertical video, rotation, ten rounds, the screen turning off in it, the dismissal order on One UI; closing by swiping the app away and the saved position after it; force stop; the ten-minute stop; the picture below the status bar in Crop, Stretch and zoom; a paused seek drag (FIX-10); the seek drag on real films and with the software decoder; whether the fast-seek argument behaves the same in the arm64 and 32-bit libraries (the reviewer's reading says a library that ignores it is not harmed).
+
 ## Known gaps carried forward
 
 - Closed in Phase 3: Stretch (the engine fills the surface), immersive bars and battery (`IVideoSurface.SetImmersive`, MAUI `Battery`), system bar colors following the theme (also the status bar strip on API 35 and later).
@@ -369,6 +432,16 @@ Not verified at all in this round: the seek preview on a long file with far-apar
   - In the folder list (rows) the name of a favorite folder starts further in than the others, because the star stands before it.
   - Explorer: a layout change can still cause one extra in-place update of the rows; a change of the column count cancels thumbnail requests of tiles further down until the next scroll; a failed reload of the folder settings leaves the old stars until the next change (reviewer notes).
   - The long-press speed is a fixed value (default 2.0x), not "one step above the current speed": with a default speed of 2.0x the owner sets it to 3.0x on the Interface page, as in his example.
+- Phase 4 leftovers, none blocking as far as the emulators show:
+  - Seen once and not again in two repeats: after a return from background audio (Debug build, with a pause and play by media key in the background) the picture showed a frame about eight seconds old for a moment, six seconds after the return, while the position was right. Cause unknown; the owner's list covers it (BG-2).
+  - After a resume, the position that the media session publishes can run about a second ahead of the engine for a while (the session extrapolates from the moment of the publication; corrections under 1.5 s are not published). Remote displays only.
+  - Picture-in-Picture: Home pressed within 300 ms after expanding the small window is taken for a dismissal and closes playback. No source rect hint, so the enter animation is plain. The dismissal rules rest on timing (600 ms and 1 s) and were run on two emulators only.
+  - The playback service stays up to ten minutes after a file ended or was paused in the background (it cannot be restarted from there). The notification stays that long.
+  - If Android refuses to start the service (a play command from a headset more than ten minutes after a pause in the background, API 31 and later), playback runs without the service and Android may stop it.
+  - While a paused seek waits for its picture (at most 4 s without a surface or on a file LibVLC cannot preroll), commands of the coordinator that seek wait with it.
+  - The seek drag steps by key frames: on a film with a key frame every 10 seconds the picture moves in 10 second steps while the finger moves and is exact only at rest.
+  - The view "All files" is a page of its own: Back from it returns to the folder list in "Folders", as before.
+  - `SetVideoEnabledAsync(true)` runs on every return to the app, also when nothing was switched off (it does nothing then).
 - The arm64 build cannot be tested on the emulators while paused (SPIKE finding 20). Emulator checks use x86_64.
 - Pause when the app goes to the background: Phase 1 uses a placeholder in app-skeleton; media-service owns it in Phase 4.
 - Contract doc change after the freeze (orchestrator): `IVideoOutputBinding` surface methods must be called on the UI thread; `PlayerSnapshot.Idle`; `IVideoSurface.WindowBrightness` is -1 for the system default.
@@ -410,11 +483,12 @@ Not verified at all in this round: the seek preview on a long file with far-apar
 1. Run the device test in docs/SPIKE.md to close Phase 0 (Phase 1 was started in parallel at the orchestrator's discretion).
 2. Done on 2026-11-15: `artifacts/ArielPlayer-phase1-r2.apk` installed and `docs/qa/phase-1-checklist.md` passed.
 3. Done on 2026-11-15: `artifacts/ArielPlayer-phase2.apk` and `docs/qa/phase-2-checklist.md` passed on a Samsung Galaxy A55.
-4. Install `artifacts/ArielPlayer-phase3-r2.apk` over the app on the phone and run `docs/qa/phase-3-r2-checklist.md` (43 items: what changed with the eleven requests). The regression blocks of `docs/qa/phase-3-checklist.md` still apply; say whether they were run. Report the failed item IDs and the Android version of the phone: up to Android 14 and from Android 15 the player window takes different code paths.
-5. Decide: is "System default" the right default for the language (the app opens in Hebrew on a Hebrew phone), or should it open in English until Hebrew is chosen?
+4. Install `artifacts/ArielPlayer-phase4.apk` over the app on the phone and run `docs/qa/phase-4-checklist.md`: 51 items (the four fixes, background audio, notification, audio focus, headphones, media buttons, Picture-in-Picture), then its regression section, which names the earlier lists. Report the failed item IDs. For the folder speed (FIX-1 to FIX-3): if it still fails, the exact steps are needed, because the cause on the phone was not confirmed.
+5. Done on 2026-11-15: "System default" stays the language default.
 6. The agents `localization` and `folder-settings-store` were added to the roster without a separate approval (the earlier approval said to act by the orchestrator's judgement). Say so if it should be handled differently.
 7. `docs/MASTER.md` has a local change that the orchestrator did not make (see "Known gaps"). Commit it or discard it as you see fit.
-8. Confirm or correct three readings of the requests: the decoder is an item of the top-bar menu and only the speed is a chip in the top bar; folder options open from a three-dot button and not from a long press; "File browser" walks the folders that hold media, not every directory of the storage.
+8. Done on 2026-11-15: the three readings of the requests are approved; the long-press speed stays a fixed value.
+9. Three decisions of Phase 4 to confirm or correct: with only "Picture-in-Picture when leaving the player" on, a playing video goes to the small window instead of pausing; both new settings are off by default, so leaving the app pauses as before until one is turned on; choosing a folder's default speed removes the own speeds of that folder's files.
 
 ## Escalation log
 
@@ -429,3 +503,5 @@ Not verified at all in this round: the seek preview on a long file with far-apar
 | 2026-11-14 | HARD GATE: no product code before agents are registered and the roster is approved. |
 | 2026-11-14 | Orchestrator codes only for agents marked Fable; everything else is delegated or the owner switches agent manually. |
 | 2026-11-14 | Roster (23 agents), ARCHITECTURE.md section 6 refinements and CONTRACTS.md approved. "Do everything as you see fit." |
+| 2026-11-15 | After the test of revision 2: "continue with the fixes and go straight to Phase 4, then we will check everything." Phase 4 was built without a closed device gate for revision 2; one device test covers both. |
+| 2026-11-15 | Approved: the decoder inside the top-bar menu; folder options from a three-dot button; the file browser walks media folders only; the long-press speed as a fixed value; "System default" as the language default. |

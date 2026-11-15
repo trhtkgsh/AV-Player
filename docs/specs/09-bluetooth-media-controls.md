@@ -21,6 +21,13 @@ Phase: 4. Agent: media-session-bt. Contracts: `IMediaSessionBridge`, `IPlaybackC
 - Device (physical, required): wired headset button (1, 2, 3 presses), Bluetooth headset buttons, a car or speaker that shows title and position, disconnect while playing.
 - `adb shell dumpsys media_session` shows the session active with correct state, position and metadata.
 
+## Decisions made while building Phase 4 (orchestrator, 2026-11-15)
+
+- The platform `MediaSession` is used (minimum API 26); no AndroidX media package.
+- The session is active while a file is open, not only while the service runs, so a headset button can start playback again after a pause in the foreground.
+- A seek of 1.5 seconds or less is not published on its own; remote displays extrapolate from the last published position.
+- One custom action, "Close", for the system's media control (see spec 08).
+
 ## Out of scope
 
 Media browser service, Android Auto, Wear OS, voice assistant actions, custom session commands.

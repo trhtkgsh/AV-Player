@@ -29,6 +29,14 @@
 - `adb shell dumpsys media_session` shows the session active with the right state, position and metadata.
 - Device (physical): spec 09 acceptance list.
 
+**Decisions made while building Phase 4 (they win over the steps above).**
+- Platform `MediaSession` (no AndroidX media package). Namespaces `Player.Core.Logic.Session` and `Player.App.MediaControls`. The bridge is split into `MediaSessionBridge.cs` and `MediaSessionBridge.Commands.cs`.
+- The session is created once on the main thread and never released; it is active while the coordinator has a current item. `ActivateAsync` and `DeactivateAsync` are idempotent entry points for the service.
+- `SessionPublishGate` decides when a state is published: a change of state, actions, speed or error, or a position more than 1.5 s away from the extrapolated one.
+- `MultiPressDetector` arms one timer per press with a generation number (no elapsed-time check: a timer may fire a moment early).
+- The headset hook and the play/pause key are counted on key-down with repeat 0 and always swallowed; other keys go to the base class.
+- A custom action "Close" (`SessionStrings`) is published while a file is open: from API 33 the system's media control shows it (spec 08).
+
 **Out of scope.** Notification and foreground service (media-service). Becoming-noisy and audio focus (media-service). Media browser, Android Auto.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

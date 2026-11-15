@@ -52,6 +52,11 @@
 - Seek drag: playback is paused when the drag starts, each move seeks to the target (only the latest target is sent while a seek is running), so the picture shows the target frame. On release playback continues when it was playing before; a cancelled drag returns to the start position.
 - `LongPress` while playing and not locked: the speed becomes `UiSettings.LongPressSpeed` with a held indicator, and the earlier speed returns when the finger lifts. The change is never recorded for the file.
 
+**Decisions made in Phase 4 and the third revision (orchestrator).**
+- Seek drag: the engine now completes the seek of a paused video when its picture is shown, so the drag sends a target only when it is the first, at least 300 ms away from the last one sent, or an end of the file; one loop sends the newest target; each drag has its own cancellation, and a finish of an older drag never seeks, writes or plays once a newer drag began.
+- A Picture-in-Picture button stands between Aspect and the menu button, for videos, where the device supports it. While the small window is shown, no control, indicator or unlock button is drawn and gestures are ignored.
+- The page leaves itself once when the coordinator has no current item (playback was closed from the notification or with the small window), also when that happened while the page was not active. `Deactivate` never pauses, stops or closes playback.
+
 **Out of scope.** Touch recognition, surface rendering, engine code, settings pages, PiP implementation.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned path is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

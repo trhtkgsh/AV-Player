@@ -28,6 +28,8 @@
 - The Release merged manifest in `obj` contains no network permission (Debug gets INTERNET from the SDK for the debugger).
 - Device: the app starts and shows the start route.
 
+**Decisions made in Phase 4 (orchestrator).** `MainActivity` supports Picture-in-Picture and forwards four calls to the pip controller. `IAppLifecycle` foreground means "started": `NotifyForegrounded` is raised in `OnStart`, `NotifyBackgrounded` in `OnStop`. The Phase 1 placeholder that paused playback in the background is removed: the media service decides. `MauiProgram` registers `AddMediaSession()`, `AddPictureInPicture()`, `AddMediaService()`.
+
 **Out of scope.** Any feature logic, page content, styles, platform services, tests. Adding a package or a permission that the brief does not name.
 
 **Escalation.** Stop and report when a wiring request needs logic rather than registration, a package version does not restore, or the same step failed twice. Never change a contract.

@@ -40,6 +40,10 @@
 - Folders with `MediaFolder.AudioOnly` are hidden in every mode while `UiSettings.IncludeAudioOnlyFolders` is false; in "All files" their files are hidden too.
 - Folder and file names use `UiSettings.ExplorerFontScale`; detail lines keep their size.
 
+**Decisions made in the third revision (owner's test of 2026-11-15; they win over the text above).**
+- The view modes are four direct buttons in a row under the title: "Folders", "Browser", "Favorites", "All files". There is no "View" menu.
+- Choosing a default speed for a folder (a value or the general default) clears the own speed of every file of that folder (`IPlaybackStateStore`), so the folder's speed applies to all of them; a later choice in the player wins for that file again. Also uses `IPlaybackStateStore.SaveAsync`.
+
 **Out of scope.** MediaStore access, thumbnail decoding, file operations, the player page, settings pages.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

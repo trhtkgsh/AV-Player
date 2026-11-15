@@ -37,6 +37,7 @@
 - `SetImmersive(true)` is the player mode: the window is laid out edge to edge and the system bars start hidden. `SetSystemBarsVisible` shows or hides them inside that mode. The window is not laid out again; the page that hosts the surface must set `SafeAreaEdges="None"`, or MAUI pads the surface while the bars are visible (SPIKE finding 27).
 - `SystemBarInsets` gives the space taken by the system bars and the display cutout (read ignoring visibility), for the HUD's paddings. It is read again after a mode change and after a layout of the container.
 - In player mode the bars are transparent with white symbols in every theme; the look the theme had set is saved and put back when the mode ends. Up to API 34 the end of player mode also clears the bar padding MAUI left on the pages under the player (SPIKE finding 28).
+- In player mode the picture area starts below the status bar, whether the bar is shown or hidden (owner: the picture may reach the bar but not pass it). A black strip over the surface cuts a zoomed picture at the bar; the pan limits use the same area. In Picture-in-Picture there is no such strip.
 
 **Out of scope.** Touch recognition (gestures). HUD (player-hud-ui). Engine internals. Picture-in-Picture.
 

@@ -38,3 +38,12 @@ No request touches background playback, Picture-in-Picture or the media session.
 ## Acceptance (device)
 
 Written by device-qa as its own list, `docs/qa/phase-3-r2-checklist.md` (the items that changed since the Phase 3 APK); the regression blocks of `docs/qa/phase-3-checklist.md` still apply.
+
+## Amendments after the owner's test of revision 2 (2026-11-15, Samsung Galaxy A55, Android 17, One UI 9)
+
+The owner approved the three readings (decoder in the menu, folder options from a button, the file browser walks media folders), the fixed long-press speed and "System default" as the language default. Four items came back; they amend the requirements above and are in `docs/qa/phase-4-checklist.md` as FIX-1 to FIX-12.
+
+- **R1-1 (amended): the view modes are direct buttons.** A row of four buttons under the title of the folder list: "Folders", "Browser", "Favorites", "All files". No "View" menu.
+- **R2-1 (amended): a folder's default speed applies to all its files.** The newest choice wins: choosing a default speed for a folder (a value or "Use the general default") clears the own speed of every file of that folder; a speed chosen later in the player for one file wins for that file again. Reason: the owner reported "the folder's default speed does not work". On the emulator the folder speed did apply to files without an own speed, so the likely cause is files whose speed had been chosen in the player before; that is not confirmed on the phone.
+- **R3-1 (amended): the picture may reach Android's status bar but never lies under it.** The picture area starts below the status bar, whether the bar is shown or hidden, in every aspect mode and when zoomed.
+- **R3-7 (clarified): the picture during the seek drag is the picture of the target time,** not of the start. While the finger moves the picture follows by the video's key frames (the nearest one before the target); when the finger rests it settles on the exact target. Cause of the owner's report and the fix: SPIKE findings 29 and 30.

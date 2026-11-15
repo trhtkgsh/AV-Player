@@ -26,6 +26,13 @@ Changes after the freeze (orchestrator only, each one logged in PROGRESS.md):
   `SetImmersive(true)` now means player mode: edge to edge with the bars hidden until they are shown).
   The code in `src/Player.Core/Contracts` and `Models` is the reference for these; the listings below show
   the Phase 3 state.
+- 2026-11-15, Phase 4 and the third revision. No signature changed; three meanings were made exact:
+  `IPlayerEngine.SeekAsync` of a paused video completes when the picture of the new position is shown (or
+  after a few seconds), and cancelling its token after the seek was sent ends only that wait;
+  `IAppLifecycle.IsForeground`, `Foregrounded` and `Backgrounded` mean "started" and "stopped", so
+  Picture-in-Picture counts as foreground; `IMediaSessionBridge.SessionToken` is not null after
+  `ActivateAsync`. New pure logic in Core: `Player.Core.Logic.Session` (`SessionStateMapper`,
+  `SessionPublishGate`, `MultiPressDetector`).
 
 Namespaces: `Player.Core.Models`, `Player.Core.Contracts`. All types are public. Nullable enabled.
 

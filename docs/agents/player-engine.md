@@ -28,6 +28,11 @@
 - No LibVLC type appears outside the owned path.
 - Device: H.264 and HEVC play in HW and SW. Decoder switch resumes within 1 s of the position. 20 background/foreground cycles, 50 rapid seeks and 20 rapid open/close cycles produce no crash and no black picture.
 
+**Decisions made in Phase 4 and the third revision (orchestrator).**
+- Every seek names its kind: the engine calls `libvlc_media_player_set_time` itself with the "fast" argument that LibVLCSharp 3 does not pass (SPIKE finding 29).
+- A seek of a paused video with a picture on a surface: a fast seek at once, the exact seek 350 ms after the newest one, and the task completes when the picture is shown (LibVLC's debug messages, 4 s limit). `PlayAsync` sends the owed exact seek first. Cancelling the token ends only the wait (SPIKE finding 30).
+- `SetVideoEnabledAsync` is kept across files; the media service owns the switch.
+
 **Out of scope.** Views, gestures, zoom, aspect (video-surface). Queue, repeat, A-B (playback-coordinator). Service, session, audio focus. Any network input.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned path is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

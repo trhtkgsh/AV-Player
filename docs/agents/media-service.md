@@ -29,6 +29,15 @@
 - Device (physical): spec 08 acceptance list items for background audio, focus loss, unplug, force-stop.
 - `adb shell dumpsys activity services` shows `isForeground=true` with type mediaPlayback while playing.
 
+**Decisions made while building Phase 4 (they win over the steps above).**
+- Namespace `Player.App.Background` (a namespace `Service` would hide `Android.App.Service`). Files: `PlaybackService` (thin, not sticky), `PlaybackServiceController` (every decision, on the UI thread), `PlaybackNotification`, `ServiceStrings`, `ServicePermissions`, `AddMediaService()`.
+- The controller follows the engine, the coordinator, the lifecycle and the defaults from app start. Commands to the engine and the coordinator run in one chain, in the order they were sent.
+- The service starts when a file plays (after the audio focus was granted and the session is active) and stops when playback is closed or after ten minutes without playing in the background. It is not stopped when a file ends in the background (SPIKE finding 32).
+- Backgrounded with background audio on: the picture is switched off whatever the status; on Foregrounded and when playback closes it is switched on again (SPIKE finding 31). With it off: pause.
+- Audio focus: gain request; loss: pause; short loss: pause and resume only what was playing; ducking is left to the system. The focus is given up whenever it was asked for, also after a short loss.
+- The headphones receiver follows playback, not the service. Swiping the app away closes playback; the state is written before the service stops.
+- The notification's own buttons serve API 26 to 32; from API 33 the system draws them from the session (the close button is the session's custom action, owned by media-session-bt).
+
 **Out of scope.** MediaSession content and transport callbacks (media-session-bt). Picture-in-Picture (pip). Engine internals.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned path is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.
