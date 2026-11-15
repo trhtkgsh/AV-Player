@@ -38,11 +38,10 @@ internal sealed class ExplorerStrings : IStringSource
         ["Explorer.SortDuration"] = new("Duration", "משך"),
         ["Explorer.SortName"] = new("Name", "שם"),
         ["Explorer.SortSize"] = new("Size", "גודל"),
-        ["Explorer.View"] = new("View", "תצוגה"),
         ["Explorer.ViewFavorites"] = new("Favorites", "מועדפים"),
         ["Explorer.ViewFlat"] = new("All files", "כל הקבצים"),
-        ["Explorer.ViewFolders"] = new("Media folders", "תיקיות מדיה"),
-        ["Explorer.ViewTree"] = new("File browser", "סייר קבצים"),
+        ["Explorer.ViewFolders"] = new("Folders", "תיקיות"),
+        ["Explorer.ViewTree"] = new("Browser", "סייר"),
         ["Explorer.Watched"] = new("Watched", "נצפה"),
     };
 }

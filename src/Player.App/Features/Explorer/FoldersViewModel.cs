@@ -47,7 +47,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     private int _folderSettingsVersion;
     private bool _flatSeen;
     private bool _openingSettings;
-    private bool _choosingView;
+    private bool _changingView;
     private bool _choosingOptions;
     private bool _choosingLayout;
     private bool _opening;
@@ -80,6 +80,19 @@ public sealed partial class FoldersViewModel : ObservableObject
     // The number of grid columns for the width of the list.
     [ObservableProperty]
     private int _columns = GridTiles.MinColumns;
+
+    // The view mode in effect. The mode buttons above the list show it.
+    [ObservableProperty]
+    private ExplorerViewMode _viewMode = ExplorerViewMode.Folders;
+
+    // The marks of the mode buttons: exactly one is true.
+    public bool IsFoldersMode => ViewMode == ExplorerViewMode.Folders;
+
+    public bool IsBrowserMode => ViewMode == ExplorerViewMode.Tree;
+
+    public bool IsFavoritesMode => ViewMode == ExplorerViewMode.Favorites;
+
+    public bool IsAllFilesMode => ViewMode == ExplorerViewMode.Flat;
 
     [ObservableProperty]
     private bool _showNoFolders;
@@ -187,47 +200,41 @@ public sealed partial class FoldersViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task ChooseView()
+    private Task SelectFolders() => SelectViewModeAsync(ExplorerViewMode.Folders);
+
+    [RelayCommand]
+    private Task SelectBrowser() => SelectViewModeAsync(ExplorerViewMode.Tree);
+
+    [RelayCommand]
+    private Task SelectFavorites() => SelectViewModeAsync(ExplorerViewMode.Favorites);
+
+    [RelayCommand]
+    private Task SelectAllFiles() => SelectViewModeAsync(ExplorerViewMode.Flat);
+
+    // A tap on a mode button saves that mode, as the view sheet did. A tap on the mode in effect does nothing.
+    private async Task SelectViewModeAsync(ExplorerViewMode mode)
     {
-        if (_choosingView)
+        if (_changingView)
         {
             return;
         }
 
-        _choosingView = true;
+        _changingView = true;
         try
         {
-            var shell = Shell.Current;
-            if (shell is null)
+            if (Shell.Current is null)
             {
                 return;
             }
 
             var ct = SessionToken;
             var current = (await _uiSettings.GetAsync(ct)).ViewMode;
-            var choices = new (string Text, ExplorerViewMode Mode)[]
+            if (current == mode)
             {
-                (_localizer["Explorer.ViewFolders"], ExplorerViewMode.Folders),
-                (_localizer["Explorer.ViewTree"], ExplorerViewMode.Tree),
-                (_localizer["Explorer.ViewFavorites"], ExplorerViewMode.Favorites),
-                (_localizer["Explorer.ViewFlat"], ExplorerViewMode.Flat),
-            };
-            var labels = choices
-                .Select(c => c.Mode == current ? "✓ " + c.Text : c.Text)
-                .ToArray();
-
-            var choice = await shell.DisplayActionSheetAsync(
-                _localizer["Explorer.View"],
-                _localizer["Common.Cancel"],
-                null,
-                labels);
-
-            // A cancelled or dismissed sheet gives no matching text, so the mode stays.
-            var index = Array.IndexOf(labels, choice);
-            if (index >= 0)
-            {
-                await SetViewModeAsync(choices[index].Mode, ct);
+                return;
             }
+
+            await SetViewModeAsync(mode, ct);
         }
         catch (OperationCanceledException)
         {
@@ -238,7 +245,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         }
         finally
         {
-            _choosingView = false;
+            _changingView = false;
         }
     }
 
@@ -300,6 +307,14 @@ public sealed partial class FoldersViewModel : ObservableObject
     }
 
     partial void OnIsGridChanged(bool value) => OnPropertyChanged(nameof(LayoutText));
+
+    partial void OnViewModeChanged(ExplorerViewMode value)
+    {
+        OnPropertyChanged(nameof(IsFoldersMode));
+        OnPropertyChanged(nameof(IsBrowserMode));
+        OnPropertyChanged(nameof(IsFavoritesMode));
+        OnPropertyChanged(nameof(IsAllFilesMode));
+    }
 
     [RelayCommand]
     private async Task OpenOptions(FolderRow row)
@@ -672,6 +687,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         }
 
         _settings = settings;
+        ViewMode = settings.ViewMode;
         NameFontSize = BaseNameFontSize * settings.ExplorerFontScale;
         IsGrid = settings.Layout == ExplorerLayout.Grid;
         RebuildRows();
