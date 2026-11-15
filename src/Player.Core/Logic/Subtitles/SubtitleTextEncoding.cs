@@ -42,13 +42,10 @@ public static class SubtitleTextEncoding
                 return Encoding.BigEndianUnicode.GetString(bytes.Slice(2));
             }
 
-            try
+            if (LooksLikeUtf8(bytes))
             {
-                return new UTF8Encoding(false, true).GetString(bytes);
-            }
-            catch (ArgumentException)
-            {
-                // Not valid UTF-8: a legacy code page.
+                // Valid UTF-8, or UTF-8 with a few bad bytes: those become replacement characters.
+                return new UTF8Encoding(false, false).GetString(bytes);
             }
 
             var codePage = LegacyCodePage(languageHint);
@@ -140,6 +137,44 @@ public static class SubtitleTextEncoding
     }
 
     private static bool IsNonLatin(int codePage) => codePage is 1255 or 1256 or 1251 or 1253 or 874;
+
+    /// <summary>
+    /// True for text that is UTF-8: it is valid, or it has at least one valid multi-byte sequence and the invalid bytes
+    /// are at most 1% of the valid multi-byte sequences. One truncated sequence at the very end is always tolerated.
+    /// Pure ASCII is UTF-8. A legacy-encoded file has many invalid bytes and almost no valid sequences, so it is not.
+    /// </summary>
+    public static bool LooksLikeUtf8(ReadOnlySpan<byte> bytes)
+    {
+        var multiByte = 0;
+        var invalid = 0;
+        var i = 0;
+        while (i < bytes.Length)
+        {
+            if (bytes[i] < 0x80)
+            {
+                i++;
+                continue;
+            }
+
+            var status = Rune.DecodeFromUtf8(bytes.Slice(i), out _, out var consumed);
+            if (status == System.Buffers.OperationStatus.Done)
+            {
+                multiByte++;
+            }
+            else if (status == System.Buffers.OperationStatus.NeedMoreData)
+            {
+                break; // truncated at the very end
+            }
+            else
+            {
+                invalid += Math.Max(consumed, 1);
+            }
+
+            i += Math.Max(consumed, 1);
+        }
+
+        return invalid == 0 || (multiByte >= 1 && invalid * 100 <= multiByte);
+    }
 
     /// <summary>The Windows code page that subtitle files of this language usually use; 1252 by default.</summary>
     public static int LegacyCodePage(string? languageHint) => LanguageCodes.Normalize(languageHint) switch

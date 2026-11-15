@@ -30,6 +30,9 @@ public interface IPlayerEngine
     long SubtitleDelayMs { get; }
     SubtitleStyle SubtitleStyle { get; }
 
+    /// <summary>The external subtitle file of the open item (a path inside the app's storage), or null.</summary>
+    string? ExternalSubtitlePath { get; }
+
     Task OpenAsync(MediaItem item, EffectivePlaybackSettings settings, bool startPaused, CancellationToken ct);
     Task PlayAsync(CancellationToken ct);
     Task PauseAsync(CancellationToken ct);
@@ -57,7 +60,8 @@ public interface IPlayerEngine
     Task SetSubtitleDelayAsync(long delayMs, CancellationToken ct);
 
     /// <param name="localFilePath">A file inside the app's own storage.</param>
-    Task AddSubtitleFileAsync(string localFilePath, CancellationToken ct);
+    /// <param name="displayName">The name shown for its track, for example the original file name.</param>
+    Task AddSubtitleFileAsync(string localFilePath, string displayName, CancellationToken ct);
 
     /// <summary>Applies to the running playback: the input restarts at the current position.</summary>
     Task SetSubtitleStyleAsync(SubtitleStyle style, CancellationToken ct);

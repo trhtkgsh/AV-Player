@@ -14,6 +14,7 @@ public sealed partial class VlcPlayerEngine
     private volatile VideoFormat? _format;
 
     private const int RevealAdvanceMs = 120;
+    private const long FirstReportedTime = -1;
     private static readonly TimeSpan RevealTimeout = TimeSpan.FromSeconds(2);
     private volatile bool _revealingFrame;
     private long _revealFromMs;
@@ -126,21 +127,23 @@ public sealed partial class VlcPlayerEngine
             // may not have been reported yet, and it would leave the new decoder with a black picture.
             // Never while opening: the first running event still has the start settings to apply.
             if (_status == PlayerStatus.Paused || (_pauseRequested && _status == PlayerStatus.Playing))
-                BeginFrameReveal(player);
+                BeginFrameReveal(player, _positionMs);
         }
     }
 
     /// <summary>
-    /// Shows a picture for a paused input whose video track was just selected again.
+    /// Shows a picture for a paused input whose video track was just selected again, or that started paused.
     /// LibVLC 3 has no reliable way to draw one frame in that state: the new decoder is not paused
     /// although the input is, so the first picture races the stopped clock (black about one time in
     /// eight), stepping a frame aborts on the assertion "p_owner->paused", and a restart with
-    /// :start-paused stays black. So the input runs muted until its clock has moved, then pauses again.
+    /// :start-paused draws nothing. So the input runs muted until its clock has moved, then pauses again.
     /// The reported status stays Paused the whole time.
     /// </summary>
-    private void BeginFrameReveal(MediaPlayer player)
+    /// <param name="fromMs">The position the clock must pass, or <see cref="FirstReportedTime"/>.</param>
+    private void BeginFrameReveal(MediaPlayer player, long fromMs)
     {
-        _revealFromMs = _positionMs;
+        Trace($"frame reveal begins from {fromMs}");
+        _revealFromMs = fromMs;
         _revealingFrame = true;
         player.Mute = true;
         player.SetPause(false);
@@ -163,6 +166,7 @@ public sealed partial class VlcPlayerEngine
             return;
 
         _revealingFrame = false;
+        Trace($"frame reveal ends, pause={pause}");
         if (_player is not { } player)
             return;
 
@@ -236,10 +240,13 @@ public sealed partial class VlcPlayerEngine
             var time = e.Time;
             PostEvent(() =>
             {
+                _clockStarted = true;
                 if (_revealingFrame)
                 {
                     // The clock has moved past the resync point, so that picture is on screen.
-                    if (time - _revealFromMs >= RevealAdvanceMs)
+                    if (_revealFromMs == FirstReportedTime)
+                        _revealFromMs = time;
+                    else if (time - _revealFromMs >= RevealAdvanceMs)
                         EndFrameReveal(pause: true);
                     return;
                 }
@@ -272,9 +279,13 @@ public sealed partial class VlcPlayerEngine
             return;
 
         _status = status;
-        if (status == PlayerStatus.Paused)
+
+        // An input that has not run yet reports the time 0, whatever its start position is.
+        if (status == PlayerStatus.Paused && _clockStarted)
             _positionMs = Math.Max(0, player.Time);
 
+        if (Diagnostics)
+            Trace($"running: status={status} first={_settingsPending} clock={_clockStarted} time={player.Time} position={_positionMs}");
         if (_settingsPending)
         {
             _settingsPending = false;
@@ -289,8 +300,13 @@ public sealed partial class VlcPlayerEngine
                 player.SetAudioTrack(audio);
 
             // An external file is selected by LibVLC only while no track was chosen after it was added.
-            if (_subtitleFileUri is { } subtitleFile)
-                player.AddSlave(MediaSlaveType.Subtitle, subtitleFile, _subtitleTrackId is null);
+            if (_externalSubtitle is { } external
+                && !(File.Exists(external.Path) && player.AddSlave(MediaSlaveType.Subtitle, external.Uri, _subtitleTrackId is null)))
+            {
+                // The copy is gone: stop reporting it, so the subtitle policy can choose again.
+                global::Android.Util.Log.Warn(Tag, "The external subtitle file could not be loaded again.");
+                _externalSubtitle = null;
+            }
             if (_subtitleTrackId is { } subtitle)
                 player.SetSpu(subtitle);
             if (_seekOnStart is { } seek)
@@ -308,7 +324,22 @@ public sealed partial class VlcPlayerEngine
         else if (status == PlayerStatus.Paused && !_pauseRequested)
             player.SetPause(false);
 
+        // A surface that came back can restart the input here: this event then belongs to the old one.
+        var generation = _generation;
         UpdateVideoOutput();
+        if (generation != _generation)
+            return;
+
+        // An input that starts paused draws nothing (docs/SPIKE.md finding 12): a restart of a paused
+        // file (decoder switch, subtitle style) would keep the old picture, or none, until Play.
+        // LibVLC reports such an input as Playing and then Paused, so the clock tells the case apart.
+        if (status == PlayerStatus.Paused && _pauseRequested && !_clockStarted && !_revealTried && !_revealingFrame
+            && !_startedWithoutVideo && _videoEnabled && _surfaceAttached && _item!.Kind == MediaKind.Video && Live)
+        {
+            _revealTried = true;
+            BeginFrameReveal(player, FirstReportedTime);
+        }
+
         if (Live)
             RefreshTracks();
     }
@@ -318,10 +349,15 @@ public sealed partial class VlcPlayerEngine
         var player = _player!;
         var tracks = _media?.Tracks ?? [];
 
-        var audioTracks = Describe(player.AudioTrackDescription, tracks);
-        var subtitleTracks = Describe(player.SpuDescription, tracks);
+        var audioTracks = Describe(player.AudioTrackDescription, tracks, null, out _);
+        var subtitleTracks = Describe(player.SpuDescription, tracks, _externalSubtitle, out var externalId);
+        _externalTrackId = externalId;
+
         var audio = player.AudioTrack;
-        SetTracks(audioTracks, subtitleTracks, new SelectedTracks(audio >= 0 ? audio : null, Math.Max(-1, player.Spu)));
+
+        // Before the tracks are known LibVLC reports -1 for the subtitle, which would read as "off".
+        int? subtitle = _status == PlayerStatus.Opening && subtitleTracks.Count == 0 ? null : Math.Max(-1, player.Spu);
+        SetTracks(new TrackState(audioTracks, subtitleTracks, audio >= 0 ? audio : null, subtitle));
 
         VideoFormat? format = null;
         _hasVideo = false;
@@ -350,41 +386,69 @@ public sealed partial class VlcPlayerEngine
         Publish();
     }
 
-    private static IReadOnlyList<TrackInfo> Describe(TrackDescription[] descriptions, MediaTrack[] tracks)
+    /// <param name="external">The external subtitle file, when the list may contain its track.</param>
+    /// <param name="externalId">The id of that track, or null when it is not in the list.</param>
+    private static IReadOnlyList<TrackInfo> Describe(
+        TrackDescription[] descriptions, MediaTrack[] tracks, ExternalSubtitle? external, out int? externalId)
     {
+        externalId = null;
         var result = new List<TrackInfo>(descriptions.Length);
         foreach (var description in descriptions)
         {
             if (description.Id < 0)
                 continue;
 
+            var name = description.Name ?? $"Track {description.Id}";
+
+            // LibVLC names the file's track after its path ("Track 1 - [app/files/subtitles/6627ac05]").
+            // The path ends with the file's own name, which is how the track is recognized.
+            if (external is not null && externalId is null && name.EndsWith(external.NameKey, StringComparison.Ordinal))
+            {
+                externalId = description.Id;
+                result.Add(new TrackInfo(description.Id, external.DisplayName, null));
+                continue;
+            }
+
             var language = Array.Find(tracks, t => t.Id == description.Id).Language;
-            result.Add(new TrackInfo(description.Id, description.Name ?? $"Track {description.Id}", language));
+            result.Add(new TrackInfo(description.Id, name, language));
         }
 
         return result;
     }
 
-    private void SetSelected(SelectedTracks selected) => SetTracks(_audioTracks, _subtitleTracks, selected);
-
-    private void SetTracks(
-        IReadOnlyList<TrackInfo> audio, IReadOnlyList<TrackInfo> subtitles, SelectedTracks selected)
+    private void SetTracks(TrackState state)
     {
-        var changed = selected != _selected
-            || !audio.SequenceEqual(_audioTracks)
-            || !subtitles.SequenceEqual(_subtitleTracks);
+        var current = _tracks;
+        var changed = state.SelectedAudio != current.SelectedAudio
+            || state.SelectedSubtitle != current.SelectedSubtitle
+            || !state.Audio.SequenceEqual(current.Audio)
+            || !state.Subtitles.SequenceEqual(current.Subtitles);
+        if (!changed)
+            return;
 
-        _audioTracks = audio;
-        _subtitleTracks = subtitles;
-        _selected = selected;
-        if (changed)
-            Raise(() => TracksChanged?.Invoke(this, EventArgs.Empty));
+        _tracks = state;
+        Raise(() => TracksChanged?.Invoke(this, EventArgs.Empty));
     }
 
-    /// <summary>Null means not known. A subtitle id of -1 means subtitles are off.</summary>
-    private sealed record SelectedTracks(int? Audio, int? Subtitle)
+    /// <summary>
+    /// One immutable picture of the tracks, so a reader never sees a new list with an old selection.
+    /// A null selection means not known. A subtitle id of -1 means subtitles are off.
+    /// </summary>
+    private sealed record TrackState(
+        IReadOnlyList<TrackInfo> Audio, IReadOnlyList<TrackInfo> Subtitles, int? SelectedAudio, int? SelectedSubtitle)
     {
-        public static SelectedTracks Unknown { get; } = new(null, null);
+        public static TrackState Empty { get; } = new([], [], null, null);
+    }
+
+    /// <summary>An external subtitle file of the open item.</summary>
+    private sealed record ExternalSubtitle(string Path, string Uri, string DisplayName)
+    {
+        /// <summary>
+        /// The end of the name LibVLC gives the file's track: the last part of the file name before its
+        /// extension (LibVLC cuts the name at dots), followed by the closing bracket.
+        /// </summary>
+        public string NameKey { get; } =
+            System.IO.Path.GetFileNameWithoutExtension(Path).Split('.')[^1] + "]";
     }
 
     private void SetFormat(VideoFormat? format)

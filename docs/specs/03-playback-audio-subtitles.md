@@ -12,7 +12,7 @@ Contracts: `IPlayerEngine`, `ISubtitleService`, `IPlaybackCoordinator`, `IPlayba
 5. **Audio delay.** -5000 ms to +5000 ms in 50 ms steps.
 6. **Subtitles.** Embedded tracks plus external `.srt` and `.ass`/`.ssa`. Off is a selectable option (`-1`).
 7. **Sidecar discovery.** When a file opens, subtitle files in the same MediaStore folder whose name starts with the video's base name are offered. The best match loads automatically when `GlobalDefaults.SubtitlesEnabled`.
-8. **Manual load.** A system file picker loads any subtitle file. The content is copied into app cache before it is given to the engine.
+8. **Manual load.** A system file picker loads any subtitle file. The content is copied into the app data folder (`subtitles`), converted to UTF-8, before it is given to the engine. The copy is kept, so the saved choice of a file survives a cache clear.
 9. **Subtitle delay.** -5000 ms to +5000 ms in 50 ms steps.
 10. **Subtitle style.** Font scale, text color, outline color and thickness, background opacity, bold, bottom margin. ASS files keep their own styling.
 11. **Persistence.** Every change made on this page during playback is written to the per-file state through `IPlaybackStateRecorder.Update`. Nothing here writes to global defaults.

@@ -276,6 +276,119 @@ public sealed class SubtitleTextEncodingTests
         Assert.Null(exception);
     }
 
+    private const string ReplacementChar = "\uFFFD";
+
+    private static readonly UTF8Encoding Utf8 = new(false);
+
+    // About 400 Hebrew letters: enough valid sequences for one or two bad bytes to stay under the 1% limit.
+    private static string LongHebrewText() =>
+        string.Concat(Enumerable.Repeat(HebrewSentence + " ", 20)).TrimEnd();
+
+    // UTF-8 bytes of the text with one single byte (0xFF) put in place of the character at charIndex.
+    private static byte[] ReplaceCharWithFfByte(string text, int charIndex) =>
+        [.. Utf8.GetBytes(text[..charIndex]), 0xFF, .. Utf8.GetBytes(text[(charIndex + 1)..])];
+
+    public static TheoryData<string?> Hints => new() { { null }, { "en" }, { "he" } };
+
+    [Theory]
+    [MemberData(nameof(Hints))]
+    public void Decode_Utf8HebrewWithOneBadAsciiByte_KeepsAllLettersAndOneReplacementChar(string? hint)
+    {
+        var text = LongHebrewText();
+        var index = text.IndexOf(' ', text.Length / 2);
+        var bytes = ReplaceCharWithFfByte(text, index);
+
+        Assert.True(SubtitleTextEncoding.LooksLikeUtf8(bytes));
+        Assert.Equal(text[..index] + ReplacementChar + text[(index + 1)..], SubtitleTextEncoding.Decode(bytes, hint));
+    }
+
+    [Theory]
+    [MemberData(nameof(Hints))]
+    public void Decode_Utf8HebrewWithOneBadByteInsideALetter_KeepsEveryOtherLetter(string? hint)
+    {
+        // A Hebrew letter has two bytes: its first byte then stands alone, so the letter becomes two replacement chars.
+        var text = LongHebrewText();
+        var index = text.IndexOf('ל', text.Length / 2);
+        byte[] bytes = [.. Utf8.GetBytes(text[..index]), 0xD7, 0xFF, .. Utf8.GetBytes(text[(index + 1)..])];
+
+        Assert.True(SubtitleTextEncoding.LooksLikeUtf8(bytes));
+        Assert.Equal(
+            text[..index] + ReplacementChar + ReplacementChar + text[(index + 1)..],
+            SubtitleTextEncoding.Decode(bytes, hint));
+    }
+
+    [Theory]
+    [MemberData(nameof(Hints))]
+    public void Decode_Utf8HebrewCutInsideLastLetter_KeepsOtherLettersAndEndsWithOneReplacementChar(string? hint)
+    {
+        var text = HebrewSentence.TrimEnd('.');
+        var full = Utf8.GetBytes(text);
+        var bytes = full[..^1];
+
+        Assert.True(SubtitleTextEncoding.LooksLikeUtf8(bytes));
+        Assert.Equal(text[..^1] + ReplacementChar, SubtitleTextEncoding.Decode(bytes, hint));
+    }
+
+    [Fact]
+    public void LooksLikeUtf8_Windows1255Hebrew_ReturnsFalse()
+    {
+        Assert.False(SubtitleTextEncoding.LooksLikeUtf8(Bytes(1255, Srt(HebrewSentence))));
+    }
+
+    [Fact]
+    public void LooksLikeUtf8_Windows1251Russian_ReturnsFalse()
+    {
+        Assert.False(SubtitleTextEncoding.LooksLikeUtf8(Bytes(1251, Srt(RussianSentence))));
+    }
+
+    [Fact]
+    public void LooksLikeUtf8_Windows1252French_ReturnsFalse()
+    {
+        Assert.False(SubtitleTextEncoding.LooksLikeUtf8(Bytes(1252, Srt(FrenchSentence))));
+    }
+
+    [Fact]
+    public void LooksLikeUtf8_PureAscii_ReturnsTrue()
+    {
+        Assert.True(SubtitleTextEncoding.LooksLikeUtf8(Encoding.ASCII.GetBytes(Srt(EnglishSentence))));
+    }
+
+    [Fact]
+    public void LooksLikeUtf8_EmptyInput_ReturnsTrue()
+    {
+        Assert.True(SubtitleTextEncoding.LooksLikeUtf8([]));
+    }
+
+    [Fact]
+    public void LooksLikeUtf8_ValidUtf8Hebrew_ReturnsTrue()
+    {
+        Assert.True(SubtitleTextEncoding.LooksLikeUtf8(Utf8.GetBytes(Srt(HebrewSentence))));
+    }
+
+    [Fact]
+    public void LooksLikeUtf8_MoreThanOnePercentBrokenSequences_ReturnsFalse()
+    {
+        var bytes = new List<byte>();
+        for (var i = 0; i < 200; i++)
+        {
+            var letter = Utf8.GetBytes(((char)('א' + (i % 27))).ToString());
+            if (i % 10 == 9)
+            {
+                letter[0] = 0xFF;
+            }
+
+            bytes.AddRange(letter);
+        }
+
+        Assert.False(SubtitleTextEncoding.LooksLikeUtf8(bytes.ToArray()));
+    }
+
+    [Fact]
+    public void LooksLikeUtf8_OnlyInvalidBytes_ReturnsFalse()
+    {
+        Assert.False(SubtitleTextEncoding.LooksLikeUtf8([0xFF, 0xFF, 0xFF]));
+    }
+
     [Theory]
     [InlineData(0xC3, 0x28)]
     [InlineData(0xE2, 0x82)]
