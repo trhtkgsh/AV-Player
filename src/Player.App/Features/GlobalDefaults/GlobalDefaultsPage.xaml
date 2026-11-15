@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="Player.App.Features.DefaultsSettings.GlobalDefaultsPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:defaults="clr-namespace:Player.App.Features.DefaultsSettings"
+             x:DataType="defaults:GlobalDefaultsViewModel"
+             Title="Playback defaults">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="8">
+
+            <Label Text="Playback" Style="{StaticResource LabelMuted}" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="Speed" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding SpeedText}" VerticalOptions="Center" />
+            </Grid>
+            <Slider Minimum="0.25" Maximum="4.0" Value="{Binding Speed, Mode=TwoWay}"
+                    DragCompletedCommand="{Binding SaveSpeedCommand}" />
+            <Button Text="Reset speed" Command="{Binding ResetSpeedCommand}" />
+
+            <Label Text="Decoder" />
+            <RadioButton Content="Hardware" GroupName="Decoder"
+                         IsChecked="{Binding IsDecoderHardware, Mode=TwoWay}" />
+            <RadioButton Content="Software" GroupName="Decoder"
+                         IsChecked="{Binding IsDecoderSoftware, Mode=TwoWay}" />
+
+            <Label Text="Repeat" />
+            <RadioButton Content="Off" GroupName="Repeat"
+                         IsChecked="{Binding IsRepeatNone, Mode=TwoWay}" />
+            <RadioButton Content="Repeat file" GroupName="Repeat"
+                         IsChecked="{Binding IsRepeatFile, Mode=TwoWay}" />
+            <RadioButton Content="Repeat folder" GroupName="Repeat"
+                         IsChecked="{Binding IsRepeatFolder, Mode=TwoWay}" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="Resume from the last position" VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding ResumeFromLastPosition, Mode=TwoWay}" />
+            </Grid>
+
+            <Label Text="Audio" Style="{StaticResource LabelMuted}" />
+
+            <Label Text="Preferred audio language" />
+            <Entry Text="{Binding PreferredAudioLanguage, Mode=TwoWay}"
+                   Placeholder="Language code, for example he or en"
+                   ReturnCommand="{Binding SaveLanguagesCommand}"
+                   Unfocused="OnLanguageUnfocused" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="Audio delay" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding AudioDelayText}" VerticalOptions="Center" />
+            </Grid>
+            <HorizontalStackLayout Spacing="8">
+                <Button Text="-50 ms" Command="{Binding AudioDelayDownCommand}" />
+                <Button Text="+50 ms" Command="{Binding AudioDelayUpCommand}" />
+                <Button Text="Reset" Command="{Binding AudioDelayResetCommand}" />
+            </HorizontalStackLayout>
+
+            <Label Text="Subtitles" Style="{StaticResource LabelMuted}" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="Show subtitles" VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding SubtitlesEnabled, Mode=TwoWay}" />
+            </Grid>
+
+            <Label Text="Preferred subtitle language" />
+            <Entry Text="{Binding PreferredSubtitleLanguage, Mode=TwoWay}"
+                   Placeholder="Language code, for example he or en"
+                   ReturnCommand="{Binding SaveLanguagesCommand}"
+                   Unfocused="OnLanguageUnfocused" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="Subtitle delay" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding SubtitleDelayText}" VerticalOptions="Center" />
+            </Grid>
+            <HorizontalStackLayout Spacing="8">
+                <Button Text="-50 ms" Command="{Binding SubtitleDelayDownCommand}" />
+                <Button Text="+50 ms" Command="{Binding SubtitleDelayUpCommand}" />
+                <Button Text="Reset" Command="{Binding SubtitleDelayResetCommand}" />
+            </HorizontalStackLayout>
+
+            <Button Text="Subtitle style" Command="{Binding OpenSubtitleStyleCommand}" />
+
+            <Button Text="Reset all to defaults" Command="{Binding ResetAllCommand}" />
+
+            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
+                   TextColor="{DynamicResource ColorDanger}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
