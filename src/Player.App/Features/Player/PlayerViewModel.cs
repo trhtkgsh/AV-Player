@@ -170,6 +170,30 @@ public sealed partial class PlayerViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void CycleAspect()
+    {
+        var next = _surface.Aspect switch
+        {
+            AspectMode.Fit => AspectMode.Stretch,
+            AspectMode.Stretch => AspectMode.Crop,
+            AspectMode.Crop => AspectMode.Original,
+            _ => AspectMode.Fit,
+        };
+        _surface.SetAspect(next);
+        _recorder.Update(s => s with { Aspect = next }); // remembered for this file only
+
+        string key = next switch
+        {
+            AspectMode.Stretch => "Player.Aspect.Stretch",
+            AspectMode.Crop => "Player.Aspect.Crop",
+            AspectMode.Original => "Player.Aspect.Original",
+            _ => "Player.Aspect.Fit",
+        };
+        Osd.Show(_localizer[key]);
+        RestartHideTimer();
+    }
+
+    [RelayCommand]
     private void SeekStarted()
     {
         _dragging = true;
