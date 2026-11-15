@@ -27,8 +27,8 @@ public sealed partial class FoldersViewModel : ObservableObject
     private bool _flatSeen;
     private bool _openingSettings;
 
-    // The NewTagDays the folder list on screen was loaded with. Null while no list is shown.
-    private int? _shownNewTagDays;
+    // The NewTagDays the current or last load read from the settings. Null when no load has read them yet, or the last load failed.
+    private int? _loadedNewTagDays;
 
     [ObservableProperty]
     private bool _isLoading;
@@ -150,6 +150,9 @@ public sealed partial class FoldersViewModel : ObservableObject
                 await shell.GoToAsync("settings");
             }
         }
+        catch (OperationCanceledException)
+        {
+        }
         catch (Exception)
         {
             ErrorMessage = "Settings could not be opened.";
@@ -188,6 +191,8 @@ public sealed partial class FoldersViewModel : ObservableObject
                 return;
             }
 
+            _loadedNewTagDays = settings.NewTagDays;
+
             if (reason == LoadReason.Activate && settings.ViewMode == ExplorerViewMode.Flat)
             {
                 if (!_flatSeen)
@@ -216,7 +221,6 @@ public sealed partial class FoldersViewModel : ObservableObject
             {
                 PermissionDenied = true;
                 Folders.Clear();
-                _shownNewTagDays = null;
                 IsEmpty = false;
                 return;
             }
@@ -234,7 +238,6 @@ public sealed partial class FoldersViewModel : ObservableObject
                 Folders.Add(new FolderRow(folder));
             }
 
-            _shownNewTagDays = settings.NewTagDays;
             IsEmpty = Folders.Count == 0;
         }
         catch (OperationCanceledException)
@@ -244,6 +247,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         {
             if (IsCurrentLoad(version))
             {
+                _loadedNewTagDays = null;
                 ReportError(ex);
             }
         }
@@ -298,8 +302,9 @@ public sealed partial class FoldersViewModel : ObservableObject
     private void OnSettingsChanged(object? sender, UiSettings settings) =>
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            // Only the new-tag window changes the folder list. A callback queued before Deactivate does nothing.
-            if (_session is not null && settings.NewTagDays != _shownNewTagDays)
+            // Only a changed new-tag window reloads. Null: no load has read the settings, the next load reads them.
+            // A callback queued before Deactivate does nothing.
+            if (_session is not null && _loadedNewTagDays is int loaded && settings.NewTagDays != loaded)
             {
                 _ = LoadAsync(LoadReason.Library);
             }
