@@ -39,6 +39,11 @@ Changes after the freeze (orchestrator only, each one logged in PROGRESS.md):
   `UiSettings.Overlay` (`PlaybackOverlaySettings`: progress line, its edge, clock, battery, times, corner,
   margin, size, color), `OverlayCorner`, `OverlayEdge`, `OverlayTimeMode`, and the pure
   `Player.Core.Logic.Overlay.PlaybackOverlayText`.
+- 2026-11-15, Phase 5 revision 2 (owner requests, docs/specs/13-owner-requests-r7.md).
+  `UiSettings.ItemSize` (`ExplorerItemSize`); `UiSettings.ExplorerFields` defaults to None;
+  `PlaybackOverlaySettings.ProgressLineThickness`, `.ClockCorner`, `.BatteryCorner` (`.Corner` now places
+  the playback times); `PlaybackOverlayText.FormatCorner`; `IFileOperations.MoveAsync` and `.CopyAsync`
+  to a `MediaFolder`; `FileOperationResult.CompletedCount`.
 
 Namespaces: `Player.Core.Models`, `Player.Core.Contracts`. All types are public. Nullable enabled.
 

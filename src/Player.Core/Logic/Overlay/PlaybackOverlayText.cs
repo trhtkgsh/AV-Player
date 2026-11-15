@@ -68,6 +68,25 @@ public static class PlaybackOverlayText
             battery);
     }
 
+    /// <summary>
+    /// The text of one corner: the items placed in that corner (times, clock, battery, in that order), each
+    /// only when its switch is on and its value is known. Empty when the corner holds nothing.
+    /// </summary>
+    public static string FormatCorner(
+        PlaybackOverlaySettings settings, OverlayCorner corner, long positionMs, long durationMs,
+        string? clock, int? batteryPercent)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var battery = settings.Battery && settings.BatteryCorner == corner && batteryPercent is { } percent
+            ? FormattableString.Invariant($"{Math.Clamp(percent, 0, 100)}%")
+            : "";
+        return Join(
+            Separator,
+            settings.Corner == corner ? FormatTimes(settings.Time, positionMs, durationMs) : "",
+            settings.Clock && settings.ClockCorner == corner ? clock ?? "" : "",
+            battery);
+    }
+
     /// <summary>The filled part of the progress line: 0 .. 1. 0 when the duration is not known.</summary>
     public static double Progress(long positionMs, long durationMs) =>
         durationMs <= 0 ? 0 : Math.Clamp((double)positionMs / durationMs, 0, 1);
