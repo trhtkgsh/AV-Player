@@ -1,6 +1,7 @@
 using Android.App;
 using Android.Content;
 using Android.Util;
+using AndroidX.Core.Content;
 using AndroidX.Lifecycle;
 using Microsoft.Maui.ApplicationModel;
 using PowerManager = Android.OS.PowerManager;
@@ -28,7 +29,7 @@ public sealed partial class PictureInPictureController
             Remember(activity);
             if (isInPictureInPictureMode)
             {
-                BeginPictureInPicture(activity);
+                BeginPictureInPicture();
                 return;
             }
 
@@ -124,7 +125,7 @@ public sealed partial class PictureInPictureController
 
     // ---- Session ----
 
-    private void BeginPictureInPicture(Activity activity)
+    private void BeginPictureInPicture()
     {
         if (_isActive)
         {
@@ -133,7 +134,7 @@ public sealed partial class PictureInPictureController
 
         _isActive = true;
         _session++;
-        RegisterReceiver(activity);
+        RegisterReceiver();
         RaiseChanged();
         UpdateParams();
     }
@@ -220,7 +221,7 @@ public sealed partial class PictureInPictureController
 
     // ---- Actions ----
 
-    private void RegisterReceiver(Activity activity)
+    private void RegisterReceiver()
     {
         if (_receiver is not null)
         {
@@ -234,17 +235,13 @@ public sealed partial class PictureInPictureController
         filter.AddAction(ActionNext);
 
         var receiver = new PipActionReceiver(HandleActionAsync);
-        if (OperatingSystem.IsAndroidVersionAtLeast(33))
-        {
-            activity.RegisterReceiver(receiver, filter, ReceiverFlags.NotExported);
-        }
-        else
-        {
-            activity.RegisterReceiver(receiver, filter);
-        }
+        // Not exported on every API level, so no other app can send the actions. The application context
+        // outlives the activity, so a destroyed activity cannot keep the receiver.
+        var host = Platform.AppContext;
+        ContextCompat.RegisterReceiver(host, receiver, filter, ContextCompat.ReceiverNotExported);
 
         _receiver = receiver;
-        _receiverHost = activity;
+        _receiverHost = host;
     }
 
     private void UnregisterReceiver()
