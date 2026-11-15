@@ -395,6 +395,161 @@ public sealed class StringCatalogTests
         Assert.Equal("[X]", catalog.Get("X", "en"));
     }
 
+    // ---- Empty (null) texts ----
+
+    private sealed class RawStringSource : IStringSource
+    {
+        public RawStringSource(string key, LocalizedText text)
+        {
+            Texts = new Dictionary<string, LocalizedText> { [key] = text };
+        }
+
+        public IReadOnlyDictionary<string, LocalizedText> Texts { get; }
+    }
+
+    private sealed class ThrowingToString
+    {
+        public override string ToString() => throw new InvalidOperationException("ToString failed");
+    }
+
+    private static StringCatalog RawCatalog(string key, LocalizedText text) => new([new RawStringSource(key, text)]);
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("he")]
+    public void Get_DefaultLocalizedText_ReturnsKeyInBrackets(string code)
+    {
+        var catalog = RawCatalog("Key.Empty", default);
+
+        Assert.Equal("[Key.Empty]", catalog.Get("Key.Empty", code));
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("he")]
+    public void TryGet_DefaultLocalizedText_ReturnsFalseAndEmptyText(string code)
+    {
+        var catalog = RawCatalog("Key.Empty", default);
+
+        Assert.False(catalog.TryGet("Key.Empty", code, out var text));
+        Assert.Equal(string.Empty, text);
+    }
+
+    [Fact]
+    public void Contains_DefaultLocalizedText_ReturnsTrue()
+    {
+        var catalog = RawCatalog("Key.Empty", default);
+
+        Assert.True(catalog.Contains("Key.Empty"));
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("he")]
+    public void Format_DefaultLocalizedText_ReturnsKeyInBracketsAndDoesNotThrow(string code)
+    {
+        var catalog = RawCatalog("Key.Empty", default);
+
+        Assert.Equal("[Key.Empty]", catalog.Format("Key.Empty", code));
+        Assert.Equal("[Key.Empty]", catalog.Format("Key.Empty", code, 1, "x"));
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("he")]
+    public void Plural_DefaultLocalizedText_ReturnsBracketedKeyAndDoesNotThrow(string code)
+    {
+        var catalog = new StringCatalog(
+        [
+            new RawStringSource("Files.One", default),
+            new RawStringSource("Files.Many", default),
+        ]);
+
+        Assert.Equal("[Files.One]", catalog.Plural("Files", code, 1));
+        Assert.Equal("[Files.Many]", catalog.Plural("Files", code, 5));
+    }
+
+    [Fact]
+    public void Get_NullHebrewAndSetEnglish_ReturnsTextInEnglishAndBracketedKeyInHebrew()
+    {
+        // Current rule: a null text counts as unknown, there is no fallback from Hebrew to English.
+        var catalog = RawCatalog("Key.HeMissing", new LocalizedText("Only English", null!));
+
+        Assert.Equal("Only English", catalog.Get("Key.HeMissing", "en"));
+        Assert.Equal("[Key.HeMissing]", catalog.Get("Key.HeMissing", "he"));
+    }
+
+    [Fact]
+    public void TryGet_NullHebrewAndSetEnglish_TrueInEnglishFalseInHebrew()
+    {
+        var catalog = RawCatalog("Key.HeMissing", new LocalizedText("Only English", null!));
+
+        Assert.True(catalog.TryGet("Key.HeMissing", "en", out var english));
+        Assert.Equal("Only English", english);
+        Assert.False(catalog.TryGet("Key.HeMissing", "he", out var hebrew));
+        Assert.Equal(string.Empty, hebrew);
+    }
+
+    [Fact]
+    public void Format_NullHebrewAndSetEnglish_FormatsEnglishAndBracketsKeyInHebrew()
+    {
+        var catalog = RawCatalog("Key.HeMissing", new LocalizedText("Value {0}", null!));
+
+        Assert.Equal("Value 7", catalog.Format("Key.HeMissing", "en", 7));
+        Assert.Equal("[Key.HeMissing]", catalog.Format("Key.HeMissing", "he", 7));
+    }
+
+    [Fact]
+    public void Get_NullEnglishAndSetHebrew_ReturnsBracketedKeyInEnglishAndTextInHebrew()
+    {
+        var catalog = RawCatalog("Key.EnMissing", new LocalizedText(null!, "רק עברית"));
+
+        Assert.Equal("[Key.EnMissing]", catalog.Get("Key.EnMissing", "en"));
+        Assert.Equal("רק עברית", catalog.Get("Key.EnMissing", "he"));
+    }
+
+    [Fact]
+    public void Format_ArgumentToStringThrows_ReturnsUnformattedTextAndDoesNotThrow()
+    {
+        var catalog = Catalog(("Key.Arg", "Value {0}", "ערך {0}"));
+
+        Assert.Equal("Value {0}", catalog.Format("Key.Arg", "en", new ThrowingToString()));
+        Assert.Equal("ערך {0}", catalog.Format("Key.Arg", "he", new ThrowingToString()));
+    }
+
+    [Fact]
+    public void Format_ArgumentToStringThrowsButNotUsed_FormatsNormally()
+    {
+        var catalog = Catalog(("Key.Arg", "Value {0}", "ערך {0}"));
+
+        Assert.Equal("Value 1", catalog.Format("Key.Arg", "en", 1, new ThrowingToString()));
+    }
+
+    [Fact]
+    public void Format_ArgsNull_ReturnsTextUnformattedAndDoesNotThrow()
+    {
+        var catalog = Catalog(("Key.Arg", "Value {0}", "ערך {0}"));
+
+        Assert.Equal("Value {0}", catalog.Format("Key.Arg", "en", (object?[])null!));
+        Assert.Equal("ערך {0}", catalog.Format("Key.Arg", "he", (object?[])null!));
+    }
+
+    [Fact]
+    public void Format_ArgsNullAndUnknownKey_ReturnsKeyInBrackets()
+    {
+        var catalog = Catalog(("Key.Arg", "Value {0}", "ערך {0}"));
+
+        Assert.Equal("[Missing.Key]", catalog.Format("Missing.Key", "en", (object?[])null!));
+    }
+
+    [Fact]
+    public void Format_SingleNullArgument_FormatsAsEmptyString()
+    {
+        var catalog = Catalog(("Key.Arg", "Value [{0}]", "ערך [{0}]"));
+
+        Assert.Equal("Value []", catalog.Format("Key.Arg", "en", (object?)null));
+    }
+
     // ---- ResolveLanguageCode ----
 
     [Theory]
