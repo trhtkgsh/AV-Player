@@ -525,12 +525,54 @@ public sealed class GestureClassifierTests
 
         rig.Move(300, 150, 20);
         Assert.Equal(0.2, rig.Last.DeltaX, 6);
-        Assert.Equal(0.1, rig.Last.DeltaY, 6);
+        Assert.Equal(0.0, rig.Last.DeltaY);
 
         rig.Up(300, 150, 30);
         Assert.Equal(Ended, rig.Last.Phase);
         Assert.Equal(0.2, rig.Last.DeltaX, 6);
-        Assert.Equal(0.1, rig.Last.DeltaY, 6);
+        Assert.Equal(0.0, rig.Last.DeltaY);
+    }
+
+    [Fact]
+    public void Process_HorizontalDragMovingDiagonally_DeltaYIsExactlyZero()
+    {
+        var rig = new Rig();
+        rig.Down(100, 100);
+        rig.Move(200, 130, 10);
+        rig.Move(300, 200, 20);
+        rig.Move(350, 400, 30);
+        rig.Up(350, 400, 40);
+
+        Assert.Equal(new[] { E(HDrag, Began), E(HDrag, Changed), E(HDrag, Changed), E(HDrag, Ended) }, rig.Shape());
+        Assert.All(rig.Events, e => Assert.Equal(0.0, e.DeltaY));
+        Assert.Equal(0.25, rig.Last.DeltaX, 6);
+    }
+
+    [Fact]
+    public void Process_VerticalDragMovingDiagonally_DeltaXIsExactlyZero()
+    {
+        var rig = new Rig();
+        rig.Down(100, 100);
+        rig.Move(130, 200, 10);
+        rig.Move(200, 300, 20);
+        rig.Move(600, 350, 30);
+        rig.Up(600, 350, 40);
+
+        Assert.Equal(new[] { E(VDrag, Began), E(VDrag, Changed), E(VDrag, Changed), E(VDrag, Ended) }, rig.Shape());
+        Assert.All(rig.Events, e => Assert.Equal(0.0, e.DeltaX));
+        Assert.Equal(0.5, rig.Last.DeltaY, 6);
+    }
+
+    [Fact]
+    public void Process_DragMovingOffAxisAfterBegan_KeepsOffAxisDeltaZero()
+    {
+        var rig = new Rig();
+        rig.Down(100, 100);
+        rig.Move(200, 100, 10);
+        rig.Move(200, 120, 20);
+
+        Assert.All(rig.Events, e => Assert.Equal(0.0, e.DeltaY));
+        Assert.Equal(0.1, rig.Last.DeltaX, 6);
     }
 
     [Fact]
@@ -1081,6 +1123,103 @@ public sealed class GestureClassifierTests
         rig.Cancel();
 
         Assert.Empty(rig.Events);
+    }
+
+    // ---------------------------------------------------------------- Reset
+
+    [Fact]
+    public void Reset_AfterTap_DropsThePendingTap()
+    {
+        var rig = new Rig();
+        rig.TapAt(500, 250, 0, 50);
+
+        rig.Classifier.Reset();
+
+        Assert.Null(rig.Classifier.NextTickMs);
+        rig.Tick(10_000);
+        Assert.Empty(rig.Events);
+    }
+
+    [Fact]
+    public void Reset_AfterTap_NextQuickTouchIsNotADoubleTap()
+    {
+        var rig = new Rig();
+        rig.TapAt(500, 250, 0, 50);
+        rig.Classifier.Reset();
+        rig.TapAt(500, 250, 100, 150);
+
+        Assert.Empty(rig.Events);
+        Assert.Equal(450, rig.Classifier.NextTickMs);
+        rig.Tick(450);
+        Assert.Equal(new[] { E(Tap, Ended) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Reset_DuringDrag_EmitsNothingAndNextDownStartsCleanGesture()
+    {
+        var rig = new Rig();
+        rig.Down(100, 100);
+        rig.Move(200, 100, 10);
+        rig.Events.Clear();
+
+        rig.Classifier.Reset();
+        Assert.Empty(rig.Events);
+
+        rig.Move(300, 100, 20);
+        rig.Up(300, 100, 30);
+        Assert.Empty(rig.Events);
+        Assert.Null(rig.Classifier.NextTickMs);
+
+        rig.Down(100, 400, 40);
+        rig.Move(100, 300, 50);
+        Assert.Equal(new[] { E(VDrag, Began) }, rig.Shape());
+        Assert.Equal(-0.2, rig.Last.DeltaY, 6);
+    }
+
+    [Fact]
+    public void Reset_DuringPinch_EmitsNothingAndNextDownStartsCleanGesture()
+    {
+        var rig = new Rig();
+        rig.StartPinch();
+        rig.Move(800, 250, 10, id: 2);
+        rig.Events.Clear();
+
+        rig.Classifier.Reset();
+        Assert.Empty(rig.Events);
+
+        rig.Move(900, 250, 20, id: 2);
+        rig.PointerUp(2, 900, 250, 25);
+        rig.Up(400, 250, 30);
+        Assert.Empty(rig.Events);
+
+        rig.Down(100, 100, 40);
+        rig.Move(200, 100, 50);
+        Assert.Equal(new[] { E(HDrag, Began) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Reset_WithNothingActive_EmitsNothing()
+    {
+        var rig = new Rig();
+
+        rig.Classifier.Reset();
+
+        Assert.Empty(rig.Events);
+        Assert.Null(rig.Classifier.NextTickMs);
+    }
+
+    [Fact]
+    public void Reset_WhileSecondTouchIsDown_DropsPendingTapAndGivesNoDoubleTap()
+    {
+        var rig = new Rig();
+        rig.TapAt(500, 250, 0, 50);
+        rig.Down(500, 250, 100);
+        rig.Classifier.Reset();
+        rig.Up(500, 250, 120);
+        rig.Tick(10_000);
+
+        Assert.Empty(rig.Events);
+        Assert.Null(rig.Classifier.NextTickMs);
     }
 
     [Theory]
