@@ -34,6 +34,11 @@ public sealed class PlayerGestureHandler
     private long _seekDuration;
     private long _seekTarget;
     private bool _seeking;
+    private bool _verticalActive; // set on Began; cleared on Ended, Cancelled and Detach
+    private bool _horizontalActive;
+    private bool _pinchActive;
+    private bool _panActive;
+    private int _lastBrightnessPercent = -1;
     private ViewTransform _zoomStart = new(1, 0, 0);
     private ViewTransform _panStart = new(1, 0, 0);
 
@@ -62,6 +67,7 @@ public sealed class PlayerGestureHandler
     public void Detach()
     {
         _gestures.Gesture -= OnGesture;
+        _verticalActive = _horizontalActive = _pinchActive = _panActive = false; // a gesture cut off by Detach is over
         _osd.Hide();
     }
 
@@ -76,20 +82,33 @@ public sealed class PlayerGestureHandler
                 Guard(nameof(DoubleTap), () => DoubleTap(e));
                 break;
             case GestureKind.VerticalDrag:
-                Guard(nameof(VerticalDrag), () => VerticalDrag(e));
+                if (Admit(ref _verticalActive, e.Phase)) Guard(nameof(VerticalDrag), () => VerticalDrag(e));
                 break;
             case GestureKind.HorizontalDrag:
-                Guard(nameof(HorizontalDrag), () => HorizontalDrag(e));
+                if (Admit(ref _horizontalActive, e.Phase)) Guard(nameof(HorizontalDrag), () => HorizontalDrag(e));
                 break;
             case GestureKind.Pinch:
-                Guard(nameof(Pinch), () => Pinch(e));
+                if (Admit(ref _pinchActive, e.Phase)) Guard(nameof(Pinch), () => Pinch(e));
                 break;
             case GestureKind.Pan:
-                Guard(nameof(Pan), () => Pan(e));
+                if (Admit(ref _panActive, e.Phase)) Guard(nameof(Pan), () => Pan(e));
                 break;
             default:
                 break;
         }
+    }
+
+    /// <summary>
+    /// Began opens a gesture of one kind. Changed, Ended and Cancelled are admitted only while it is open,
+    /// so a touch that started before Attach does nothing. Ended and Cancelled close it.
+    /// </summary>
+    private static bool Admit(ref bool active, GesturePhase phase)
+    {
+        if (phase == GesturePhase.Began) active = true;
+        else if (!active) return false;
+
+        if (phase is GesturePhase.Ended or GesturePhase.Cancelled) active = false;
+        return true;
     }
 
     private void Tap(GestureEvent e)
@@ -142,6 +161,7 @@ public sealed class PlayerGestureHandler
         {
             double current = _surface.WindowBrightness;
             _brightnessStart = current < 0 ? DefaultBrightness : current; // negative: the system default is in effect
+            _lastBrightnessPercent = -1; // the first Changed always sends
         }
 
         if (e.Phase is GesturePhase.Ended or GesturePhase.Cancelled)
@@ -151,7 +171,13 @@ public sealed class PlayerGestureHandler
         }
 
         double brightness = Math.Clamp(_brightnessStart - e.DeltaY, MinBrightness, 1.0);
-        _surface.SetWindowBrightness(brightness);
+        int percent = (int)Math.Round(brightness * 100);
+        if (percent != _lastBrightnessPercent)
+        {
+            _lastBrightnessPercent = percent;
+            _surface.SetWindowBrightness(brightness);
+        }
+
         _osd.Hold(_localizer.Format("Player.Osd.Brightness", (int)Math.Round(brightness * 100)));
     }
 
