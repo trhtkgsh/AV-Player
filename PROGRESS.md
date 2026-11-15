@@ -4,7 +4,11 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 
 ## Current phase
 
-Phase 2 (started 2026-11-15) is built and waits for the owner's device test. Phase 3 does not start before it.
+Phase 3 (started 2026-11-15). The Phase 2 gate is passed: on 2026-11-15 the owner ran
+`docs/qa/phase-2-checklist.md` with `ArielPlayer-phase2.apk` on a Samsung Galaxy A55 (Android version not given):
+0 failed items, nothing skipped, ARM-1 and ARM-2 without any problem. So the hang of the arm64 build on the
+emulator's ARM translation (SPIKE finding 20) does not occur on that phone. The owner sent three items with the
+report; they are in "Owner feedback on 2026-11-15 (Phase 2 APK)" below and are handled before the Phase 3 work.
 The Phase 1 gate is passed: on 2026-11-15 the owner reported that
 `ArielPlayer-phase1-r2.apk` installs and works on the phone and that every item of `docs/qa/phase-1-checklist.md`
 was run and passed. The owner did not name the phone model or the Android version.
@@ -33,14 +37,22 @@ status bar color, explorer, thumbnails, playback, HUD symbols, pause and play, p
 | 3 | The app needs its own icon, on the launcher and on the splash screen. | Both were the purple ".NET" template images. | P1-30: a white play triangle on a blue gradient (launcher), the same symbol in a blue circle on black (splash). | Done, checked on API 34 and API 36. |
 | 4 | The Android status bar must have the color of the app design. | It was purple: the template colors in `colors.xml`. | P1-30: `colorPrimary` and `colorPrimaryDark` are the Dark OLED surface color, `colorAccent` the accent blue. | Done for the one theme of Phase 1, checked on API 34 and API 36. Following a theme change at runtime stays a Phase 3 task (ARCHITECTURE.md section 5). |
 
+## Owner feedback on 2026-11-15 (Phase 2 APK, Samsung Galaxy A55)
+
+| # | Feedback | What was found | What was done | State |
+|---|---|---|---|---|
+| 5 | Add a Hebrew interface as an option (an addition, not a replacement). | Every text of the app is an English literal in XAML or in a ViewModel. Spec 06 listed language selection as out of scope: the owner's request changes that. | See the Phase 3 task log (L10N tasks). | open |
+| 6 | In "fit to screen" the video shows at about 99% of the screen and becomes 100% after pause or play. On leaving the player the picture is stretched over the whole screen for about a second. | See the Phase 3 task log (P3-01). | - | open |
+| 7 | The play, next and previous buttons are reversed: the play triangle points left and next/previous swapped places. | The phone's language is Hebrew, so Android lays the app out right to left and MAUI mirrors the transport row and its vector symbols. Media transport controls must not be mirrored. | See the Phase 3 task log (P3-02). | open |
+
 ## Gates
 
 | Phase | Build | Tests | Reviewer | Owner device test | Status |
 |---|---|---|---|---|---|
 | 0 Spike | green (spike) | n/a | n/a | pending | go on emulator, waiting for owner device test (docs/SPIKE.md) |
 | 1 | green (Debug and Release) | 349 pass (307 Core, 42 Data) | every merged task approved, except P1-27 (tests only, Sonnet, checked by the orchestrator) | passed on 2026-11-15 (owner report: all checklist items pass) | PASSED |
-| 2 | green (Debug and Release) | 900 pass (662 Core, 238 Data) | every merged task approved; engine and subtitle service had a gate review and a second round | pending: `docs/qa/phase-2-checklist.md` with `artifacts/ArielPlayer-phase2.apk` | built, waiting for the owner |
-| 3 | - | - | - | - | not started |
+| 2 | green (Debug and Release) | 900 pass (662 Core, 238 Data) | every merged task approved; engine and subtitle service had a gate review and a second round | passed on 2026-11-15 (owner report: Samsung Galaxy A55, 0 failed items, ARM-1 and ARM-2 pass) | PASSED |
+| 3 | - | - | - | - | in progress |
 | 4 | - | - | - | - | not started |
 | 5 | - | - | - | - | not started |
 
