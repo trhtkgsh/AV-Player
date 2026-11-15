@@ -7,6 +7,7 @@
     xmlns:vm="clr-namespace:Player.App.Features.PlayerHud"
     xmlns:controls="clr-namespace:Player.App.Features.PlayerHud.Controls"
     xmlns:loc="clr-namespace:Player.App.Localization"
+    xmlns:gestures="clr-namespace:Player.App.Gestures"
     x:DataType="vm:PlayerViewModel"
     Shell.NavBarIsVisible="False"
     Shell.TabBarIsVisible="False"
@@ -16,12 +17,8 @@
         <!-- (a) The picture, behind everything. -->
         <surface:VideoSurfaceView HorizontalOptions="Fill" VerticalOptions="Fill" />
 
-        <!-- (b) Transparent tap layer: a single tap toggles the HUD. -->
-        <ContentView BackgroundColor="Transparent">
-            <ContentView.GestureRecognizers>
-                <TapGestureRecognizer Command="{Binding ToggleHudCommand}" />
-            </ContentView.GestureRecognizers>
-        </ContentView>
+        <!-- (b) Native gesture view: taps, double taps and drags, reported through IGestureSource. -->
+        <gestures:GestureOverlayView HorizontalOptions="Fill" VerticalOptions="Fill" />
 
         <!-- (c) Loading indicator while the file opens. -->
         <ActivityIndicator

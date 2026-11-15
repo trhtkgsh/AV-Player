@@ -20,6 +20,8 @@ public sealed partial class PlayerViewModel : ObservableObject
     private readonly IUiSettingsStore _uiSettings;
     private readonly IPlaybackStateRecorder _recorder;
     private readonly ILocalizer _localizer;
+    private readonly IVideoSurface _surface;
+    private readonly PlayerGestureHandler _gestureHandler;
 
     private UiSettings _settings = new();
     private bool _active;
@@ -57,14 +59,19 @@ public sealed partial class PlayerViewModel : ObservableObject
         IPlaybackCoordinator coordinator,
         IUiSettingsStore uiSettings,
         IPlaybackStateRecorder recorder,
-        ILocalizer localizer)
+        ILocalizer localizer,
+        IGestureSource gestures,
+        IVideoSurface surface)
     {
         _engine = engine;
         _coordinator = coordinator;
         _uiSettings = uiSettings;
         _recorder = recorder;
         _localizer = localizer;
+        _surface = surface;
         Osd = new OsdViewModel();
+        _gestureHandler = new PlayerGestureHandler(
+            gestures, engine, coordinator, surface, localizer, Osd, () => _settings, ToggleHud);
     }
 
     /// <summary>Called when the page appears. Reads the settings once, then subscribes and starts the timers.</summary>
@@ -81,6 +88,8 @@ public sealed partial class PlayerViewModel : ObservableObject
         _engine.SnapshotChanged += OnSnapshotChanged;
         _coordinator.Changed += OnCoordinatorChanged;
         _uiSettings.Changed += OnUiSettingsChanged;
+        _gestureHandler.Attach();
+        _surface.SetImmersive(true);
 
         ApplySnapshot(_engine.Snapshot);
         if (_returnFromSheet)
@@ -101,6 +110,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _engine.SnapshotChanged -= OnSnapshotChanged;
         _coordinator.Changed -= OnCoordinatorChanged;
         _uiSettings.Changed -= OnUiSettingsChanged;
+        _gestureHandler.Detach(); // the window stays immersive: a settings sheet may open on top
         CancelHideTimer();
         StopClock();
     }
@@ -188,6 +198,8 @@ public sealed partial class PlayerViewModel : ObservableObject
         try
         {
             await _coordinator.CloseAsync(CancellationToken.None);
+            _surface.SetImmersive(false);
+            _surface.SetWindowBrightness(null);
             if (Shell.Current is { } shell) await shell.GoToAsync("..");
         }
         catch (OperationCanceledException)
