@@ -18,11 +18,14 @@ public static class PlaybackSettingsServiceCollectionExtensions
         services.AddTransient<AudioSheet>();
         services.AddTransient<SubtitleSheetViewModel>();
         services.AddTransient<SubtitleSheet>();
+        services.AddTransient<SubtitleStyleSheetViewModel>();
+        services.AddTransient<SubtitleStyleSheet>();
         // Flat route names on purpose: a route that starts with another registered route's name is resolved wrongly by Shell.
         Routing.RegisterRoute("player-speed", typeof(SpeedSheet));
         Routing.RegisterRoute("player-repeat", typeof(RepeatSheet));
         Routing.RegisterRoute("player-audio", typeof(AudioSheet));
         Routing.RegisterRoute("player-subtitles", typeof(SubtitleSheet));
+        Routing.RegisterRoute("player-subtitle-style", typeof(SubtitleStyleSheet));
         return services;
     }
 }
