@@ -4,8 +4,13 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 
 ## Current phase
 
-Phase 5, in work since 2026-11-15 19:10, together with the owner's new request (the quiet display during
-playback, `docs/specs/12-playback-overlay.md`). On 2026-11-15 19:10 the owner reported on
+Phase 5 with the quiet display (`docs/specs/12-playback-overlay.md`): built on 2026-11-15, waits for the
+owner's device test. APK: `artifacts/ArielPlayer-phase5.apk` (Release, built from main at 2e84fe5,
+108,652,422 bytes, arm64-v8a, armeabi-v7a and x86_64,
+SHA-256 BEADD66B82991289F0DECC8BAB9088DFAC41227798260EB51FD28BBBAE7E19DA, same signing certificate; new
+permission `WRITE_EXTERNAL_STORAGE` up to API 28 only; no network permission). Checklist:
+`docs/qa/phase-5-checklist.md`. Task log and verification: section "Phase 5 and the quiet display" below.
+On 2026-11-15 19:10 the owner reported on
 `ArielPlayer-phase4-r2.apk`: "Everything is fine", asked for the quiet display and said to complete it and
 continue to Phase 5. He did not say which items were run; audio focus, media buttons, Bluetooth, BG-1 and
 BG-12 were not mentioned, so they stay in the Phase 5 list.
@@ -156,7 +161,7 @@ The owner's order is kept in the first column. "Phase" is the phase whose module
 | 3, revision 2 | green (Debug and Release) | 1634 pass (1104 Core, 530 Data) | every merged product task approved; R3-T2 (tests only, Sonnet) checked by the orchestrator | 2026-11-15: four items reported (fixed in revision 3), three readings approved; a full run of the list was not stated | not closed on its own: tested together with Phase 4 by the owner's decision |
 | 4 (with revision 3) | green (Debug and Release) | 1728 pass (1198 Core, 530 Data) | every merged product task approved; engine, surface, media service, session and Picture-in-Picture had a gate review (two or three rounds each); P4-T1 (tests only, Sonnet) checked by the orchestrator | 2026-11-15: three faults and one wish (fixed in revision 2); a full run of the list was not stated; focus, buttons and Bluetooth not reported | superseded by revision 2 |
 | 4, revision 2 | green (Debug and Release) | 1728 pass (1198 Core, 530 Data) | R5-01, R5-02 gate review: approve | 2026-11-15 19:10: "Everything is fine" (which items were run was not stated; focus, buttons and Bluetooth not reported) | PASSED by the owner's report |
-| 5 (with the quiet display, spec 12) | - | - | - | - | in work |
+| 5 (with the quiet display, spec 12) | green (Debug and Release) | 1892 pass (1310 Core, 582 Data) | R6-10 approved; R6-20, P5-10, P5-20 changes required, fixed by the agents, the fixes not reviewed again; tests-only tasks checked by the orchestrator; P5-50 not reviewed (one registration line) | pending (`docs/qa/phase-5-checklist.md`) | built, waiting for the owner |
 
 ## Section 9 checklist
 
@@ -447,6 +452,25 @@ Not verified at all: sound in the background (only the position was seen to adva
 | R5-60 | device-qa | Haiku 5.5 | merged. `docs/qa/phase-4-r2-checklist.md`, 10 items. |
 
 Verification, emulator only (Pixel 7 AVD, API 36, x86_64; Debug build, then the Release APK on a fresh installation): screen off for 10 s and on while playing: the position runs on, the input restarts at the position, the picture is complete from its first frame (0.7 to 1.6 s after the return, with MP4 and MKV, key frames 10 s apart); Home and return with Picture-in-Picture off: the same; Home and return while paused: same position, the picture is there (it moves on by about 0.2 s); Picture-in-Picture enter and expand: no surface loss, no restart; rotation: no restart; a 1.0x file after a 2.0x file plays at 1.0x; seek drag as before; the defaults page shows both switches on; Home with the defaults opens the small window. Not run: API 34; the update over the Phase 4 APK (the stored choice is kept by the store's merge, read in the code); sound; everything on a phone. The owner's broken picture itself was never seen here.
+
+## Phase 5 and the quiet display (2026-11-15, owner requests 16 and 17)
+
+| Task | Agent | Result |
+|---|---|---|
+| R6-01 | core-contracts (orchestrator) | merged. `UiSettings.Overlay`, three enums, `PlaybackOverlayText`, spec 12. |
+| R6-10 | ui-settings | merged. Store fields (the color as 8 hex digits, because an existing test forbids "42" in the row) and the group "While the controls are hidden". Review: approve. "Theme accent" as a text color left out. |
+| R6-20, R6-21 | player-hud-ui | merged. The display and `-remaining / total` in the seek row. Review: changes required (clock aligned to the minute, fill by scale, no work while hidden), fixed. The clock is `HH:mm` like the HUD clock, not the phone's 12/24 h setting. The display stays on while the screen is locked. |
+| P5-10, P5-11 | file-ops | merged. Rename and trash through MediaStore, consent through the activity result registry, the saved state follows a rename and is deleted on trash. Review: changes required (result after a committed write, UI-thread call, duplicate check), fixed. |
+| P5-20 to P5-22 | explorer-ui | merged. ⋮ on file rows and tiles, Rename and Delete, in-place list edit. Review: changes required (delete never edited in place, reload race, taps during an operation), fixed. |
+| P5-50 | app-skeleton | merged. `AddFileOps()`. |
+| R6-T1, P5-T1 | test-writer (Sonnet 5.5) | merged. 59 + 105 tests. |
+| P5-60 | device-qa | `docs/qa/phase-5-checklist.md`. |
+
+Verification, emulator only (Pixel 7 AVD, API 36, x86_64; Debug, then a smoke run of the Release APK): the display with defaults in portrait and landscape (text flush in the top right screen corner, line at the bottom from the left), hidden with the controls shown; the seek row text; the settings group; corner bottom left, margin 22, size 18 and yellow seen in the player with the app in Hebrew (not mirrored); rename with Android's dialog (Allow: the list shows the new name, the file is renamed, no NEW mark; a second rename of the same file needed no dialog; Deny: nothing changes); trash with Android's dialog (the row goes, the file becomes `.trashed-...`).
+
+Not verified: API 34 and lower (API 29 and 26-28 paths were never run); the time choices other than the default, the line at the top, the switches, the other corners and colors on screen; Picture-in-Picture with the display; the minute tick; invalid and duplicate names on screen (unit tests cover the rules; the duplicate query was not run); the resume position after a rename as a number; rename or delete of the playing file; rotation during Android's dialog; grid tiles; everything on a phone. The fixes after the reviews of R6-20, P5-10 and P5-20 had no second review.
+
+Known limits: a subtitle file next to a renamed video keeps its old name; the playback queue can hold a renamed or deleted item; thumbnails are computed again after a rename; rotation during Android's dialog can report "cancelled" for a change that happened.
 
 ## Known gaps carried forward
 
