@@ -21,6 +21,10 @@ public sealed partial class FoldersViewModel : ObservableObject
 
     private readonly IMediaLibrary _library;
     private readonly IUiSettingsStore _uiSettings;
+    private readonly ILocalizer _localizer;
+
+    // The folders of the last successful load. The rows are rebuilt from it when the language changes.
+    private IReadOnlyList<MediaFolder> _folders = [];
 
     private CancellationTokenSource? _session;
     private int _loadVersion;
@@ -51,10 +55,11 @@ public sealed partial class FoldersViewModel : ObservableObject
     [ObservableProperty]
     private bool _showBusy;
 
-    public FoldersViewModel(IMediaLibrary library, IUiSettingsStore uiSettings)
+    public FoldersViewModel(IMediaLibrary library, IUiSettingsStore uiSettings, ILocalizer localizer)
     {
         _library = library;
         _uiSettings = uiSettings;
+        _localizer = localizer;
     }
 
     public ObservableCollection<FolderRow> Folders { get; } = new();
@@ -67,6 +72,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         _session = new CancellationTokenSource();
         _library.Changed += OnLibraryChanged;
         _uiSettings.Changed += OnSettingsChanged;
+        _localizer.Changed += OnLanguageChanged;
         await LoadAsync(LoadReason.Activate);
     }
 
@@ -155,7 +161,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         }
         catch (Exception)
         {
-            ErrorMessage = "Settings could not be opened.";
+            ErrorMessage = _localizer["Explorer.SettingsFailed"];
         }
         finally
         {
@@ -220,7 +226,8 @@ public sealed partial class FoldersViewModel : ObservableObject
             if (!permitted)
             {
                 PermissionDenied = true;
-                Folders.Clear();
+                _folders = [];
+                RebuildRows();
                 IsEmpty = false;
                 return;
             }
@@ -232,12 +239,8 @@ public sealed partial class FoldersViewModel : ObservableObject
                 return;
             }
 
-            Folders.Clear();
-            foreach (var folder in folders)
-            {
-                Folders.Add(new FolderRow(folder));
-            }
-
+            _folders = folders;
+            RebuildRows();
             IsEmpty = Folders.Count == 0;
         }
         catch (OperationCanceledException)
@@ -274,7 +277,7 @@ public sealed partial class FoldersViewModel : ObservableObject
 
         await shell.GoToAsync(
             ItemsRoute,
-            new Dictionary<string, object> { ["title"] = "All media" });
+            new Dictionary<string, object>());
     }
 
     private bool IsCurrentLoad(int version) => version == _loadVersion;
@@ -283,6 +286,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     {
         _library.Changed -= OnLibraryChanged;
         _uiSettings.Changed -= OnSettingsChanged;
+        _localizer.Changed -= OnLanguageChanged;
 
         _session?.Cancel();
         _session?.Dispose();
@@ -309,6 +313,18 @@ public sealed partial class FoldersViewModel : ObservableObject
                 _ = LoadAsync(LoadReason.Library);
             }
         });
+
+    private void OnLanguageChanged(object? sender, EventArgs e) => RebuildRows();
+
+    // The rows keep the texts of the language they were made in: they are made again from the folders held now.
+    private void RebuildRows()
+    {
+        Folders.Clear();
+        foreach (var folder in _folders)
+        {
+            Folders.Add(new FolderRow(folder, _localizer));
+        }
+    }
 
     partial void OnErrorMessageChanged(string? value)
     {
