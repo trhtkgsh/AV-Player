@@ -29,8 +29,7 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
     private MediaFileId? _lastId;
     private PlayerStatus _lastStatus = PlayerStatus.Idle;
     private MediaFileId? _pending;
-    private bool _disposed;
-    private volatile string? _engineCopy; // the last copy given to the engine for the current file
+    private volatile bool _disposed;
 
     public SubtitleService(
         IPlayerEngine engine,
@@ -85,12 +84,19 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
         }
     }
 
-    public Task<bool> LoadExternalAsync(string contentUri, CancellationToken ct) => LoadAsync(contentUri, true, ct);
+    public Task<bool> LoadExternalAsync(string contentUri, CancellationToken ct) =>
+        _engine.Snapshot.Current is { } id ? LoadAsync(id, contentUri, true, ct) : Task.FromResult(false);
 
     public async Task<bool> PickAndLoadAsync(CancellationToken ct)
     {
         try
         {
+            // The file the user is looking at: a skip while the picker is open must not move the subtitle to another file.
+            if (_engine.Snapshot.Current is not { } id)
+            {
+                return false;
+            }
+
             var picked = await MainThread.InvokeOnMainThreadAsync(() => FilePicker.Default.PickAsync(PickOptions.Default))
                 .WaitAsync(ct).ConfigureAwait(false);
             if (picked is null || SubtitleFileStore.ExtensionOf(picked.FileName) is null)
@@ -98,8 +104,11 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
                 return false;
             }
 
-            await using var stream = await picked.OpenReadAsync().ConfigureAwait(false);
-            return await ImportAsync(stream, picked.FileName, null, true, ct).ConfigureAwait(false);
+            return await Task.Run(async () =>
+            {
+                await using var stream = await picked.OpenReadAsync().ConfigureAwait(false);
+                return await ImportAsync(id, stream, picked.FileName, null, true, ct).ConfigureAwait(false);
+            }, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -125,37 +134,12 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
         await ApplyPreferredAsync(id.Value, state, defaults, false, ct).ConfigureAwait(false);
     }
 
-    private async Task<bool> LoadAsync(string contentUri, bool record, CancellationToken ct)
+    // Everything that touches the content resolver or the disk runs on a thread-pool thread.
+    private async Task<bool> LoadAsync(MediaFileId id, string contentUri, bool record, CancellationToken ct)
     {
         try
         {
-            if (string.IsNullOrEmpty(contentUri))
-            {
-                return false;
-            }
-
-            var local = SubtitleFileStore.FromFileUri(contentUri);
-            if (local is not null)
-            {
-                return await AddToEngineAsync(local, record, ct).ConfigureAwait(false);
-            }
-
-            var uri = AndroidUri.Parse(contentUri)!;
-            if (string.Equals(uri.Scheme, "file", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            var meta = ReadMeta(uri);
-            var name = meta.Name ?? uri.LastPathSegment;
-            if (SubtitleFileStore.ExtensionOf(name) is null)
-            {
-                return false;
-            }
-
-            var key = string.Create(CultureInfo.InvariantCulture, $"{contentUri}|{meta.Size}|{meta.Modified}");
-            await using var stream = Resolver.OpenInputStream(uri);
-            return stream is not null && await ImportAsync(stream, name!, key, record, ct).ConfigureAwait(false);
+            return await Task.Run(() => LoadCoreAsync(id, contentUri, record, ct), ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -168,8 +152,40 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
         }
     }
 
+    private async Task<bool> LoadCoreAsync(MediaFileId id, string contentUri, bool record, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(contentUri))
+        {
+            return false;
+        }
+
+        var local = SubtitleFileStore.FromFileUri(contentUri);
+        if (local is not null)
+        {
+            return await AddAsync(id, local, SubtitleFileStore.ReadName(local), record, ct).ConfigureAwait(false);
+        }
+
+        var uri = AndroidUri.Parse(contentUri)!;
+        if (string.Equals(uri.Scheme, "file", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var meta = ReadMeta(uri);
+        var name = meta.Name ?? uri.LastPathSegment;
+        if (SubtitleFileStore.ExtensionOf(name) is null)
+        {
+            return false;
+        }
+
+        var key = string.Create(CultureInfo.InvariantCulture, $"{contentUri}|{meta.Size}|{meta.Modified}");
+        await using var stream = Resolver.OpenInputStream(uri);
+        return stream is not null && await ImportAsync(id, stream, name!, key, record, ct).ConfigureAwait(false);
+    }
+
     /// <summary>The shared copy step: decode, write the UTF-8 copy, hand it to the engine, optionally record it.</summary>
-    private async Task<bool> ImportAsync(Stream stream, string displayName, string? sourceKey, bool record, CancellationToken ct)
+    private async Task<bool> ImportAsync(
+        MediaFileId id, Stream stream, string displayName, string? sourceKey, bool record, CancellationToken ct)
     {
         var extension = SubtitleFileStore.ExtensionOf(displayName);
         if (extension is null)
@@ -187,8 +203,8 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
         var hint = LanguageSuffix(displayName) ?? defaults.PreferredSubtitleLanguage
             ?? CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
         var text = SubtitleTextEncoding.Decode(bytes, hint);
-        var local = await Task.Run(() => SubtitleFileStore.Write(text, sourceKey, extension), ct).ConfigureAwait(false);
-        return await AddToEngineAsync(local, record, ct).ConfigureAwait(false);
+        var local = SubtitleFileStore.Write(text, sourceKey, extension, displayName);
+        return await AddAsync(id, local, displayName, record, ct).ConfigureAwait(false);
     }
 
     // The language part of "name.he.srt" (also for names with more dots); null when there is none.
@@ -201,15 +217,22 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
             : SidecarMatcher.Match(stem.Substring(0, dot) + ".mp4", [displayName], null).FirstOrDefault()?.Language;
     }
 
-    private async Task<bool> AddToEngineAsync(string local, bool record, CancellationToken ct)
+    /// <summary>
+    /// Gives the copy to the engine unless the engine already holds it, and records it when asked. The file id is the one
+    /// that was current when the load started: if the user moved on, nothing is added and nothing is recorded.
+    /// </summary>
+    private async Task<bool> AddAsync(MediaFileId id, string local, string displayName, bool record, CancellationToken ct)
     {
-        // Already the engine's external subtitle for this file: adding it again would duplicate the track.
-        if (!string.Equals(local, _engineCopy, StringComparison.Ordinal))
+        if (!IsCurrent(id))
+        {
+            return false;
+        }
+
+        if (!SamePath(_engine.ExternalSubtitlePath, local))
         {
             try
             {
-                await _engine.AddSubtitleFileAsync(local, ct).ConfigureAwait(false);
-                _engineCopy = local;
+                await _engine.AddSubtitleFileAsync(local, displayName, ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -221,10 +244,23 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
         if (record)
         {
             var uri = SubtitleFileStore.ToFileUri(local);
-            _recorder.Update(s => s with { ExternalSubtitleUri = uri, SubtitleTrackId = null });
+            _recorder.Update(s => s.Id == id ? s with { ExternalSubtitleUri = uri, SubtitleTrackId = null } : s);
         }
 
         return true;
+    }
+
+    private static bool SamePath(string? a, string? b)
+    {
+        try
+        {
+            return a is not null && b is not null
+                && string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.Ordinal);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     private IReadOnlyList<SubtitleFile> QuerySidecars(MediaItem item, string? preferredLanguage, CancellationToken ct)
@@ -277,7 +313,7 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
             }
 
             var name = TextOf(cursor, IOpenableColumns.DisplayName);
-            return (name, NumberOf(cursor, IOpenableColumns.Size), NumberOf(cursor, "last_modified"));
+            return (name, NumberOf(cursor, IOpenableColumns.Size), NumberOf(cursor, MediaStore.IMediaColumns.DateModified));
         }
         catch (Exception)
         {
@@ -302,6 +338,8 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
     private static void Warn(string message, Exception ex) =>
         global::Android.Util.Log.Warn(Tag, $"{message}: {ex.GetType().Name}: {ex.Message}");
 
+    private static void Warn(string message) => global::Android.Util.Log.Warn(Tag, message);
+
     // ---- Automatic policy ----
 
     // Engine thread: only bookkeeping here, the work runs in a serialized chain.
@@ -322,7 +360,6 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
             if (snapshot.Current is not { } id)
             {
                 _pending = null;
-                _engineCopy = null;
                 return;
             }
 
@@ -331,7 +368,6 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
             if (previousId != id || restart)
             {
                 _pending = id;
-                _engineCopy = null;
             }
 
             if (_pending == id && snapshot.Status is PlayerStatus.Playing or PlayerStatus.Paused)
@@ -358,20 +394,14 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
             var defaults = await _defaults.GetAsync(ct).ConfigureAwait(false);
             var subtitleDecided = false;
 
+            // Restore the saved copy. The engine keeps its own file across restarts and replays, so a copy it already
+            // holds is not added again. A failure (copy deleted, engine refused it) leaves the subtitle undecided.
             var saved = SubtitleFileStore.FromFileUri(state?.ExternalSubtitleUri);
             if (saved is not null)
             {
-                if (!IsCurrent(id))
-                {
-                    return;
-                }
-
                 SubtitleFileStore.Touch(saved);
-                await _engine.AddSubtitleFileAsync(saved, ct).ConfigureAwait(false);
-                _engineCopy = saved;
-                subtitleDecided = true;
-
-                if (state!.SubtitleTrackId is { } track)
+                subtitleDecided = await AddAsync(id, saved, SubtitleFileStore.ReadName(saved), false, ct).ConfigureAwait(false);
+                if (subtitleDecided && state!.SubtitleTrackId is { } track)
                 {
                     await WaitForAsync(() => track == -1 || HasSubtitle(track), id, ct).ConfigureAwait(false);
                     if (IsCurrent(id) && (track == -1 || HasSubtitle(track)))
@@ -380,17 +410,27 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
                     }
                 }
             }
-            else if (state?.SubtitleTrackId is null && defaults.SubtitlesEnabled
-                && _coordinator.Current is { } item && item.Id == id)
+
+            if (!IsCurrent(id))
             {
-                var sidecars = await FindSidecarsAsync(item, ct).ConfigureAwait(false);
-                if (sidecars.Count > 0 && IsCurrent(id))
-                {
-                    subtitleDecided = await LoadAsync(sidecars[0].ContentUri, false, ct).ConfigureAwait(false);
-                }
+                return;
             }
 
-            await ApplyPreferredAsync(id, state, defaults, subtitleDecided, ct).ConfigureAwait(false);
+            // An external file that the engine already holds decides the subtitle kind: no sidecar on top of it.
+            subtitleDecided |= _engine.ExternalSubtitlePath is not null;
+
+            if (!subtitleDecided && state?.SubtitleTrackId is null && defaults.SubtitlesEnabled)
+            {
+                subtitleDecided = await LoadSidecarAsync(id, ct).ConfigureAwait(false);
+            }
+
+            // A saved copy that could not be restored does not fix the subtitle kind.
+            var effective = subtitleDecided || state is null ? state : state with { ExternalSubtitleUri = null };
+            await ApplyPreferredAsync(id, effective, defaults, subtitleDecided, ct).ConfigureAwait(false);
+        }
+        catch (Exception) when (_disposed)
+        {
+            // The service was disposed while it worked (a cancelled wait is no failure).
         }
         catch (Exception ex)
         {
@@ -398,36 +438,58 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
         }
     }
 
+    private async Task<bool> LoadSidecarAsync(MediaFileId id, CancellationToken ct)
+    {
+        // The coordinator sets its current item only after the engine accepted the open: wait for the item of this open.
+        await WaitForAsync(() => _coordinator.Current?.Id == id, id, ct).ConfigureAwait(false);
+        if (_coordinator.Current is not { } item || item.Id != id)
+        {
+            Warn("Sidecar search skipped: the coordinator has not reached the item of this open");
+            return false;
+        }
+
+        var sidecars = await FindSidecarsAsync(item, ct).ConfigureAwait(false);
+        return sidecars.Count > 0 && IsCurrent(id)
+            && await LoadAsync(id, sidecars[0].ContentUri, false, ct).ConfigureAwait(false);
+    }
+
     private async Task ApplyPreferredAsync(
         MediaFileId id, PlaybackState? state, GlobalDefaults defaults, bool subtitleDecided, CancellationToken ct)
     {
-        var audio = state?.AudioTrackId is null;
+        var audio = state?.AudioTrackId is null && !string.IsNullOrWhiteSpace(defaults.PreferredAudioLanguage);
         var subtitle = !subtitleDecided && state?.SubtitleTrackId is null && state?.ExternalSubtitleUri is null;
-        if (!audio && !subtitle)
+
+        if (audio)
         {
-            return;
+            await WaitForAsync(() => _engine.AudioTracks.Count > 0, id, ct).ConfigureAwait(false);
+            if (IsCurrent(id)
+                && PreferredTrackSelector.SelectAudio(_engine.AudioTracks, defaults.PreferredAudioLanguage) is { } audioId
+                && audioId != _engine.CurrentAudioTrackId)
+            {
+                await _engine.SelectAudioTrackAsync(audioId, ct).ConfigureAwait(false);
+            }
         }
 
-        await WaitForAsync(() => _engine.AudioTracks.Count > 0 || _engine.SubtitleTracks.Count > 0, id, ct).ConfigureAwait(false);
-
-        if (audio && IsCurrent(id)
-            && PreferredTrackSelector.SelectAudio(_engine.AudioTracks, defaults.PreferredAudioLanguage) is { } audioId
-            && audioId != _engine.CurrentAudioTrackId)
+        if (subtitle)
         {
-            await _engine.SelectAudioTrackAsync(audioId, ct).ConfigureAwait(false);
-        }
+            // The engine reports no subtitle track (not even -1) until it knows the subtitle tracks.
+            if (defaults.SubtitlesEnabled)
+            {
+                await WaitForAsync(() => _engine.CurrentSubtitleTrackId is not null, id, ct).ConfigureAwait(false);
+            }
 
-        if (subtitle && IsCurrent(id)
-            && PreferredTrackSelector.SelectSubtitle(_engine.SubtitleTracks, defaults.PreferredSubtitleLanguage, defaults.SubtitlesEnabled) is { } subtitleId
-            && subtitleId != _engine.CurrentSubtitleTrackId)
-        {
-            await _engine.SelectSubtitleTrackAsync(subtitleId, ct).ConfigureAwait(false);
+            if (IsCurrent(id)
+                && PreferredTrackSelector.SelectSubtitle(_engine.SubtitleTracks, defaults.PreferredSubtitleLanguage, defaults.SubtitlesEnabled) is { } subtitleId
+                && subtitleId != _engine.CurrentSubtitleTrackId)
+            {
+                await _engine.SelectSubtitleTrackAsync(subtitleId, ct).ConfigureAwait(false);
+            }
         }
     }
 
     private bool HasSubtitle(int trackId) => _engine.SubtitleTracks.Any(t => t.Id == trackId);
 
-    // The engine fills its track lists a moment after the status changes.
+    // The engine fills its track lists a moment after the status changes. Bounded; cancelled by Dispose.
     private async Task WaitForAsync(Func<bool> condition, MediaFileId id, CancellationToken ct)
     {
         var until = DateTime.UtcNow + TrackWait;
