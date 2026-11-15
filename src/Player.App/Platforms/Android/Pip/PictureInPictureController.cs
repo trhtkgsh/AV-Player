@@ -112,7 +112,7 @@ public sealed partial class PictureInPictureController : IPictureInPictureContro
 
     private bool EnterOnMainThread()
     {
-        var activity = Platform.CurrentActivity;
+        var activity = GetActivity();
         if (activity is null)
         {
             return false;
@@ -204,7 +204,7 @@ public sealed partial class PictureInPictureController : IPictureInPictureContro
                 return;
             }
 
-            var activity = Platform.CurrentActivity;
+            var activity = GetActivity();
             if (activity is null)
             {
                 return;
