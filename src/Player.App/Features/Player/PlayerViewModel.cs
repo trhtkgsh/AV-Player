@@ -107,6 +107,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _uiSettings.Changed += OnUiSettingsChanged;
         _gestureHandler.Attach();
         _surface.SetImmersive(true);
+        _surface.SetSystemBarsVisible(IsHudVisible); // the bars show exactly while the controls show
         _surface.Changed += OnSurfaceChanged;
         ApplyInsets(_surface.SystemBarInsets);
 
@@ -156,6 +157,12 @@ public sealed partial class PlayerViewModel : ObservableObject
         {
             if (_active) ApplyInsets(_surface.SystemBarInsets);
         });
+    }
+
+    partial void OnIsHudVisibleChanged(bool value)
+    {
+        // The system bars follow the controls: visible exactly while the controls are visible.
+        _surface.SetSystemBarsVisible(value);
     }
 
     partial void OnPositionMsChanged(double value)
