@@ -96,8 +96,8 @@
                 <Label
                     Grid.Column="5"
                     VerticalOptions="Center"
-                    IsVisible="{Binding ShowClock}"
-                    Text="{Binding ClockText}"
+                    IsVisible="{Binding ShowStatus}"
+                    Text="{Binding StatusText}"
                     TextColor="{DynamicResource ColorHudOnBackground}" />
             </Grid>
 

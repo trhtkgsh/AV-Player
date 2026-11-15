@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.Devices;
 using Player.Core.Contracts;
 using Player.Core.Models;
 
@@ -13,7 +14,7 @@ namespace Player.App.Features.PlayerHud;
 /// </summary>
 public sealed partial class PlayerViewModel : ObservableObject
 {
-    private const int ClockRefreshSeconds = 15;
+    private const int StatusRefreshSeconds = 15;
 
     private readonly IPlayerEngine _engine;
     private readonly IPlaybackCoordinator _coordinator;
@@ -33,7 +34,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private bool _errorHandled;
     private double _enginePositionMs;
     private CancellationTokenSource? _hideCts;
-    private CancellationTokenSource? _clockCts;
+    private CancellationTokenSource? _statusCts;
 
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private double _positionMs;
@@ -45,8 +46,8 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _isHudVisible = true;
     [ObservableProperty] private string _decoderText = "...";
     [ObservableProperty] private string _speedText = "1.0x";
-    [ObservableProperty] private bool _showClock;
-    [ObservableProperty] private string _clockText = "";
+    [ObservableProperty] private bool _showStatus;
+    [ObservableProperty] private string _statusText = "";
 
     /// <summary>The on-screen indicator of gesture values.</summary>
     public OsdViewModel Osd { get; }
@@ -112,7 +113,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _uiSettings.Changed -= OnUiSettingsChanged;
         _gestureHandler.Detach(); // the window stays immersive: a settings sheet may open on top
         CancelHideTimer();
-        StopClock();
+        StopStatus();
     }
 
     partial void OnPositionMsChanged(double value)
@@ -301,8 +302,8 @@ public sealed partial class PlayerViewModel : ObservableObject
     private void ApplySettings(UiSettings settings)
     {
         _settings = settings;
-        ShowClock = settings.ShowClock;
-        UpdateClockState();
+        ShowStatus = settings.ShowClock || settings.ShowBattery;
+        UpdateStatusState();
     }
 
     private void RefreshTitle() => Title = _coordinator.Current?.DisplayName ?? "";
@@ -356,38 +357,42 @@ public sealed partial class PlayerViewModel : ObservableObject
         if (!ct.IsCancellationRequested && IsPlaying && !_dragging) IsHudVisible = false;
     }
 
-    /// <summary>The clock runs only while active and ShowClock is on.</summary>
-    private void UpdateClockState()
+    /// <summary>The status line runs only while active and ShowStatus is on.</summary>
+    private void UpdateStatusState()
     {
-        if (!_active || !ShowClock)
+        if (!_active || !ShowStatus)
         {
-            StopClock();
+            StopStatus();
             return;
         }
 
-        if (_clockCts is not null) return; // already running
+        if (_statusCts is not null)
+        {
+            UpdateStatus(); // already running: show the new settings at once
+            return;
+        }
 
-        UpdateClock();
+        UpdateStatus();
         var cts = new CancellationTokenSource();
-        _clockCts = cts;
-        _ = RunClockAsync(cts.Token);
+        _statusCts = cts;
+        _ = RunStatusAsync(cts.Token);
     }
 
-    private void StopClock()
+    private void StopStatus()
     {
-        _clockCts?.Cancel();
-        _clockCts?.Dispose();
-        _clockCts = null;
+        _statusCts?.Cancel();
+        _statusCts?.Dispose();
+        _statusCts = null;
     }
 
-    private async Task RunClockAsync(CancellationToken ct)
+    private async Task RunStatusAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(ClockRefreshSeconds));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(StatusRefreshSeconds));
         try
         {
             while (await timer.WaitForNextTickAsync(ct))
             {
-                UpdateClock();
+                UpdateStatus();
             }
         }
         catch (OperationCanceledException)
@@ -396,9 +401,33 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
     }
 
-    private void UpdateClock()
+    /// <summary>Builds the status line: the clock and the battery percentage, joined by two spaces.</summary>
+    private void UpdateStatus()
     {
-        if (ShowClock) ClockText = DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture);
+        var parts = new List<string>(2);
+        if (_settings.ShowClock) parts.Add(DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture));
+        if (_settings.ShowBattery && ReadBatteryPercent() is { } percent)
+        {
+            parts.Add(percent.ToString(CultureInfo.InvariantCulture) + "%");
+        }
+
+        StatusText = string.Join("  ", parts);
+    }
+
+    /// <summary>The battery level in percent, or null when it is unknown. Never throws.</summary>
+    private static int? ReadBatteryPercent()
+    {
+        try
+        {
+            double level = Battery.Default.ChargeLevel;
+            if (double.IsNaN(level) || level < 0) return null;
+            return (int)Math.Round(Math.Clamp(level, 0d, 1d) * 100d);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Battery level unavailable: {ex}");
+            return null;
+        }
     }
 
     /// <summary>Shows an alert with the localized OK button. Never throws, so it is safe to await inside a catch block.</summary>
