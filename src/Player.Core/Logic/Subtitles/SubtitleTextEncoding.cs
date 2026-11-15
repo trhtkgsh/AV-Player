@@ -13,8 +13,10 @@ public static class SubtitleTextEncoding
     }
 
     /// <summary>
-    /// Returns the text of a subtitle file. Order: UTF-8 BOM, UTF-16 BOM, valid UTF-8 without BOM,
-    /// otherwise the legacy code page of <paramref name="languageHint"/>, otherwise Windows-1252. Never throws.
+    /// Returns the text of a subtitle file. Order: UTF-8 BOM, UTF-16 BOM, valid UTF-8 without BOM. For other bytes:
+    /// (a) the code page of <paramref name="languageHint"/> when it names a non-Latin language
+    /// (he, yi, ar, fa, ru, uk, bg, sr, el, th); (b) the code page found by <see cref="DetectLegacyCodePage"/>;
+    /// (c) the code page of the hint; (d) Windows-1252. Never throws.
     /// </summary>
     public static string Decode(ReadOnlySpan<byte> bytes, string? languageHint)
     {
@@ -49,13 +51,95 @@ public static class SubtitleTextEncoding
                 // Not valid UTF-8: a legacy code page.
             }
 
-            return LegacyEncoding(LegacyCodePage(languageHint)).GetString(bytes);
+            var codePage = LegacyCodePage(languageHint);
+            if (!IsNonLatin(codePage))
+            {
+                var detected = DetectLegacyCodePage(bytes);
+                if (detected != 0)
+                {
+                    codePage = detected;
+                }
+            }
+
+            return LegacyEncoding(codePage).GetString(bytes);
         }
         catch (Exception)
         {
             return Encoding.Latin1.GetString(bytes);
         }
     }
+
+    /// <summary>
+    /// Guesses the code page of text that is not UTF-8 from where its high bytes (0x80 and above) fall.
+    /// Returns 1255 (Hebrew), 1251 (Cyrillic) or 0 when it cannot tell, for example for Latin text with a few accents
+    /// or for fewer than 20 high bytes.
+    /// Limits: Greek (1253) and Arabic (1256) are not detected. Their byte ranges overlap Cyrillic and, for upper-case
+    /// text, each other, so they stay with the language hint; a Greek or Arabic file without a hint may come out as
+    /// Cyrillic or Latin. Cyrillic is only claimed when most high bytes are lower-case letters (0xE0..0xFF), so a
+    /// text in capitals returns 0.
+    /// </summary>
+    public static int DetectLegacyCodePage(ReadOnlySpan<byte> bytes)
+    {
+        int high = 0, letters = 0, hebrew = 0, cyrillic = 0, cyrillicLower = 0, cyrillicMark = 0, hebrewExclude = 0;
+        foreach (var b in bytes)
+        {
+            if (b < 0x80)
+            {
+                if ((b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z'))
+                {
+                    letters++;
+                }
+
+                continue;
+            }
+
+            high++;
+            if (b >= 0xE0 && b <= 0xFA)
+            {
+                hebrew++;
+            }
+
+            if (b >= 0xC0)
+            {
+                cyrillic++;
+            }
+
+            if (b >= 0xE0)
+            {
+                cyrillicLower++;
+            }
+
+            if ((b >= 0xC0 && b <= 0xDF) || b >= 0xFB)
+            {
+                cyrillicMark++;
+
+                // 0xFD and 0xFE are the left/right marks that Hebrew files use.
+                if (b != 0xFD && b != 0xFE)
+                {
+                    hebrewExclude++;
+                }
+            }
+        }
+
+        if (high < 20 || high * 100 < 15 * (letters + high))
+        {
+            return 0;
+        }
+
+        if (hebrew * 100 >= 90 * high && hebrewExclude * 100 < 5 * high)
+        {
+            return 1255;
+        }
+
+        if (cyrillic * 100 >= 90 * high && cyrillicMark * 100 >= 5 * high && cyrillicLower * 100 >= 70 * high)
+        {
+            return 1251;
+        }
+
+        return 0;
+    }
+
+    private static bool IsNonLatin(int codePage) => codePage is 1255 or 1256 or 1251 or 1253 or 874;
 
     /// <summary>The Windows code page that subtitle files of this language usually use; 1252 by default.</summary>
     public static int LegacyCodePage(string? languageHint) => LanguageCodes.Normalize(languageHint) switch
