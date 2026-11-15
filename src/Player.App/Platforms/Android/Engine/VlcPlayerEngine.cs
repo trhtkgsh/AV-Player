@@ -142,6 +142,10 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             return;
 
         _pauseRequested = false;
+        SeekPictureShown();   // playback shows the picture anyway: nobody waits for it
+        if (_previewTarget is { } exact && Live && _status != PlayerStatus.Opening)
+            SetTime(_player!, exact, fast: false);   // play from the position itself, not from the key frame before it
+        _previewTarget = null;
         if (_revealingFrame)
         {
             // Already running for the frame reveal: keep it running and say so.
@@ -180,30 +184,53 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         Publish();
     }, ct);
 
-    public Task SeekAsync(long positionMs, CancellationToken ct) => _queue.Enqueue(() =>
+    /// <summary>
+    /// A seek of a paused video is done in two steps, so that a finger that drags over the picture sees
+    /// it follow. First a fast seek: LibVLC shows the key frame at or before the position at once. The
+    /// task completes when that picture is on the screen (or after <see cref="SeekPictureTimeout"/>), which
+    /// paces a caller that sends one target after another: a newer seek would throw away a picture that
+    /// is still being decoded. Then, when no newer seek has come for <see cref="ExactSeekDelay"/>, an
+    /// exact seek shows the picture of the position itself; playing does the same before it starts.
+    /// Cancelling <paramref name="ct"/> after the seek was sent ends only the wait.
+    /// </summary>
+    public async Task SeekAsync(long positionMs, CancellationToken ct)
     {
-        if (_item is null)
-            return;
-
-        var target = Math.Max(0, _durationMs > 0 ? Math.Min(positionMs, _durationMs) : positionMs);
-        if (Live && _status != PlayerStatus.Opening)
+        Task? picture = null;
+        await _queue.Enqueue(() =>
         {
-            _player!.Time = target;
+            if (_item is null)
+                return;
 
-            // A frame reveal in progress must now wait for the clock to pass the new position.
-            _revealFromMs = target;
-        }
-        else
-        {
-            // Not seekable yet: start there, or seek as soon as the input plays.
-            _startMs = target;
-            if (Live)
-                _seekOnStart = target;
-        }
+            var target = Math.Max(0, _durationMs > 0 ? Math.Min(positionMs, _durationMs) : positionMs);
+            if (Live && _status != PlayerStatus.Opening)
+            {
+                // A frame reveal in progress must now wait for the clock to pass the new position.
+                _revealFromMs = target;
+                if (_pauseRequested && !_revealingFrame && _hasVideo && _videoEnabled)
+                {
+                    picture = PreviewSeek(target);
+                }
+                else
+                {
+                    _previewTarget = null;
+                    SetTime(_player!, target, fast: false);
+                }
+            }
+            else
+            {
+                // Not seekable yet: start there, or seek as soon as the input plays.
+                _startMs = target;
+                if (Live)
+                    _seekOnStart = target;
+            }
 
-        _positionMs = target;
-        Publish();
-    }, ct);
+            _positionMs = target;
+            Publish();
+        }, ct).ConfigureAwait(false);
+
+        if (picture is not null)
+            await picture.WaitAsync(ct).ConfigureAwait(false);
+    }
 
     public Task SetSpeedAsync(float speed, CancellationToken ct) => _queue.Enqueue(() =>
     {
@@ -427,6 +454,8 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         _surfaceTimer = null;
         _waitingForSurface = false;
         EndFrameReveal(pause: false);
+        SeekPictureShown();
+        _previewTarget = null;
 
         // Stopped is raised inside Stop() and captures the old generation, so it is ignored.
         _player?.Stop();
