@@ -59,10 +59,11 @@ public sealed record GlobalDefaults
     public long SubtitleDelayMs { get; init; }
     public SubtitleStyle SubtitleStyle { get; init; } = SubtitleStyle.Default;
 
-    /// <summary>Keep playing audio-only when the app leaves the foreground.</summary>
-    public bool BackgroundAudio { get; init; }
+    /// <summary>Keep playing audio-only when the app leaves the foreground. On unless the user turns it off.</summary>
+    public bool BackgroundAudio { get; init; } = true;
 
-    public bool PictureInPictureOnLeave { get; init; }
+    /// <summary>A playing video continues in a small window when the player is left. On unless turned off.</summary>
+    public bool PictureInPictureOnLeave { get; init; } = true;
 }
 
 /// <summary>The result of resolving per-file state against the global defaults.</summary>

@@ -10,7 +10,8 @@ namespace Player.App.Engine;
 // LibVLC events, track and format discovery, and the surface binding.
 public sealed partial class VlcPlayerEngine
 {
-    private volatile bool _surfaceAttached;
+    private volatile bool _surfaceAttached;   // UI thread: the views are attached to LibVLC's window
+    private bool _hasSurface;                 // engine thread: the same fact, in the order the reports arrived
     private volatile VideoFormat? _format;
 
     private const int RevealAdvanceMs = 120;
@@ -37,7 +38,7 @@ public sealed partial class VlcPlayerEngine
     // seconds on a slow device. The wait must outlast it, or a caller that keeps seeking would never
     // see a picture.
     private static readonly TimeSpan SeekPictureTimeout = TimeSpan.FromSeconds(4);
-    private static readonly TimeSpan ExactSeekDelay = TimeSpan.FromMilliseconds(350);
+    private static readonly TimeSpan ExactSeekDelay = TimeSpan.FromMilliseconds(250);
     private const string PrerollEndMessage = "end of video preroll";
     private const string BufferingDoneMessage = "Stream buffering done (";
 
@@ -45,7 +46,7 @@ public sealed partial class VlcPlayerEngine
     // the position. Up to this length there is nothing to drop (a fast seek, or a position on a key
     // frame) and no preroll message follows: the picture comes within a moment of the buffering.
     private const int ShortBufferMs = 1500;
-    private static readonly TimeSpan ShortBufferSettle = TimeSpan.FromMilliseconds(150);
+    private static readonly TimeSpan ShortBufferSettle = TimeSpan.FromMilliseconds(60);
     private TaskCompletionSource? _seekPicture;   // engine thread only: the newest paused seek whose picture is awaited
     private long? _previewTarget;                 // engine thread only: a paused position shown by its key frame so far
     private int _previewId;
@@ -114,14 +115,18 @@ public sealed partial class VlcPlayerEngine
             throw new ArgumentException("An Android.Views.Surface is required.", nameof(nativeSurface));
 
         if (_surfaceAttached)
-            _window.DetachViews();
+            ReleaseSurface();
         _window.SetVideoSurface(surface, null);
         _window.AttachViews();
         _window.SetWindowSize(widthPx, heightPx);
         _surfaceAttached = true;
         Trace($"surface ready {widthPx}x{heightPx}");
         ReportSurfaceSize(widthPx, heightPx);
-        _queue.Post(OnSurfaceChanged);
+        _queue.Post(() =>
+        {
+            _hasSurface = true;
+            OnSurfaceChanged();
+        });
     }
 
     public void SurfaceSizeChanged(int widthPx, int heightPx)
@@ -177,9 +182,55 @@ public sealed partial class VlcPlayerEngine
             return;
 
         _surfaceAttached = false;
-        _window.DetachViews();
         Trace("surface lost");
-        _queue.Post(OnSurfaceChanged);
+        ReleaseSurface();
+    }
+
+    private static readonly TimeSpan VideoOutputStopLimit = TimeSpan.FromMilliseconds(700);
+    private static readonly TimeSpan SurfaceReleaseLimit = TimeSpan.FromMilliseconds(1000);
+
+    /// <summary>
+    /// UI thread. Android keeps a surface valid only until the callback that reports its loss returns,
+    /// and a hardware decoder that still draws into a dead surface fails and starts again in the middle
+    /// of the stream (a broken picture until the next key frame). So the video track is switched off
+    /// and its output is gone before the views are detached. The wait is bounded.
+    /// </summary>
+    private void ReleaseSurface()
+    {
+        try
+        {
+            var stopped = _queue.Enqueue(
+                () =>
+                {
+                    _hasSurface = false;
+                    if (_waitingForSurface)
+                        return;
+
+                    UpdateVideoOutput();
+                    WaitForVideoOutputEnd();
+                },
+                CancellationToken.None);
+            if (!stopped.Wait(SurfaceReleaseLimit))
+                global::Android.Util.Log.Warn(Tag, "The video output was still running when the surface went away.");
+        }
+        catch (Exception ex)
+        {
+            global::Android.Util.Log.Warn(Tag, $"Stopping the video output failed: {ex}");
+        }
+
+        _window.DetachViews();
+    }
+
+    /// <summary>Engine thread. LibVLC closes the output of a deselected track a moment after the call.</summary>
+    private void WaitForVideoOutputEnd()
+    {
+        if (!Live || _player is not { } player)
+            return;
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        while (player.VoutCount > 0 && watch.Elapsed < VideoOutputStopLimit)
+            Thread.Sleep(10);
+        Trace($"video output ended after {watch.ElapsedMilliseconds} ms, left={player.VoutCount}");
     }
 
     private static void EnsureMainThread()
@@ -205,7 +256,7 @@ public sealed partial class VlcPlayerEngine
     {
         if (!_waitingForSurface)
             UpdateVideoOutput();
-        else if (_surfaceAttached)
+        else if (_hasSurface)
             Launch();
     }
 
@@ -217,8 +268,8 @@ public sealed partial class VlcPlayerEngine
 
         var player = _player!;
         if (Diagnostics)
-            Trace($"video output: enabled={_videoEnabled} surface={_surfaceAttached} noVideoStart={_startedWithoutVideo} track={player.VideoTrack} saved={_savedVideoTrack} status={_status}");
-        if (!(_videoEnabled && _surfaceAttached))
+            Trace($"video output: enabled={_videoEnabled} surface={_hasSurface} noVideoStart={_startedWithoutVideo} track={player.VideoTrack} saved={_savedVideoTrack} status={_status}");
+        if (!(_videoEnabled && _hasSurface))
         {
             if (!_startedWithoutVideo && player.VideoTrack >= 0)
             {
@@ -226,28 +277,16 @@ public sealed partial class VlcPlayerEngine
                 player.SetVideoTrack(-1);
             }
         }
-        else if (_startedWithoutVideo)
+        else if (_startedWithoutVideo || _savedVideoTrack is not null)
         {
-            // An input started with :no-video cannot select a video track later.
+            // The picture comes back by starting the input again at the current position, the way a
+            // file is opened: its decoder then begins on a key frame. An input started with :no-video
+            // cannot select a video track at all, and selecting the track again in mid-stream gave a
+            // broken picture for seconds on a phone (the decoder began between two key frames).
+            // While paused the last published position is used: LibVLC can still report the time from
+            // before a seek that was issued a moment ago (during a seek drag: the key frame before it).
             if (_item!.Kind == MediaKind.Video)
-                Start(CurrentPositionMs);
-        }
-        else if (_savedVideoTrack is { } track)
-        {
-            _savedVideoTrack = null;
-            player.SetVideoTrack(track);
-
-            // A track selected in mid-stream starts out of sync with the clock and stays black for
-            // seconds. A seek to the current position flushes and resyncs it from the last key frame.
-            // The last published position is used: LibVLC can still report the time from before a
-            // seek that was issued a moment ago, and this resync must not undo that seek.
-            SetTime(player, _positionMs, fast: false);
-
-            // The requested state decides, not only the reported one: a pause that was just requested
-            // may not have been reported yet, and it would leave the new decoder with a black picture.
-            // Never while opening: the first running event still has the start settings to apply.
-            if (_status == PlayerStatus.Paused || (_pauseRequested && _status == PlayerStatus.Playing))
-                BeginFrameReveal(player, _positionMs);
+                Start(_pauseRequested ? _positionMs : CurrentPositionMs);
         }
     }
 
@@ -426,8 +465,9 @@ public sealed partial class VlcPlayerEngine
         {
             _settingsPending = false;
             player.Volume = _volume;
-            if (_speed != 1f)
-                player.SetRate(_speed);
+
+            // Always: LibVLC keeps the rate of the file before on the same player.
+            player.SetRate(_speed);
             if (_audioDelayMs != 0)
                 player.SetAudioDelay(_audioDelayMs * 1000);
             if (_subtitleDelayMs != 0)
@@ -472,7 +512,7 @@ public sealed partial class VlcPlayerEngine
         // file (decoder switch, subtitle style) would keep the old picture, or none, until Play.
         // LibVLC reports such an input as Playing and then Paused, so the clock tells the case apart.
         if (status == PlayerStatus.Paused && _pauseRequested && !_clockStarted && !_revealTried && !_revealingFrame
-            && !_startedWithoutVideo && _videoEnabled && _surfaceAttached && _item!.Kind == MediaKind.Video && Live)
+            && !_startedWithoutVideo && _videoEnabled && _hasSurface && _item!.Kind == MediaKind.Video && Live)
         {
             _revealTried = true;
             BeginFrameReveal(player, FirstReportedTime);
