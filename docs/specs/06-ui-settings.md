@@ -20,4 +20,4 @@ Phase: 2. Agent: ui-settings. Contracts: `IUiSettingsStore`, `UiSettings`.
 
 ## Out of scope
 
-Language selection, gesture customization, button layout editing.
+Gesture customization, button layout editing. (Language selection was out of scope until Phase 3; it is now part of `UiSettings`, see docs/specs/10-localization.md.)

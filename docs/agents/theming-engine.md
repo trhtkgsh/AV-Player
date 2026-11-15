@@ -29,6 +29,12 @@
 - No literal color in the owned XAML.
 - Device: all four themes recolor open pages and system bars at once. The theme survives a restart with no flash.
 
+**Decisions made in Phase 3 (orchestrator).**
+- No text and no thin line is drawn in `ColorAccent` directly on the background or the surface (an accent can be too bright in the Light theme): section labels use `ColorOnSurfaceMuted`, marks `ColorOnSurface`, spinners `ColorProgress`. Filled controls keep the accent.
+- `ColorProgress` follows the chosen accent in the themes whose palette defines it equal to the accent (all but Light).
+- `ThemeSettingsNormalizer` (Core) is the one place that makes settings valid; the service, the resolver and the repository use it. NaN opacity means 0.6.
+- `ThemeService.ApplySystemBars()` is called by the activity in `OnCreate` and `OnResume`. The page registers the route `settings-theme`.
+
 **Out of scope.** Feature pages' layout. Following the system dark mode. Fonts and icons.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

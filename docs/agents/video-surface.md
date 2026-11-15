@@ -28,6 +28,11 @@
 - Geometry is pure static code in `src/Player.Core/Logic/Surface` (inputs: format, container, mode, transform; output: rectangle), so test-writer can cover it.
 - Device: the four aspect modes look right for 16:9, 4:3 and vertical video in both orientations. Text in a 1080p frame stays sharp at 400%. Pan never shows an empty edge. 20 background/foreground cycles keep the picture.
 
+**Decisions made in Phase 3 (orchestrator).**
+- `IVideoSurface.SetImmersive` hides the system bars and lets the picture use the cutout area; it belongs here because it is window code, like the brightness.
+- The surface keeps its last shape when the engine reports "no format" (a stop); a newly attached view starts from the engine's current format.
+- The engine fills the surface exactly (it sets LibVLC's aspect ratio to the surface size), so the rectangle computed here is the shape of the picture in every mode.
+
 **Out of scope.** Touch recognition (gestures). HUD (player-hud-ui). Engine internals. Picture-in-Picture.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned path is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

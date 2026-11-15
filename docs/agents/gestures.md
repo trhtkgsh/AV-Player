@@ -28,6 +28,12 @@
 - Classifier is 100% pure and covered by test-writer: every rule above, cancellation, locked mode.
 - Device: each gesture in spec 02 is recognized on the first try, 10 of 10 times. A diagonal drag never switches axis. Pinch never triggers a seek.
 
+**Decisions made in Phase 3 (orchestrator).**
+- Thresholds are an options record (slop from the platform, double-tap window 300 ms, distance 100 px). The classifier has no clock: time comes with the events and with `Tick`.
+- Deltas are fractions of the view size since the touch-down point; an axis-locked drag reports only its own axis; the pan after a pinch is measured from the end of the pinch.
+- A one-pointer drag is a `Pan` while the picture is zoomed: `GestureSource` reads `IVideoSurface.Transform.Scale` before each touch-down.
+- A long press without movement is a tap. `Reset()` drops pending state when the view detaches.
+
 **Out of scope.** Applying gestures (player-hud-ui ViewModel). OSD visuals. Zoom limits (video-surface).
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

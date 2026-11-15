@@ -43,6 +43,7 @@ App id: `com.arielplayer.app`. Min API 26, target API 36.
 | `src/Player.App/Features/PlaybackSettings/**` | playback-settings-ui |
 | `src/Player.App/Features/GlobalDefaults/**`, `src/Player.Data/GlobalDefaults/**` | global-defaults-store |
 | `src/Player.App/Features/UiSettings/**`, `src/Player.Data/UiSettings/**` | ui-settings |
+| `src/Player.App/Localization/**`, `src/Player.Core/Logic/Localization/**` | localization (added in Phase 3) |
 | `tests/**` | test-writer |
 | `docs/qa/**` | device-qa |
 | none (read-only) | reviewer |
@@ -54,6 +55,7 @@ Rules that keep the paths disjoint:
 - **No shared manifest edits.** Permissions are declared with `[assembly: UsesPermission(...)]` and services with `[Service]` attributes inside the owner's path. `AndroidManifest.xml` stays minimal.
 - **No shared schema file.** Each store owner ships its own `IDbMigration` class in its path. The database bootstrap (app-skeleton) runs all registered migrations in `Order`.
 - **Pure logic lives in `Player.Core/Logic/<Area>`** so that net10.0 tests can reach it. It may use only Player.Core types and the BCL.
+- **No shared text file.** Each UI module has one `IStringSource` class in its own path with its texts in English and Hebrew, registered in its own `Add<Area>()`. The localization module merges them (docs/specs/10-localization.md).
 
 ## 3. Runtime rules
 
@@ -64,6 +66,16 @@ Rules that keep the paths disjoint:
 **Decoder switch (SPIKE 3, 4).** Stop, rebuild the media with `:codec=mediacodec_ndk,all` or `:codec=all`, start at the saved position. The snapshot reports both the requested and the actual decoder, parsed from LibVLC's log.
 
 **Video surface (SPIKE 5, 6, 7, 8).** video-surface owns a native `SurfaceView` and knows nothing about LibVLC. player-engine owns LibVLC's `AWindow`. They meet in `IVideoOutputBinding`: the surface reports ready / size changed / lost, the engine attaches, reports the window size explicitly and restarts the video track only after the surface is ready. With no surface the engine disables the video track (audio-only) instead of retrying.
+
+**Shape of the picture (Phase 3).** The surface view alone decides the shape: `SurfaceGeometry` computes the rectangle of the native surface from the video format, the container, the aspect mode and the zoom, and the surface is really that large (a zoomed picture is rendered at its size, not upscaled). The engine tells LibVLC to fill the surface exactly (its aspect ratio is set to the surface size), so LibVLC never adds bars of its own; while the format of a new file is unknown it keeps the video's own proportions. The surface keeps its last shape when the engine stops. The aspect mode of a file is applied by the coordinator when it opens the item; the HUD only changes it on request.
+
+**Player window (Phase 3).** `IVideoSurface.SetImmersive` and `SetWindowBrightness` are the only places that touch the activity window for the player. The HUD turns immersive mode on when the player page is active and off, with the brightness reset, when the page closes.
+
+**Gestures (Phase 3).** A native overlay view feeds a pure classifier; `IGestureSource` raises semantic events on the UI thread and has no side effects. The HUD applies them.
+
+**Language and direction (Phase 3).** `ILocalizer` follows `UiSettings.Language` and the language of the device. Texts in XAML are bindings created by `{loc:T Key}`, so they change at once. The flow direction is set explicitly on the window and its pages (never `MatchParent`), so the app's language decides the direction and not the device. The bottom bar of the player is always left to right.
+
+**Start page.** The window starts with an empty black page; the shell is created after the saved theme and language are applied (at most five seconds later), so the first real page never shows the wrong theme or language.
 
 **File identity.** `MediaFileId = (MediaStoreId, SizeBytes, DateModifiedSeconds)`. Paths are display text only. Media is opened by content URI through a file descriptor (verified in SPIKE check 1).
 
@@ -106,7 +118,7 @@ Before handing over an APK, check it:
 - `dumpsys package com.arielplayer.app` lists no INTERNET or network permission.
 - It runs on the emulator as x86_64 (`adb install -r <apk>`) and as arm64 (`adb install -r --abi arm64-v8a <apk>`; the API 34 and API 36 emulator images translate arm64). The 32-bit ARM part cannot run on these emulators.
 
-System bars: before `ThemeService` runs, and for the whole of Phase 1, the status bar color comes from `Platforms/Android/Resources/values/colors.xml`. Up to API 34 the status bar uses `colorPrimaryDark`. From API 35 the window is edge to edge and the area behind the status bar is the background of the Shell `AppBarLayout`, which uses `colorPrimary`; `Window.SetStatusBarColor` does nothing there. Both colors are set to the Dark OLED `ColorSurface`. Following a theme change at runtime is a Phase 3 task of theming-engine (spec 07, requirement 7).
+System bars: before `ThemeService` runs, and for the whole of Phase 1, the status bar color comes from `Platforms/Android/Resources/values/colors.xml`. Up to API 34 the status bar uses `colorPrimaryDark`. From API 35 the window is edge to edge and the area behind the status bar is the background of the Shell `AppBarLayout`, which uses `colorPrimary`; `Window.SetStatusBarColor` does nothing there. Both colors are set to the Dark OLED `ColorSurface`. Following a theme change at runtime is a Phase 3 task of theming-engine (spec 07, requirement 7). Phase 3 result: `ThemeService.ApplySystemBars()` sets the bar colors up to API 34 and the icon brightness on every level; from API 35 the Shell colors (shared styles, `DynamicResource`) color the area behind the status bar. `MainActivity` calls it in `OnCreate` and `OnResume`, because the theme can be applied before an activity exists.
 
 ## 6. Refinements to MASTER.md (approved by the owner on 2026-11-14)
 

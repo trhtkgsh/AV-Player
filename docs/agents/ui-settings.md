@@ -30,6 +30,12 @@
 - `[ObservableProperty]` and `[RelayCommand]` only. `DynamicResource` tokens only.
 - Device: spec 06 acceptance list.
 
+**Decisions made in Phase 3 (orchestrator).**
+- `UiSettings.Language` (System, English, Hebrew) is stored by name and chosen in a "Language" section at the top of the Interface page. The page only saves the setting: the localizer follows the store.
+- "Skip length" and "Show the battery" are shown now. The settings home has a third row, "Theme", that navigates to `settings-theme`.
+- Every stored field is read tolerantly whatever its JSON kind, so one bad field never loses the others.
+- Texts come from `InterfaceStrings` (spec 10); a failed save shows a localized text.
+
 **Out of scope.** Playback defaults, theming page content, explorer and HUD reactions to the settings.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

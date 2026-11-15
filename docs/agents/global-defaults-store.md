@@ -29,6 +29,8 @@
 - `[ObservableProperty]` and `[RelayCommand]` only. `DynamicResource` tokens only.
 - Device: spec 05 acceptance list.
 
+**Decisions made in Phase 3 (orchestrator).** The "Aspect" row (Fit, Stretch, Crop, 100%) is shown now and "Reset all to defaults" covers it. `BackgroundAudio` and `PictureInPictureOnLeave` stay hidden until Phase 4. Texts come from `DefaultsStrings` (spec 10).
+
 **Out of scope.** The resolver (core-contracts). Per-file state. UI settings. Applying defaults to playback (playback-coordinator).
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

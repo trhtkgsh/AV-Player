@@ -35,6 +35,15 @@
 - `[ObservableProperty]` and `[RelayCommand]` only. `DynamicResource` tokens only.
 - Device: spec 02 acceptance list.
 
+**Decisions made in Phase 3 (orchestrator).**
+- Top bar: Back, a title block with a small status line (clock and battery), Subtitles, Audio, Repeat, Aspect, Lock. The bottom bar (seek row and button row) is `FlowDirection="LeftToRight"` in every language. `HudIconButton` never mirrors its symbol unless `MirrorInRightToLeft` is set (only Back).
+- Gesture handling lives in `PlayerGestureHandler`, the indicator in `OsdViewModel`. Volume, brightness and zoom show a held indicator; a seek drag shows `[+0:14]  12:30` and seeks on release.
+- The page is immersive while active (`IVideoSurface.SetImmersive`); leaving restores the bars and the system brightness.
+- The lock survives the background and the screen turning off; it is released only by the unlock button, a close or an error close. While locked a tap or the Back button shows the unlock button for three seconds.
+- The aspect mode at the start of a file is applied by the coordinator. The Aspect button cycles the modes and records the choice for the file.
+- The battery level comes from MAUI's `Battery` API; the permission it requires is declared in `BatteryPermission.cs`.
+- Texts come from `PlayerStrings` (spec 10). Error alerts show localized generic texts; the engine's own message goes to the debug log.
+
 **Out of scope.** Touch recognition, surface rendering, engine code, settings pages, PiP implementation.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned path is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.
