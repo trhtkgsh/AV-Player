@@ -41,6 +41,8 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     }
 
     private LibVLC? _libVlc;
+    private SubtitleStyle? _instanceStyle;   // the style the LibVLC instance was created with
+    private int _instanceMarginPx;           // and its subtitle margin
     private MediaPlayer? _player;
     private VlcMedia? _media;
     private ParcelFileDescriptor? _descriptor;
@@ -305,10 +307,22 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         _queue.Post(() =>
         {
             Halt();
-            _player?.Dispose();
-            _libVlc?.Dispose();
+            DisposePlayer();
             _queue.Dispose();
         });
+    }
+
+    /// <summary>Called only after Halt, so no input is running.</summary>
+    private void DisposePlayer()
+    {
+        _player?.Dispose();
+        _player = null;
+        if (_libVlc is { } libVlc)
+        {
+            libVlc.Log -= OnLog;
+            libVlc.Dispose();
+            _libVlc = null;
+        }
     }
 
     private void Start(long startMs)
@@ -349,13 +363,13 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
 
         try
         {
-            var player = EnsurePlayer();
-            var withVideo = _videoEnabled && _surfaceAttached;
-
             // Media is opened by content URI through a file descriptor, never by path.
             // LibVLC duplicates the descriptor when the input starts, so it stays open until Halt.
             _descriptor = AndroidApp.Context.ContentResolver!.OpenFileDescriptor(AndroidUri.Parse(_item!.ContentUri)!, "r")
                 ?? throw new IOException("The media file could not be opened.");
+
+            var player = EnsurePlayer(SubtitleMarginPx());
+            var withVideo = _videoEnabled && _surfaceAttached;
             _media = new VlcMedia(_libVlc!, _descriptor.Fd);
             _media.AddOption(_requestedDecoder == DecoderMode.Hardware ? ":codec=mediacodec_ndk,all" : ":codec=all");
             if (_startMs > 0)
@@ -364,7 +378,6 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
                 _media.AddOption(":start-paused");
             if (!withVideo)
                 _media.AddOption(":no-video");
-            AddSubtitleStyleOptions(_media, _subtitleStyle);
 
             _startedWithoutVideo = !withVideo;
             _settingsPending = true;
@@ -439,19 +452,83 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         }
     }
 
-    private static void AddSubtitleStyleOptions(VlcMedia media, SubtitleStyle style)
+    /// <summary>
+    /// The subtitle options of a LibVLC instance. They are read from the instance, not from the media:
+    /// the video output and its text renderer belong to the player, not to the input.
+    /// </summary>
+    private static string[] SubtitleOptions(SubtitleStyle style, int marginPx)
     {
+        // The paragraph direction comes from the text, so a Hebrew or Arabic line is laid out
+        // right to left and its closing punctuation ends up on the left.
+        var options = new List<string> { "--freetype-text-direction=2" };
         if (style == SubtitleStyle.Default)
-            return;
+            return [.. options];
 
         var scale = Math.Clamp(style.FontScale, 0.25, 4.0);
-        media.AddOption($":freetype-rel-fontsize={(int)Math.Round(16 / scale)}");
-        media.AddOption($":freetype-color={style.TextColorArgb & 0xFFFFFF}");
-        media.AddOption($":freetype-outline-color={style.OutlineColorArgb & 0xFFFFFF}");
-        media.AddOption($":freetype-outline-thickness={Math.Clamp(style.OutlineThickness, 0, 3) * 2}");
-        media.AddOption($":freetype-background-opacity={(int)Math.Round(Math.Clamp(style.BackgroundOpacity, 0, 1) * 255)}");
+        options.Add($"--sub-text-scale={(int)Math.Round(scale * 100)}");
+        options.Add($"--freetype-color={style.TextColorArgb & 0xFFFFFF}");
+        options.Add($"--freetype-outline-color={style.OutlineColorArgb & 0xFFFFFF}");
+
+        // LibVLC knows four outline widths: 0, 2, 4 (its default) and 6.
+        options.Add($"--freetype-outline-thickness={Math.Clamp(style.OutlineThickness, 0, 3) * 2}");
+        options.Add($"--freetype-background-opacity={(int)Math.Round(Math.Clamp(style.BackgroundOpacity, 0, 1) * 255)}");
         if (style.Bold)
-            media.AddOption(":freetype-bold");
+            options.Add("--freetype-bold");
+        if (marginPx != 0)
+            options.Add($"--sub-margin={marginPx}");
+        return [.. options];
+    }
+
+    /// <summary>
+    /// LibVLC takes the subtitle margin in pixels of the video, measured up from its own default position,
+    /// so the video height must be known before the instance is created. Zero keeps LibVLC's position.
+    /// </summary>
+    private int SubtitleMarginPx()
+    {
+        var standard = SubtitleStyle.Default.BottomMarginFraction;
+        var fraction = Math.Clamp(_subtitleStyle.BottomMarginFraction, 0, 0.5);
+        if (_item!.Kind != MediaKind.Video || Math.Abs(fraction - standard) < 0.0005)
+            return 0;
+
+        var height = _format?.Height ?? ProbeVideoHeight();
+
+        // A little below the default position is possible; further down the text would leave the picture.
+        return height > 0 ? (int)Math.Round(Math.Max(fraction - standard, -0.03) * height) : 0;
+    }
+
+    /// <summary>The displayed height of the video, or 0 when it cannot be read. Uses its own descriptor.</summary>
+    private int ProbeVideoHeight()
+    {
+        try
+        {
+            using var descriptor = AndroidApp.Context.ContentResolver!
+                .OpenFileDescriptor(AndroidUri.Parse(_item!.ContentUri)!, "r");
+            if (descriptor is null)
+                return 0;
+
+            using var retriever = new global::Android.Media.MediaMetadataRetriever();
+            try
+            {
+                retriever.SetDataSource(descriptor.FileDescriptor);
+                var width = Number(retriever.ExtractMetadata(global::Android.Media.MetadataKey.VideoWidth));
+                var height = Number(retriever.ExtractMetadata(global::Android.Media.MetadataKey.VideoHeight));
+                var rotation = Number(retriever.ExtractMetadata(global::Android.Media.MetadataKey.VideoRotation));
+                return rotation is 90 or 270 ? width : height;
+            }
+            finally
+            {
+                retriever.Release();
+                descriptor.Close();
+            }
+        }
+        catch (Exception ex)
+        {
+            global::Android.Util.Log.Warn(Tag, $"The video height could not be read: {ex.Message}");
+            return 0;
+        }
+
+        static int Number(string? text) =>
+            int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : 0;
     }
 
     private sealed class NoOpSurfaceCallback : Java.Lang.Object, AWindow.ISurfaceCallback
