@@ -18,7 +18,7 @@
                         <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
                             <Label Grid.Column="0" Text="{Binding Name}" VerticalOptions="Center" />
                             <Label Grid.Column="1" Text="✓" FontAttributes="Bold"
-                                   TextColor="{DynamicResource ColorAccent}" VerticalOptions="Center"
+                                   TextColor="{DynamicResource ColorOnSurface}" VerticalOptions="Center"
                                    IsVisible="{Binding IsSelected}" />
                             <Grid.GestureRecognizers>
                                 <TapGestureRecognizer

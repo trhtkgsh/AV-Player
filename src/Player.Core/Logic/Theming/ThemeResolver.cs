@@ -23,7 +23,7 @@ public static class ThemeResolver
             colors[ThemeTokens.ColorProgress] = accent;
         }
 
-        var opacity = double.IsNaN(settings.HudOpacity) ? 0 : Math.Clamp(settings.HudOpacity, 0, 1);
+        var opacity = ThemeSettingsNormalizer.NormalizeOpacity(settings.HudOpacity);
         var alpha = (uint)Math.Round(opacity * 255);
         colors[ThemeTokens.ColorHudBackground] =
             (alpha << 24) | (colors[ThemeTokens.ColorHudBackground] & 0x00FFFFFF);

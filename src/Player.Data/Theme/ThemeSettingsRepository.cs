@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Player.Core.Contracts;
+using Player.Core.Logic.Theming;
 using Player.Core.Models;
 using Player.Data.Database;
 
@@ -70,16 +72,7 @@ public sealed class ThemeSettingsRepository
 		});
 	}
 
-	private static ThemeSettings Normalize(ThemeSettings value)
-	{
-		var defaults = new ThemeSettings();
-		return new ThemeSettings
-		{
-			Theme = Enum.IsDefined(value.Theme) ? value.Theme : defaults.Theme,
-			AccentColorArgb = value.AccentColorArgb | 0xFF000000u,
-			HudOpacity = double.IsNaN(value.HudOpacity) ? defaults.HudOpacity : Math.Clamp(value.HudOpacity, 0, 1),
-		};
-	}
+	private static ThemeSettings Normalize(ThemeSettings value) => ThemeSettingsNormalizer.Normalize(value);
 
 	private static ThemeId ReadTheme(JsonElement? element, ThemeId fallback)
 	{

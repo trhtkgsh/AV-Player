@@ -15,8 +15,10 @@ public sealed partial class ThemeViewModel : ObservableObject
     private static readonly TimeSpan OpacityDebounce = TimeSpan.FromMilliseconds(150);
 
     private readonly IThemeService _themeService;
+    private readonly ILocalizer _localizer;
     private ThemeSettings _desired;
     private bool _loading;
+    private int _applyVersion;
     private CancellationTokenSource? _opacityDebounce;
 
     [ObservableProperty]
@@ -24,8 +26,8 @@ public sealed partial class ThemeViewModel : ObservableObject
     private double _hudOpacityPercent;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasError))]
-    private string? _errorMessage;
+    [NotifyPropertyChangedFor(nameof(ErrorMessage))]
+    private bool _hasError;
 
     public ThemeViewModel(IThemeService themeService, ILocalizer localizer)
     {
@@ -33,17 +35,19 @@ public sealed partial class ThemeViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(localizer);
 
         _themeService = themeService;
+        _localizer = localizer;
         _desired = themeService.Current;
 
         Themes =
         [
-            new ThemeChoice(ThemeId.DarkOled, localizer["Theme.DarkOled"]),
-            new ThemeChoice(ThemeId.DarkSlate, localizer["Theme.DarkSlate"]),
-            new ThemeChoice(ThemeId.Light, localizer["Theme.Light"]),
-            new ThemeChoice(ThemeId.HighContrast, localizer["Theme.HighContrast"]),
+            new ThemeChoice(ThemeId.DarkOled, string.Empty),
+            new ThemeChoice(ThemeId.DarkSlate, string.Empty),
+            new ThemeChoice(ThemeId.Light, string.Empty),
+            new ThemeChoice(ThemeId.HighContrast, string.Empty),
         ];
         Accents = [.. AccentPalette.Colors.Select(argb => new AccentSwatch(argb))];
 
+        RefreshTexts();
         Refresh();
     }
 
@@ -53,7 +57,37 @@ public sealed partial class ThemeViewModel : ObservableObject
 
     public string HudOpacityText => $"{(int)Math.Round(HudOpacityPercent)}%";
 
-    public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+    /// <summary>The localized text of a failed save; null when there is no error.</summary>
+    public string? ErrorMessage => HasError ? _localizer["Theme.SaveFailed"] : null;
+
+    /// <summary>Starts following language changes. Call it when the page appears.</summary>
+    public void Attach()
+    {
+        _localizer.Changed -= OnLanguageChanged;
+        _localizer.Changed += OnLanguageChanged;
+        RefreshTexts();
+    }
+
+    /// <summary>Stops following language changes. Call it when the page disappears.</summary>
+    public void Detach() => _localizer.Changed -= OnLanguageChanged;
+
+    private void OnLanguageChanged(object? sender, EventArgs e) => RefreshTexts();
+
+    private void RefreshTexts()
+    {
+        foreach (var theme in Themes)
+        {
+            theme.Name = _localizer[theme.Id switch
+            {
+                ThemeId.DarkOled => "Theme.DarkOled",
+                ThemeId.DarkSlate => "Theme.DarkSlate",
+                ThemeId.Light => "Theme.Light",
+                _ => "Theme.HighContrast",
+            }];
+        }
+
+        OnPropertyChanged(nameof(ErrorMessage));
+    }
 
     /// <summary>Shows the settings in effect. Call it when the page appears.</summary>
     public void Refresh()
@@ -161,10 +195,14 @@ public sealed partial class ThemeViewModel : ObservableObject
     private async Task ApplyDesiredAsync()
     {
         var settings = _desired;
+        var version = Interlocked.Increment(ref _applyVersion);
         try
         {
-            ErrorMessage = null;
             await _themeService.ApplyAsync(settings, CancellationToken.None);
+            if (version == Volatile.Read(ref _applyVersion))
+            {
+                HasError = false;
+            }
         }
         catch (OperationCanceledException)
         {
@@ -172,8 +210,12 @@ public sealed partial class ThemeViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            // The theme is applied even when the save failed; the page says so.
-            ErrorMessage = ex.Message;
+            // The theme is applied even when the save failed; the page says so. Older applies stay silent.
+            System.Diagnostics.Debug.WriteLine($"Theme could not be saved: {ex}");
+            if (version == Volatile.Read(ref _applyVersion))
+            {
+                HasError = true;
+            }
         }
     }
 

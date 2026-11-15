@@ -9,12 +9,13 @@ public sealed partial class ThemeChoice : ObservableObject
     public ThemeChoice(ThemeId id, string name)
     {
         Id = id;
-        Name = name;
+        _name = name;
     }
 
     public ThemeId Id { get; }
 
-    public string Name { get; }
+    [ObservableProperty]
+    private string _name;
 
     [ObservableProperty]
     private bool _isSelected;

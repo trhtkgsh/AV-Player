@@ -14,6 +14,13 @@ public partial class ThemePage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        _viewModel.Attach();
         _viewModel.Refresh();
+    }
+
+    protected override void OnDisappearing()
+    {
+        _viewModel.Detach();
+        base.OnDisappearing();
     }
 }

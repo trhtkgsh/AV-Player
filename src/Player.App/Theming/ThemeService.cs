@@ -52,7 +52,7 @@ public sealed partial class ThemeService : IThemeService
             ThemeSettings saved;
             try
             {
-                saved = await _repository.LoadAsync(ct);
+                saved = ThemeSettingsNormalizer.Normalize(await _repository.LoadAsync(ct));
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -75,6 +75,9 @@ public sealed partial class ThemeService : IThemeService
     {
         ArgumentNullException.ThrowIfNull(settings);
         ct.ThrowIfCancellationRequested();
+
+        // Normalized once: resources, Current, Changed and the saved row all carry the same valid value.
+        settings = ThemeSettingsNormalizer.Normalize(settings);
 
         await _gate.WaitAsync(ct);
         try
