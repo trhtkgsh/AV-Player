@@ -25,10 +25,12 @@ public sealed partial class PlayerViewModel : ObservableObject
     private readonly ILocalizer _localizer;
     private readonly IVideoSurface _surface;
     private readonly IGestureSource _gestures;
+    private readonly IPictureInPictureController _pip;
     private readonly PlayerGestureHandler _gestureHandler;
 
     private UiSettings _settings = new();
     private bool _active;
+    private bool _pipActive;
     private bool _sheetOpening;
     private bool _menuOpen;
     private bool _returnFromSheet;
@@ -55,6 +57,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private bool _isLocked;
     [ObservableProperty] private bool _isUnlockVisible;
+    [ObservableProperty] private bool _canEnterPip;
 
     // The bars and the OSD keep clear of the system bars and a camera cutout (see ApplyInsets).
     [ObservableProperty] private Thickness _topBarPadding = new(8, 6, 8, 6);
@@ -75,7 +78,8 @@ public sealed partial class PlayerViewModel : ObservableObject
         IPlaybackStateRecorder recorder,
         ILocalizer localizer,
         IGestureSource gestures,
-        IVideoSurface surface)
+        IVideoSurface surface,
+        IPictureInPictureController pictureInPicture)
     {
         _engine = engine;
         _coordinator = coordinator;
@@ -84,6 +88,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _localizer = localizer;
         _surface = surface;
         _gestures = gestures;
+        _pip = pictureInPicture;
         Osd = new OsdViewModel();
         _gestureHandler = new PlayerGestureHandler(
             gestures, engine, coordinator, surface, localizer, Osd, () => _settings, ToggleHud);
@@ -98,6 +103,13 @@ public sealed partial class PlayerViewModel : ObservableObject
         var settings = await _uiSettings.GetAsync(CancellationToken.None);
         if (activation != _activation || _active) return; // deactivated, or another activation took over
 
+        if (_coordinator.Current is null)
+        {
+            // Playback was closed from outside while the page was not active: leave once, like the outside close.
+            _ = LeaveAfterOutsideCloseAsync();
+            return;
+        }
+
         _active = true;
         _gestures.Locked = IsLocked; // a locked page stays locked when it is activated again
         if (IsLocked) IsHudVisible = false;
@@ -105,18 +117,22 @@ public sealed partial class PlayerViewModel : ObservableObject
         _engine.SnapshotChanged += OnSnapshotChanged;
         _coordinator.Changed += OnCoordinatorChanged;
         _uiSettings.Changed += OnUiSettingsChanged;
+        _pip.Changed += OnPipChanged;
         _gestureHandler.Attach();
         _surface.SetImmersive(true);
-        _surface.SetSystemBarsVisible(IsHudVisible); // the bars show exactly while the controls show
+        _surface.SetSystemBarsVisible(IsHudVisible && !_pip.IsActive); // the bars show exactly while the controls show
         _surface.Changed += OnSurfaceChanged;
         ApplyInsets(_surface.SystemBarInsets);
+
+        // A Picture-in-Picture that started or ended while the page was not active.
+        if (_pip.IsActive || _pipActive) ApplyPipState(_pip.IsActive);
 
         ApplySnapshot(_engine.Snapshot);
         if (_returnFromSheet)
         {
             // Back from a settings sheet: the HUD comes back, the countdown starts again below.
             _returnFromSheet = false;
-            IsHudVisible = true;
+            IsHudVisible = !_pipActive;
         }
 
         RestartHideTimer();
@@ -130,11 +146,19 @@ public sealed partial class PlayerViewModel : ObservableObject
         _engine.SnapshotChanged -= OnSnapshotChanged;
         _coordinator.Changed -= OnCoordinatorChanged;
         _uiSettings.Changed -= OnUiSettingsChanged;
+        _pip.Changed -= OnPipChanged;
         _surface.Changed -= OnSurfaceChanged;
         _gestureHandler.Detach(); // the window stays immersive: a settings sheet may open on top
         CancelUnlockTimer(); // the lock itself stays: a locked screen stays locked in the background
         IsUnlockVisible = false;
         CancelHideTimer();
+        if (_pip.IsActive)
+        {
+            // The page disappears into Picture-in-Picture; Changed may not arrive before the page is gone.
+            _pipActive = true;
+            IsHudVisible = false;
+            _surface.SetSystemBarsVisible(false);
+        }
         StopStatus();
     }
 
@@ -161,8 +185,8 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     partial void OnIsHudVisibleChanged(bool value)
     {
-        // The system bars follow the controls: visible exactly while the controls are visible.
-        _surface.SetSystemBarsVisible(value);
+        // The system bars follow the controls: visible exactly while the controls are visible, never in Picture-in-Picture.
+        _surface.SetSystemBarsVisible(value && !_pipActive);
     }
 
     partial void OnPositionMsChanged(double value)
@@ -271,9 +295,11 @@ public sealed partial class PlayerViewModel : ObservableObject
         RestartHideTimer();
     }
 
-    /// <summary>While locked: shows the unlock button for 3 seconds. A new call restarts the 3 seconds.</summary>
+    /// <summary>While locked: shows the unlock button for 3 seconds. A new call restarts the 3 seconds. Not in Picture-in-Picture.</summary>
     public void ShowUnlockButton()
     {
+        if (_pipActive) return;
+
         IsUnlockVisible = true;
         CancelUnlockTimer();
         var cts = new CancellationTokenSource();
@@ -383,6 +409,35 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Starts Picture-in-Picture. The controls go away before the call, so the small window never shows them. A
+    /// refusal or a failure brings them back and does nothing else visible. Never throws.
+    /// </summary>
+    [RelayCommand]
+    private async Task EnterPipAsync()
+    {
+        CancelHideTimer();
+        IsHudVisible = false;
+        _surface.SetSystemBarsVisible(false);
+
+        bool entered = false;
+        try
+        {
+            entered = await _pip.EnterAsync(CancellationToken.None);
+            if (!entered) System.Diagnostics.Debug.WriteLine("Picture-in-Picture was refused.");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Picture-in-Picture failed: {ex}");
+        }
+
+        if (!entered && !_pipActive)
+        {
+            IsHudVisible = true; // the controls the user tapped come back
+            RestartHideTimer();
+        }
+    }
+
     private async Task RunAsync(Func<Task> action)
     {
         RestartHideTimer();
@@ -433,10 +488,74 @@ public sealed partial class PlayerViewModel : ObservableObject
         MainThread.BeginInvokeOnMainThread(() => { if (_active) ApplySnapshot(snapshot); });
 
     private void OnCoordinatorChanged(object? sender, EventArgs e) =>
-        MainThread.BeginInvokeOnMainThread(() => { if (_active) RefreshTitle(); });
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (!_active) return;
+            RefreshTitle();
+            // Playback closed from outside (the notification, or the Picture-in-Picture window): leave the page.
+            if (_coordinator.Current is null) _ = LeaveAfterOutsideCloseAsync();
+        });
 
     private void OnUiSettingsChanged(object? sender, UiSettings settings) =>
         MainThread.BeginInvokeOnMainThread(() => { if (_active) ApplySettings(settings); });
+
+    private void OnPipChanged(object? sender, EventArgs e) =>
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (_active && (_pip.IsActive || _pipActive)) ApplyPipState(_pip.IsActive);
+        });
+
+    /// <summary>
+    /// Picture-in-Picture on or off. While on, the page shows only the picture: the controls, the OSD, the unlock
+    /// button and the auto-hide are off, and gestures are ignored. When it ends, the controls stay hidden.
+    /// </summary>
+    private void ApplyPipState(bool active)
+    {
+        _pipActive = active;
+        _gestureHandler.Suspended = active;
+        if (active)
+        {
+            CancelHideTimer();
+            CancelUnlockTimer();
+            IsUnlockVisible = false;
+            Osd.Hide();
+        }
+
+        IsHudVisible = false;
+        _surface.SetSystemBarsVisible(false);
+    }
+
+    /// <summary>
+    /// Leaves the page after playback was closed from outside. Does not close playback again and shows no message.
+    /// Runs once: a page that is already closing ignores it. Never throws.
+    /// </summary>
+    private async Task LeaveAfterOutsideCloseAsync()
+    {
+        if (_closing) return;
+        _closing = true;
+        try
+        {
+            ReleaseLock(); // playback is gone: a lock must not keep the page open
+            _surface.SetImmersive(false);
+            _surface.SetWindowBrightness(null);
+            if (Shell.Current is not { } shell)
+            {
+                _closing = false; // no shell to navigate with: allow a later attempt
+                return;
+            }
+
+            await shell.GoToAsync("..");
+        }
+        catch (OperationCanceledException)
+        {
+            _closing = false; // the page is leaving anyway; allow a later attempt
+        }
+        catch (Exception ex)
+        {
+            _closing = false; // the leave failed: a later Back press must still work
+            System.Diagnostics.Debug.WriteLine($"Leaving after outside close failed: {ex}");
+        }
+    }
 
     private void ApplySnapshot(PlayerSnapshot snapshot)
     {
@@ -475,7 +594,11 @@ public sealed partial class PlayerViewModel : ObservableObject
         UpdateStatusState();
     }
 
-    private void RefreshTitle() => Title = _coordinator.Current?.DisplayName ?? "";
+    private void RefreshTitle()
+    {
+        Title = _coordinator.Current?.DisplayName ?? "";
+        CanEnterPip = _pip.IsSupported && _coordinator.Current?.Kind == MediaKind.Video;
+    }
 
     /// <summary>Shows the error once, then closes the page through the same path as the Back button. Never throws.</summary>
     private async Task HandleErrorAsync(string message)
@@ -497,7 +620,7 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     private void RestartHideTimer()
     {
-        if (!_active || IsLocked || _menuOpen) return; // the menu's action sheet keeps the controls up
+        if (!_active || IsLocked || _menuOpen || _pipActive) return; // the menu's action sheet keeps the controls up; no countdown in Picture-in-Picture
 
         CancelHideTimer();
         var cts = new CancellationTokenSource();

@@ -29,6 +29,7 @@ internal sealed class PlayerStrings : IStringSource
         ["Player.Osd.Volume"] = new("Volume {0}%", "עוצמת קול {0}%"),
         ["Player.Osd.Zoom"] = new("Zoom {0}%", "זום {0}%"),
         ["Player.Pause"] = new("Pause", "השהה"),
+        ["Player.Pip"] = new("Picture-in-Picture", "תמונה בתוך תמונה"),
         ["Player.Play"] = new("Play", "נגן"),
         ["Player.PlaybackSpeed"] = new("Playback speed", "מהירות ניגון"),
         ["Player.Previous"] = new("Previous", "הקודם"),
