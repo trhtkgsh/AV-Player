@@ -11,6 +11,11 @@ public sealed class UiSettingsStore : IUiSettingsStore
 
 	private static readonly int[] SkipChoices = [5, 10, 15, 30, 60];
 
+	private const double MinFontScale = 0.8;
+	private const double MaxFontScale = 1.6;
+	private const float MinSpeed = 0.25f;
+	private const float MaxSpeed = 4.0f;
+
 	private const ExplorerInfoFields AllExplorerFields =
 		ExplorerInfoFields.Duration | ExplorerInfoFields.Resolution | ExplorerInfoFields.Size |
 		ExplorerInfoFields.Date | ExplorerInfoFields.Path;
@@ -108,10 +113,23 @@ public sealed class UiSettingsStore : IUiSettingsStore
 		SortDirection = Name(value.SortDirection),
 		NewTagDays = value.NewTagDays,
 		Language = Name(value.Language),
+		Layout = Name(value.Layout),
+		ExplorerFontScale = ToElement(value.ExplorerFontScale),
+		IncludeAudioOnlyFolders = ToElement(value.IncludeAudioOnlyFolders),
+		LongPressSpeed = ToElement(value.LongPressSpeed),
 	};
 
 	private static JsonElement Name<T>(T value) where T : struct, Enum =>
 		JsonSerializer.SerializeToElement(value.ToString(), UiSettingsJsonContext.Default.String);
+
+	private static JsonElement ToElement(double value) =>
+		JsonSerializer.SerializeToElement(value, UiSettingsJsonContext.Default.Double);
+
+	private static JsonElement ToElement(float value) =>
+		JsonSerializer.SerializeToElement(value, UiSettingsJsonContext.Default.Single);
+
+	private static JsonElement ToElement(bool value) =>
+		JsonSerializer.SerializeToElement(value, UiSettingsJsonContext.Default.Boolean);
 
 	// Each field falls back on its own: a missing or unreadable field takes the record default
 	// and never discards the others.
@@ -135,8 +153,22 @@ public sealed class UiSettingsStore : IUiSettingsStore
 			SortDirection = ParseEnum(dto.SortDirection, defaults.SortDirection),
 			NewTagDays = dto.NewTagDays ?? defaults.NewTagDays,
 			Language = ParseEnum(dto.Language, defaults.Language),
+			Layout = ParseEnum(dto.Layout, defaults.Layout),
+			ExplorerFontScale = ParseNumber(dto.ExplorerFontScale, defaults.ExplorerFontScale),
+			IncludeAudioOnlyFolders = ParseBool(dto.IncludeAudioOnlyFolders, defaults.IncludeAudioOnlyFolders),
+			LongPressSpeed = (float)ParseNumber(dto.LongPressSpeed, defaults.LongPressSpeed),
 		};
 	}
+
+	private static double ParseNumber(JsonElement? element, double fallback) =>
+		element is { ValueKind: JsonValueKind.Number } value && value.TryGetDouble(out var number)
+			? number
+			: fallback;
+
+	private static bool ParseBool(JsonElement? element, bool fallback) =>
+		element is { ValueKind: JsonValueKind.True or JsonValueKind.False } value
+			? value.GetBoolean()
+			: fallback;
 
 	// Each enum field is read on its own: a name (any case), a number, or anything else. A name or number
 	// that is not defined is rejected by Normalize; anything else takes the default.
@@ -195,10 +227,25 @@ public sealed class UiSettingsStore : IUiSettingsStore
 			SortField = Enum.IsDefined(value.SortField) ? value.SortField : defaults.SortField,
 			SortDirection = Enum.IsDefined(value.SortDirection) ? value.SortDirection : defaults.SortDirection,
 			Language = Enum.IsDefined(value.Language) ? value.Language : defaults.Language,
+			Layout = Enum.IsDefined(value.Layout) ? value.Layout : defaults.Layout,
+			ExplorerFontScale = NormalizeFontScale(value.ExplorerFontScale),
+			LongPressSpeed = NormalizeLongPressSpeed(value.LongPressSpeed),
 		};
 
 		return normalized == value ? value : normalized;
 	}
+
+	// 0.8 .. 1.6 in steps of 0.1; NaN takes the record default.
+	private static double NormalizeFontScale(double value) =>
+		double.IsNaN(value)
+			? new UiSettings().ExplorerFontScale
+			: Math.Round(Math.Clamp(value, MinFontScale, MaxFontScale), 1, MidpointRounding.AwayFromZero);
+
+	// 0.25 .. 4.0 in steps of 0.25; NaN takes the record default.
+	private static float NormalizeLongPressSpeed(float value) =>
+		float.IsNaN(value)
+			? new UiSettings().LongPressSpeed
+			: (float)(Math.Clamp(Math.Round(Math.Clamp(value, MinSpeed, MaxSpeed) * 4.0, MidpointRounding.AwayFromZero) / 4.0, MinSpeed, MaxSpeed));
 
 	private static int NearestSkip(int seconds)
 	{

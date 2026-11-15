@@ -17,4 +17,8 @@ internal sealed class UiSettingsDto
 	public JsonElement? SortDirection { get; set; }
 	public int? NewTagDays { get; set; }
 	public JsonElement? Language { get; set; }
+	public JsonElement? Layout { get; set; }
+	public JsonElement? ExplorerFontScale { get; set; }
+	public JsonElement? IncludeAudioOnlyFolders { get; set; }
+	public JsonElement? LongPressSpeed { get; set; }
 }
