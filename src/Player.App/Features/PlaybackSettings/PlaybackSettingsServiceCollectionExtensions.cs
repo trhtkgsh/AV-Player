@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
+using Player.Core.Contracts;
 
 namespace Player.App.Features.PlaybackSettings;
 
@@ -8,6 +9,7 @@ public static class PlaybackSettingsServiceCollectionExtensions
     public static IServiceCollection AddPlaybackSettings(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        services.AddSingleton<IStringSource, SheetStrings>();
         services.AddTransient<SpeedSheetViewModel>();
         services.AddTransient<SpeedSheet>();
         services.AddSingleton<AbRepeatDraft>();
