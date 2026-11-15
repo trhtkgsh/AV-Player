@@ -159,7 +159,16 @@ public sealed partial class PictureInPictureController
         _isActive = true;
         _session++;
         _endedWithoutCloseAt = null;
-        RegisterReceiver();
+        try
+        {
+            RegisterReceiver();
+        }
+        catch (Exception ex)
+        {
+            // Without the receiver the window has no working actions, but the session still counts.
+            Log.Warn(Tag, $"Registering the Picture-in-Picture receiver failed: {ex}");
+        }
+
         RaiseChanged();
         ApplyParamsAgain();
     }
