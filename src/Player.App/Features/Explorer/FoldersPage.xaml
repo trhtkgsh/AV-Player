@@ -3,12 +3,13 @@
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:explorer="clr-namespace:Player.App.Features.Explorer"
+             xmlns:loc="clr-namespace:Player.App.Localization"
              x:DataType="explorer:FoldersViewModel"
              Title="Ariel Player">
 
     <ContentPage.ToolbarItems>
-        <ToolbarItem Text="All files" Command="{Binding ShowAllCommand}" />
-        <ToolbarItem Text="Settings" Order="Secondary" Command="{Binding OpenSettingsCommand}" />
+        <ToolbarItem Text="{loc:T Explorer.AllFiles}" Command="{Binding ShowAllCommand}" />
+        <ToolbarItem Text="{loc:T Common.Settings}" Order="Secondary" Command="{Binding OpenSettingsCommand}" />
     </ContentPage.ToolbarItems>
 
     <Grid RowDefinitions="*,Auto">
@@ -37,15 +38,15 @@
         <ActivityIndicator IsRunning="{Binding ShowBusy}" IsVisible="{Binding ShowBusy}"
                            HorizontalOptions="Center" VerticalOptions="Center" />
 
-        <Label Text="No media folders found" IsVisible="{Binding IsEmpty}"
+        <Label Text="{loc:T Explorer.NoFolders}" IsVisible="{Binding IsEmpty}"
                HorizontalOptions="Center" VerticalOptions="Center" />
 
         <VerticalStackLayout IsVisible="{Binding PermissionDenied}" Padding="24" Spacing="12"
                              HorizontalOptions="Fill" VerticalOptions="Center">
-            <Label Text="Ariel Player needs permission to read your video and audio files."
+            <Label Text="{loc:T Explorer.PermissionNeeded}"
                    HorizontalTextAlignment="Center" />
-            <Button Text="Try again" Command="{Binding RetryPermissionCommand}" />
-            <Button Text="Open app settings" Command="{Binding OpenAppSettingsCommand}" />
+            <Button Text="{loc:T Common.TryAgain}" Command="{Binding RetryPermissionCommand}" />
+            <Button Text="{loc:T Explorer.OpenAppSettings}" Command="{Binding OpenAppSettingsCommand}" />
         </VerticalStackLayout>
 
         <Label Grid.Row="1" Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
