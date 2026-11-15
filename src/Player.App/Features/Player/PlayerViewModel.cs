@@ -20,6 +20,12 @@ public sealed partial class PlayerViewModel : ObservableObject
     private const int StatusRefreshSeconds = 15;
     private const int UnlockVisibleSeconds = 3;
 
+    /// <summary>
+    /// Previous above this position asks "Start again from the beginning?". Same value as
+    /// PlaybackCoordinator.RestartThresholdMs (private in Core): above it the coordinator restarts the file.
+    /// </summary>
+    private const long RestartConfirmMs = 3000;
+
     private readonly IPlayerEngine _engine;
     private readonly IPlaybackCoordinator _coordinator;
     private readonly IUiSettingsStore _uiSettings;
@@ -29,10 +35,12 @@ public sealed partial class PlayerViewModel : ObservableObject
     private readonly IGestureSource _gestures;
     private readonly IPictureInPictureController _pip;
     private readonly PlayerGestureHandler _gestureHandler;
+    private readonly PlayerScreenKeeper _screenKeeper;
 
     private UiSettings _settings = new();
     private bool _active;
     private bool _pipActive;
+    private bool _restartAsking;
     private bool _sheetOpening;
     private bool _menuOpen;
     private bool _returnFromSheet;
@@ -68,7 +76,7 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     // The bars and the OSD keep clear of the system bars and a camera cutout (see ApplyInsets).
     [ObservableProperty] private Thickness _topBarPadding = new(8, 6, 8, 6);
-    [ObservableProperty] private Thickness _bottomBarPadding = new(12, 8, 12, 8);
+    [ObservableProperty] private Thickness _bottomBarPadding = new(12, 2, 12, 2);
     [ObservableProperty] private Thickness _osdMargin = new(0, 96, 0, 0);
     [ObservableProperty] private Thickness _unlockMargin = new(16, 0, 16, 0);
 
@@ -77,10 +85,14 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _progressLineEnabled = true;
     [ObservableProperty] private LayoutOptions _progressLineVertical = LayoutOptions.End;
     [ObservableProperty] private double _progressScale;
-    [ObservableProperty] private string _overlayText = "";
-    [ObservableProperty] private bool _overlayTextVisible;
-    [ObservableProperty] private LayoutOptions _overlayVertical = LayoutOptions.Start;
-    [ObservableProperty] private LayoutOptions _overlayHorizontal = LayoutOptions.End;
+    [ObservableProperty] private double _progressLineHeight = PlaybackOverlaySettings.MinProgressLineThickness;
+
+    // One label per physical screen corner. Each is shown exactly while its text is not empty.
+    public OverlayCornerText CornerTopLeft { get; } = new();
+    public OverlayCornerText CornerTopRight { get; } = new();
+    public OverlayCornerText CornerBottomLeft { get; } = new();
+    public OverlayCornerText CornerBottomRight { get; } = new();
+
     [ObservableProperty] private Thickness _overlayMargin;
     [ObservableProperty] private double _overlayFontSize = 12;
     [ObservableProperty] private Microsoft.Maui.Graphics.Color _overlayColor = Microsoft.Maui.Graphics.Colors.White;
@@ -99,7 +111,8 @@ public sealed partial class PlayerViewModel : ObservableObject
         ILocalizer localizer,
         IGestureSource gestures,
         IVideoSurface surface,
-        IPictureInPictureController pictureInPicture)
+        IPictureInPictureController pictureInPicture,
+        PlayerScreenKeeper screenKeeper)
     {
         _engine = engine;
         _coordinator = coordinator;
@@ -109,6 +122,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _surface = surface;
         _gestures = gestures;
         _pip = pictureInPicture;
+        _screenKeeper = screenKeeper;
         Osd = new OsdViewModel();
         _gestureHandler = new PlayerGestureHandler(
             gestures, engine, coordinator, surface, localizer, Osd, () => _settings, ToggleHud);
@@ -131,6 +145,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
 
         _active = true;
+        _screenKeeper.SetPageActive(true);
         _gestures.Locked = IsLocked; // a locked page stays locked when it is activated again
         if (IsLocked) IsHudVisible = false;
         ApplySettings(settings);
@@ -165,6 +180,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     {
         _activation++;
         _active = false;
+        _screenKeeper.SetPageActive(false); // the page is left on every path: the screen may go off unless Picture-in-Picture shows the picture
         _engine.SnapshotChanged -= OnSnapshotChanged;
         _coordinator.Changed -= OnCoordinatorChanged;
         _uiSettings.Changed -= OnUiSettingsChanged;
@@ -194,7 +210,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private void ApplyInsets(EdgeInsets insets)
     {
         TopBarPadding = new Thickness(8 + insets.Left, 6 + insets.Top, 8 + insets.Right, 6);
-        BottomBarPadding = new Thickness(12 + insets.Left, 8, 12 + insets.Right, 8 + insets.Bottom);
+        BottomBarPadding = new Thickness(12 + insets.Left, 2, 12 + insets.Right, 2 + insets.Bottom);
         OsdMargin = new Thickness(insets.Left, 96, insets.Right, 0);
         UnlockMargin = new Thickness(16 + insets.Left, 0, 16 + insets.Right, 0);
     }
@@ -241,7 +257,60 @@ public sealed partial class PlayerViewModel : ObservableObject
     private Task NextAsync() => RunAsync(() => _coordinator.NextAsync(CancellationToken.None));
 
     [RelayCommand]
-    private Task PreviousAsync() => RunAsync(() => _coordinator.PreviousAsync(CancellationToken.None));
+    private Task PreviousAsync() => PreviousWithConfirmAsync();
+
+    /// <summary>
+    /// Above RestartConfirmMs the coordinator restarts the file, so the user is asked first. Playback keeps running
+    /// while the question is shown; the controls do not auto-hide under it and a second question does not open.
+    /// </summary>
+    private async Task PreviousWithConfirmAsync()
+    {
+        if (_restartAsking) return;
+        if (_engine.Snapshot.PositionMs <= RestartConfirmMs)
+        {
+            await RunAsync(() => _coordinator.PreviousAsync(CancellationToken.None));
+            return;
+        }
+
+        _restartAsking = true;
+        int activation = _activation;
+        MediaItem? asked = _coordinator.Current;
+        CancelHideTimer();
+        try
+        {
+            bool yes = await AskRestartAsync();
+            // Yes only while the page is still the active one, the same file is open, the position is still above
+            // the threshold and no Picture-in-Picture started meanwhile. Any other case counts as No.
+            bool still = activation == _activation && _active && !_pip.IsActive && !_pipActive
+                && asked is not null && _coordinator.Current?.Id == asked.Id
+                && _engine.Snapshot.PositionMs > RestartConfirmMs;
+            if (yes && still) await RunAsync(() => _coordinator.PreviousAsync(CancellationToken.None));
+        }
+        finally
+        {
+            _restartAsking = false;
+            if (_active) RestartHideTimer();
+        }
+    }
+
+    /// <summary>Yes / No question on the shell, as the other page dialogs. Never throws; a failure answers No.</summary>
+    private async Task<bool> AskRestartAsync()
+    {
+        try
+        {
+            if (Shell.Current is not { } shell) return false;
+            return await shell.DisplayAlertAsync(
+                _localizer["Player.Previous"],
+                _localizer["Player.RestartQuestion"],
+                _localizer["Common.Yes"],
+                _localizer["Common.No"]);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Restart question failed: {ex}");
+            return false;
+        }
+    }
 
     [RelayCommand]
     private Task ToggleDecoderAsync() => RunAsync(async () =>
@@ -492,6 +561,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         try
         {
             // The sheet covers the HUD: stop the countdown and hide it. ActivateAsync shows it again.
+            _screenKeeper.SetSheetOpen(true); // the picture stays on the screen under the sheet (Deactivate runs when it covers the page)
             CancelHideTimer();
             IsHudVisible = false;
             _returnFromSheet = true;
@@ -500,6 +570,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         catch (Exception ex)
         {
             // The route may not exist yet; the sheet is then simply not opened. Give the user the controls back.
+            _screenKeeper.SetSheetOpen(false);
             _returnFromSheet = false;
             IsHudVisible = true;
             RestartHideTimer();
@@ -653,13 +724,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _overlay = overlay;
         ProgressLineEnabled = overlay.ProgressLine;
         ProgressLineVertical = overlay.ProgressLineEdge == OverlayEdge.Top ? LayoutOptions.Start : LayoutOptions.End;
-        (OverlayVertical, OverlayHorizontal) = overlay.Corner switch
-        {
-            OverlayCorner.TopLeft => (LayoutOptions.Start, LayoutOptions.Start),
-            OverlayCorner.BottomLeft => (LayoutOptions.End, LayoutOptions.Start),
-            OverlayCorner.BottomRight => (LayoutOptions.End, LayoutOptions.End),
-            _ => (LayoutOptions.Start, LayoutOptions.End),
-        };
+        ProgressLineHeight = Math.Clamp(overlay.ProgressLineThickness, PlaybackOverlaySettings.MinProgressLineThickness, PlaybackOverlaySettings.MaxProgressLineThickness);
         OverlayMargin = new Thickness(Math.Clamp(overlay.MarginDp, PlaybackOverlaySettings.MinMarginDp, PlaybackOverlaySettings.MaxMarginDp));
         OverlayFontSize = Math.Clamp(overlay.FontSize, PlaybackOverlaySettings.MinFontSize, PlaybackOverlaySettings.MaxFontSize);
         OverlayColor = Microsoft.Maui.Graphics.Color.FromUint(overlay.ColorArgb);
@@ -697,14 +762,22 @@ public sealed partial class PlayerViewModel : ObservableObject
         if (e.PropertyName == nameof(OsdViewModel.IsVisible)) UpdateOverlayVisibility();
     }
 
-    /// <summary>Recomputes the progress line and the text of the display. Called only while the display is shown.</summary>
+    /// <summary>
+    /// Recomputes the progress line and the four corner texts. Called only while the display is shown.
+    /// A corner whose text did not change is not set.
+    /// </summary>
     private void RefreshOverlay()
     {
         long position = (long)_enginePositionMs;
         ProgressScale = PlaybackOverlayText.Progress(position, _engineDurationMs);
-        OverlayText = PlaybackOverlayText.FormatLine(_overlay, position, _engineDurationMs, _overlayClock, _overlayBattery);
-        OverlayTextVisible = OverlayText.Length > 0;
+        CornerTopLeft.Set(CornerText(OverlayCorner.TopLeft, position));
+        CornerTopRight.Set(CornerText(OverlayCorner.TopRight, position));
+        CornerBottomLeft.Set(CornerText(OverlayCorner.BottomLeft, position));
+        CornerBottomRight.Set(CornerText(OverlayCorner.BottomRight, position));
     }
+
+    private string CornerText(OverlayCorner corner, long position) =>
+        PlaybackOverlayText.FormatCorner(_overlay, corner, position, _engineDurationMs, _overlayClock, _overlayBattery);
 
     private void ReadOverlayClockAndBattery()
     {
@@ -782,7 +855,7 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     private void RestartHideTimer()
     {
-        if (!_active || IsLocked || _menuOpen || _pipActive) return; // the menu's action sheet keeps the controls up; no countdown in Picture-in-Picture
+        if (!_active || IsLocked || _menuOpen || _pipActive || _restartAsking) return; // the menu's action sheet keeps the controls up; no countdown in Picture-in-Picture; the restart question keeps them up too
 
         CancelHideTimer();
         var cts = new CancellationTokenSource();
