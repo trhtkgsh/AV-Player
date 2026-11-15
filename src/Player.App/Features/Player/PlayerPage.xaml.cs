@@ -1,15 +1,18 @@
 using Microsoft.Maui.Controls;
+using Player.Core.Contracts;
 
 namespace Player.App.Features.PlayerHud;
 
 public partial class PlayerPage : ContentPage
 {
     private readonly PlayerViewModel _viewModel;
+    private readonly ILocalizer _localizer;
 
-    public PlayerPage(PlayerViewModel viewModel)
+    public PlayerPage(PlayerViewModel viewModel, ILocalizer localizer)
     {
         InitializeComponent();
         _viewModel = viewModel;
+        _localizer = localizer;
         BindingContext = viewModel;
     }
 
@@ -22,7 +25,8 @@ public partial class PlayerPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlertAsync("Error", ex.Message, "OK");
+            System.Diagnostics.Debug.WriteLine($"Activation failed: {ex}");
+            await DisplayAlertAsync(_localizer["Common.Error"], _localizer["Player.ActionFailed"], _localizer["Common.Ok"]);
         }
     }
 

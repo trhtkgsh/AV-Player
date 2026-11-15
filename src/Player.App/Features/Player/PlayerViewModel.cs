@@ -19,6 +19,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private readonly IPlaybackCoordinator _coordinator;
     private readonly IUiSettingsStore _uiSettings;
     private readonly IPlaybackStateRecorder _recorder;
+    private readonly ILocalizer _localizer;
 
     private UiSettings _settings = new();
     private bool _active;
@@ -52,12 +53,14 @@ public sealed partial class PlayerViewModel : ObservableObject
         IPlayerEngine engine,
         IPlaybackCoordinator coordinator,
         IUiSettingsStore uiSettings,
-        IPlaybackStateRecorder recorder)
+        IPlaybackStateRecorder recorder,
+        ILocalizer localizer)
     {
         _engine = engine;
         _coordinator = coordinator;
         _uiSettings = uiSettings;
         _recorder = recorder;
+        _localizer = localizer;
     }
 
     /// <summary>Called when the page appears. Reads the settings once, then subscribes and starts the timers.</summary>
@@ -207,7 +210,8 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            await ShowAlertAsync("Error", ex.Message);
+            System.Diagnostics.Debug.WriteLine($"Command failed: {ex}");
+            await ShowAlertAsync(_localizer["Common.Error"], _localizer["Player.ActionFailed"]);
         }
     }
 
@@ -274,7 +278,7 @@ public sealed partial class PlayerViewModel : ObservableObject
 
         if (snapshot.Status == PlayerStatus.Error)
         {
-            _ = HandleErrorAsync(snapshot.Error ?? "Unknown error.");
+            _ = HandleErrorAsync(snapshot.Error ?? "no message");
         }
     }
 
@@ -294,7 +298,8 @@ public sealed partial class PlayerViewModel : ObservableObject
         _errorHandled = true;
         try
         {
-            await ShowAlertAsync("Cannot play", message);
+            System.Diagnostics.Debug.WriteLine($"Playback error: {message}");
+            await ShowAlertAsync(_localizer["Player.CannotPlay"], _localizer["Player.CannotPlayMessage"]);
             await CloseAsync();
         }
         catch (Exception ex)
@@ -380,14 +385,14 @@ public sealed partial class PlayerViewModel : ObservableObject
         if (ShowClock) ClockText = DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Shows an alert. Never throws, so it is safe to await inside a catch block.</summary>
-    private static async Task ShowAlertAsync(string title, string message)
+    /// <summary>Shows an alert with the localized OK button. Never throws, so it is safe to await inside a catch block.</summary>
+    private async Task ShowAlertAsync(string title, string message)
     {
         try
         {
             if (Shell.Current is { } shell)
             {
-                await shell.DisplayAlertAsync(title, message, "OK");
+                await shell.DisplayAlertAsync(title, message, _localizer["Common.Ok"]);
             }
         }
         catch (Exception ex)

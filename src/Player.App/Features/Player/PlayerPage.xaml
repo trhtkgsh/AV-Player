@@ -6,6 +6,7 @@
     xmlns:surface="clr-namespace:Player.App.Surface"
     xmlns:vm="clr-namespace:Player.App.Features.PlayerHud"
     xmlns:controls="clr-namespace:Player.App.Features.PlayerHud.Controls"
+    xmlns:loc="clr-namespace:Player.App.Localization"
     x:DataType="vm:PlayerViewModel"
     Shell.NavBarIsVisible="False"
     Shell.TabBarIsVisible="False"
@@ -44,7 +45,7 @@
                     MirrorInRightToLeft="True"
                     IconColor="{DynamicResource ColorHudOnBackground}"
                     Command="{Binding CloseCommand}"
-                    SemanticProperties.Description="Back" />
+                    SemanticProperties.Description="{loc:T Common.Back}" />
                 <Label
                     Grid.Column="1"
                     VerticalOptions="Center"
@@ -58,7 +59,7 @@
                     WidthRequest="44"
                     IconColor="{DynamicResource ColorHudOnBackground}"
                     Command="{Binding OpenSubtitlesCommand}"
-                    SemanticProperties.Description="Subtitles" />
+                    SemanticProperties.Description="{loc:T Player.Subtitles}" />
                 <controls:HudIconButton
                     Grid.Column="3"
                     IconData="M3 9 H7 L12 4.5 V19.5 L7 15 H3 Z M14.5 8 L15.9 6.6 A7.6 7.6 0 0 1 15.9 17.4 L14.5 16 A5.6 5.6 0 0 0 14.5 8 Z"
@@ -66,7 +67,7 @@
                     WidthRequest="44"
                     IconColor="{DynamicResource ColorHudOnBackground}"
                     Command="{Binding OpenAudioCommand}"
-                    SemanticProperties.Description="Audio" />
+                    SemanticProperties.Description="{loc:T Player.Audio}" />
                 <controls:HudIconButton
                     Grid.Column="4"
                     IconData="M6 6 H16 V3 L21 7.5 L16 12 V9 H8 V12 H6 Z M18 18 H8 V21 L3 16.5 L8 12 V15 H16 V12 H18 Z"
@@ -74,7 +75,7 @@
                     WidthRequest="44"
                     IconColor="{DynamicResource ColorHudOnBackground}"
                     Command="{Binding OpenRepeatCommand}"
-                    SemanticProperties.Description="Repeat" />
+                    SemanticProperties.Description="{loc:T Player.Repeat}" />
                 <Label
                     Grid.Column="5"
                     VerticalOptions="Center"
@@ -129,7 +130,7 @@
                         MinimumHeightRequest="32"
                         HeightRequest="32"
                         MinimumWidthRequest="52"
-                        SemanticProperties.Hint="Playback speed" />
+                        SemanticProperties.Hint="{loc:T Player.PlaybackSpeed}" />
                     <controls:HudIconButton
                         Grid.Column="1"
                         IconData="M6 5 H8.5 V19 H6 Z M19 5 V19 L9.5 12 Z"
@@ -137,7 +138,7 @@
                         WidthRequest="56"
                         IconColor="{DynamicResource ColorHudOnBackground}"
                         Command="{Binding PreviousCommand}"
-                        SemanticProperties.Description="Previous" />
+                        SemanticProperties.Description="{loc:T Player.Previous}" />
                     <controls:HudIconButton
                         Grid.Column="2"
                         IconData="M7 4.5 L19.5 12 L7 19.5 Z"
@@ -146,7 +147,7 @@
                         IsVisible="{Binding ShowPlayIcon}"
                         IconColor="{DynamicResource ColorHudOnBackground}"
                         Command="{Binding PlayPauseCommand}"
-                        SemanticProperties.Description="Play" />
+                        SemanticProperties.Description="{loc:T Player.Play}" />
                     <controls:HudIconButton
                         Grid.Column="2"
                         IconData="M6.5 5 H10.5 V19 H6.5 Z M13.5 5 H17.5 V19 H13.5 Z"
@@ -155,7 +156,7 @@
                         IsVisible="{Binding IsPlaying}"
                         IconColor="{DynamicResource ColorHudOnBackground}"
                         Command="{Binding PlayPauseCommand}"
-                        SemanticProperties.Description="Pause" />
+                        SemanticProperties.Description="{loc:T Player.Pause}" />
                     <controls:HudIconButton
                         Grid.Column="3"
                         IconData="M15.5 5 H18 V19 H15.5 Z M5 5 L14.5 12 L5 19 Z"
@@ -163,7 +164,7 @@
                         WidthRequest="56"
                         IconColor="{DynamicResource ColorHudOnBackground}"
                         Command="{Binding NextCommand}"
-                        SemanticProperties.Description="Next" />
+                        SemanticProperties.Description="{loc:T Player.Next}" />
                     <Button
                         Grid.Column="4"
                         HorizontalOptions="End"
@@ -180,7 +181,7 @@
                         MinimumHeightRequest="32"
                         HeightRequest="32"
                         MinimumWidthRequest="52"
-                        SemanticProperties.Hint="Decoder" />
+                        SemanticProperties.Hint="{loc:T Player.Decoder}" />
                 </Grid>
             </Grid>
         </Grid>
