@@ -95,6 +95,9 @@ internal sealed class VideoSurfaceContainer : ViewGroup, ISurfaceHolderCallback
         var surfaceLeft = (int)Math.Round(rect.Left);
         var surfaceTop = (int)Math.Round(rect.Top);
         _surface.Layout(surfaceLeft, surfaceTop, surfaceLeft + Pixels(rect.Width), surfaceTop + Pixels(rect.Height));
+
+        // A rotation moves the system bars. Posted: subscribers may change their own layout.
+        Post(() => _controller.RefreshInsets(this));
     }
 
     private static int Pixels(double value) => Math.Max(1, (int)Math.Round(value));

@@ -20,6 +20,18 @@ public sealed record UiSettings
 
     /// <summary>Language of the user interface.</summary>
     public AppLanguage Language { get; init; } = AppLanguage.System;
+
+    /// <summary>Rows or tiles in the explorer.</summary>
+    public ExplorerLayout Layout { get; init; } = ExplorerLayout.List;
+
+    /// <summary>Scale of folder and file names in the explorer: 0.8 .. 1.6.</summary>
+    public double ExplorerFontScale { get; init; } = 1.0;
+
+    /// <summary>False hides folders that hold no video file.</summary>
+    public bool IncludeAudioOnlyFolders { get; init; } = true;
+
+    /// <summary>Playback speed while a finger is held on the picture: 0.25 .. 4.0.</summary>
+    public float LongPressSpeed { get; init; } = 2.0f;
 }
 
 /// <summary>One text of the user interface in every supported language.</summary>
