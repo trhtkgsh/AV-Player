@@ -16,6 +16,7 @@ using Player.Core.Contracts;
 using Player.Core.Logic.Playback;
 using Player.Core.Logic.StateRecording;
 using Player.Data.Database;
+using Player.Data.FolderSettingsStorage;
 using Player.Data.GlobalDefaultsStorage;
 using Player.Data.PlaybackStateStorage;
 using Player.Data.UiSettingsStorage;
@@ -43,6 +44,7 @@ public static class MauiProgram
 		builder.Services.AddPlaybackStateStore();
 		builder.Services.AddGlobalDefaults();
 		builder.Services.AddUiSettings();
+		builder.Services.AddFolderSettings();
 		builder.Services.AddSingleton<IPlaybackStateRecorder, PlaybackStateRecorder>();
 		builder.Services.AddPlayerEngine();
 		builder.Services.AddMediaLibrary();
