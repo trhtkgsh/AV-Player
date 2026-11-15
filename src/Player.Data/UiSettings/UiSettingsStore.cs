@@ -10,6 +10,10 @@ public sealed class UiSettingsStore : IUiSettingsStore
 {
 	public const string SettingsKey = "ui_settings";
 
+	// Version 2 of the row: ExplorerFields is read as stored. Older rows have the former default
+	// (Duration, Resolution, Size), so they are read as None until the next save writes version 2.
+	private const int CurrentSchemaVersion = 2;
+
 	private static readonly int[] SkipChoices = [5, 10, 15, 30, 60];
 
 	private const double MinFontScale = 0.8;
@@ -104,6 +108,7 @@ public sealed class UiSettingsStore : IUiSettingsStore
 
 	private static UiSettingsDto ToDto(UiSettings value) => new()
 	{
+		SchemaVersion = ToElement(CurrentSchemaVersion),
 		HudAutoHideSeconds = ToElement(value.HudAutoHideSeconds),
 		SkipSeconds = ToElement(value.SkipSeconds),
 		ShowClock = ToElement(value.ShowClock),
@@ -115,15 +120,19 @@ public sealed class UiSettingsStore : IUiSettingsStore
 		NewTagDays = ToElement(value.NewTagDays),
 		Language = Name(value.Language),
 		Layout = Name(value.Layout),
+		ItemSize = Name(value.ItemSize),
 		ExplorerFontScale = ToElement(value.ExplorerFontScale),
 		IncludeAudioOnlyFolders = ToElement(value.IncludeAudioOnlyFolders),
 		LongPressSpeed = ToElement(value.LongPressSpeed),
 		OverlayProgressLine = ToElement(value.Overlay.ProgressLine),
 		OverlayProgressLineEdge = Name(value.Overlay.ProgressLineEdge),
+		OverlayProgressLineThickness = ToElement(value.Overlay.ProgressLineThickness),
 		OverlayClock = ToElement(value.Overlay.Clock),
 		OverlayBattery = ToElement(value.Overlay.Battery),
 		OverlayTime = Name(value.Overlay.Time),
 		OverlayCorner = Name(value.Overlay.Corner),
+		OverlayClockCorner = Name(value.Overlay.ClockCorner),
+		OverlayBatteryCorner = Name(value.Overlay.BatteryCorner),
 		OverlayMarginDp = ToElement(value.Overlay.MarginDp),
 		OverlayFontSize = ToElement(value.Overlay.FontSize),
 		OverlayColorArgb = ColorHex(value.Overlay.ColorArgb),
@@ -158,19 +167,26 @@ public sealed class UiSettingsStore : IUiSettingsStore
 			return defaults;
 		}
 
+		// One-time switch: a row older than version 2 holds the former default of ExplorerFields.
+		// It is read as None; the next save writes version 2 with the fields the user kept.
+		var isCurrent = ParseInt(dto.SchemaVersion, 0) >= CurrentSchemaVersion;
+
 		return new UiSettings
 		{
 			HudAutoHideSeconds = ParseInt(dto.HudAutoHideSeconds, defaults.HudAutoHideSeconds),
 			SkipSeconds = ParseInt(dto.SkipSeconds, defaults.SkipSeconds),
 			ShowClock = ParseBool(dto.ShowClock, defaults.ShowClock),
 			ShowBattery = ParseBool(dto.ShowBattery, defaults.ShowBattery),
-			ExplorerFields = ParseEnum(dto.ExplorerFields, defaults.ExplorerFields),
+			ExplorerFields = isCurrent
+				? ParseEnum(dto.ExplorerFields, defaults.ExplorerFields)
+				: ExplorerInfoFields.None,
 			ViewMode = ParseEnum(dto.ViewMode, defaults.ViewMode),
 			SortField = ParseEnum(dto.SortField, defaults.SortField),
 			SortDirection = ParseEnum(dto.SortDirection, defaults.SortDirection),
 			NewTagDays = ParseInt(dto.NewTagDays, defaults.NewTagDays),
 			Language = ParseEnum(dto.Language, defaults.Language),
 			Layout = ParseEnum(dto.Layout, defaults.Layout),
+			ItemSize = ParseEnum(dto.ItemSize, defaults.ItemSize),
 			ExplorerFontScale = ParseNumber(dto.ExplorerFontScale, defaults.ExplorerFontScale),
 			IncludeAudioOnlyFolders = ParseBool(dto.IncludeAudioOnlyFolders, defaults.IncludeAudioOnlyFolders),
 			LongPressSpeed = (float)ParseNumber(dto.LongPressSpeed, defaults.LongPressSpeed),
@@ -178,10 +194,13 @@ public sealed class UiSettingsStore : IUiSettingsStore
 			{
 				ProgressLine = ParseBool(dto.OverlayProgressLine, defaults.Overlay.ProgressLine),
 				ProgressLineEdge = ParseEnum(dto.OverlayProgressLineEdge, defaults.Overlay.ProgressLineEdge),
+				ProgressLineThickness = ParseInt(dto.OverlayProgressLineThickness, defaults.Overlay.ProgressLineThickness),
 				Clock = ParseBool(dto.OverlayClock, defaults.Overlay.Clock),
 				Battery = ParseBool(dto.OverlayBattery, defaults.Overlay.Battery),
 				Time = ParseEnum(dto.OverlayTime, defaults.Overlay.Time),
 				Corner = ParseEnum(dto.OverlayCorner, defaults.Overlay.Corner),
+				ClockCorner = ParseEnum(dto.OverlayClockCorner, defaults.Overlay.ClockCorner),
+				BatteryCorner = ParseEnum(dto.OverlayBatteryCorner, defaults.Overlay.BatteryCorner),
 				MarginDp = ParseInt(dto.OverlayMarginDp, defaults.Overlay.MarginDp),
 				FontSize = ParseInt(dto.OverlayFontSize, defaults.Overlay.FontSize),
 				ColorArgb = ParseColorHex(dto.OverlayColorArgb, defaults.Overlay.ColorArgb),
@@ -270,6 +289,7 @@ public sealed class UiSettingsStore : IUiSettingsStore
 			SortDirection = Enum.IsDefined(value.SortDirection) ? value.SortDirection : defaults.SortDirection,
 			Language = Enum.IsDefined(value.Language) ? value.Language : defaults.Language,
 			Layout = Enum.IsDefined(value.Layout) ? value.Layout : defaults.Layout,
+			ItemSize = Enum.IsDefined(value.ItemSize) ? value.ItemSize : defaults.ItemSize,
 			ExplorerFontScale = NormalizeFontScale(value.ExplorerFontScale),
 			LongPressSpeed = NormalizeLongPressSpeed(value.LongPressSpeed),
 			Overlay = NormalizeOverlay(value.Overlay),
@@ -278,15 +298,21 @@ public sealed class UiSettingsStore : IUiSettingsStore
 		return normalized == value ? value : normalized;
 	}
 
-	// Margin and size are clamped to their range; unknown enum values take the default.
+	// Thickness, margin and size are clamped to their range; unknown enum values take the default.
 	private static PlaybackOverlaySettings NormalizeOverlay(PlaybackOverlaySettings value)
 	{
 		var defaults = new PlaybackOverlaySettings();
 		return value with
 		{
 			ProgressLineEdge = Enum.IsDefined(value.ProgressLineEdge) ? value.ProgressLineEdge : defaults.ProgressLineEdge,
+			ProgressLineThickness = Math.Clamp(
+				value.ProgressLineThickness,
+				PlaybackOverlaySettings.MinProgressLineThickness,
+				PlaybackOverlaySettings.MaxProgressLineThickness),
 			Time = Enum.IsDefined(value.Time) ? value.Time : defaults.Time,
 			Corner = Enum.IsDefined(value.Corner) ? value.Corner : defaults.Corner,
+			ClockCorner = Enum.IsDefined(value.ClockCorner) ? value.ClockCorner : defaults.ClockCorner,
+			BatteryCorner = Enum.IsDefined(value.BatteryCorner) ? value.BatteryCorner : defaults.BatteryCorner,
 			MarginDp = Math.Clamp(value.MarginDp, PlaybackOverlaySettings.MinMarginDp, PlaybackOverlaySettings.MaxMarginDp),
 			FontSize = Math.Clamp(value.FontSize, PlaybackOverlaySettings.MinFontSize, PlaybackOverlaySettings.MaxFontSize),
 		};
