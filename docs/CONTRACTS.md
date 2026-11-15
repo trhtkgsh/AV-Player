@@ -2,6 +2,12 @@
 
 Status: FROZEN. Approved by the owner on 2026-11-14. Only the orchestrator may change this file,
 and `src/Player.Core/Contracts` + `src/Player.Core/Models` must match it exactly.
+
+Changes after the freeze (orchestrator only, each one logged in PROGRESS.md):
+- 2026-11-15, Phase 2: `IPlayerEngine` gained `TracksChanged`, `CurrentAudioTrackId`, `CurrentSubtitleTrackId`,
+  `AudioDelayMs`, `SubtitleDelayMs` and `SubtitleStyle`. The in-player settings sheets need the values in effect, and
+  the engine is the only place that knows them (a track picked by LibVLC itself is in no store). Additions only.
+
 Namespaces: `Player.Core.Models`, `Player.Core.Contracts`. All types are public. Nullable enabled.
 
 Conventions for every contract:
@@ -150,6 +156,12 @@ public interface IPlayerEngine
     event EventHandler<PlayerSnapshot>? SnapshotChanged;     // status, decoder, tracks, error, position (max 4 per second)
     IReadOnlyList<TrackInfo> AudioTracks { get; }
     IReadOnlyList<TrackInfo> SubtitleTracks { get; }
+    event EventHandler? TracksChanged;                       // a track list or a selected track changed
+    int? CurrentAudioTrackId { get; }                        // null while not known
+    int? CurrentSubtitleTrackId { get; }                     // -1 = off, null while not known
+    long AudioDelayMs { get; }
+    long SubtitleDelayMs { get; }
+    SubtitleStyle SubtitleStyle { get; }
 
     Task OpenAsync(MediaItem item, EffectivePlaybackSettings settings, bool startPaused, CancellationToken ct);
     Task PlayAsync(CancellationToken ct);
@@ -165,7 +177,7 @@ public interface IPlayerEngine
     Task SelectSubtitleTrackAsync(int trackId, CancellationToken ct);   // -1 = off
     Task SetSubtitleDelayAsync(long delayMs, CancellationToken ct);
     Task AddSubtitleFileAsync(string localFilePath, CancellationToken ct);   // file inside app storage
-    Task SetSubtitleStyleAsync(SubtitleStyle style, CancellationToken ct);
+    Task SetSubtitleStyleAsync(SubtitleStyle style, CancellationToken ct);   // restarts at the current position
 }
 
 // --- Engine <-> surface boundary. Implemented by player-engine, called by video-surface on the UI thread.

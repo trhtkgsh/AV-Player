@@ -17,6 +17,19 @@ public interface IPlayerEngine
     IReadOnlyList<TrackInfo> AudioTracks { get; }
     IReadOnlyList<TrackInfo> SubtitleTracks { get; }
 
+    /// <summary>Raised when a track list or a selected track changes.</summary>
+    event EventHandler? TracksChanged;
+
+    /// <summary>The selected audio track, or null while it is not known.</summary>
+    int? CurrentAudioTrackId { get; }
+
+    /// <summary>The selected subtitle track, -1 while subtitles are off, or null while it is not known.</summary>
+    int? CurrentSubtitleTrackId { get; }
+
+    long AudioDelayMs { get; }
+    long SubtitleDelayMs { get; }
+    SubtitleStyle SubtitleStyle { get; }
+
     Task OpenAsync(MediaItem item, EffectivePlaybackSettings settings, bool startPaused, CancellationToken ct);
     Task PlayAsync(CancellationToken ct);
     Task PauseAsync(CancellationToken ct);
@@ -46,6 +59,7 @@ public interface IPlayerEngine
     /// <param name="localFilePath">A file inside the app's own storage.</param>
     Task AddSubtitleFileAsync(string localFilePath, CancellationToken ct);
 
+    /// <summary>Applies to the running playback: the input restarts at the current position.</summary>
     Task SetSubtitleStyleAsync(SubtitleStyle style, CancellationToken ct);
 }
 

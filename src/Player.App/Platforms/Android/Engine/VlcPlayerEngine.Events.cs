@@ -191,6 +191,7 @@ public sealed partial class VlcPlayerEngine
         player.EncounteredError += (_, _) => PostEvent(() => Fail("The file cannot be played."));
         player.ESAdded += (_, _) => PostEvent(RefreshTracks);
         player.ESDeleted += (_, _) => PostEvent(RefreshTracks);
+        player.ESSelected += (_, _) => PostEvent(RefreshTracks);
         player.Vout += (_, _) => PostEvent(RefreshTracks);
         player.EndReached += (_, _) => PostEvent(() =>
         {
@@ -270,10 +271,12 @@ public sealed partial class VlcPlayerEngine
                 player.SetSpuDelay(_subtitleDelayMs * 1000);
             if (_audioTrackId is { } audio)
                 player.SetAudioTrack(audio);
+
+            // An external file is selected by LibVLC only while no track was chosen after it was added.
+            if (_subtitleFileUri is { } subtitleFile)
+                player.AddSlave(MediaSlaveType.Subtitle, subtitleFile, _subtitleTrackId is null);
             if (_subtitleTrackId is { } subtitle)
                 player.SetSpu(subtitle);
-            if (_subtitleFileUri is { } subtitleFile)
-                player.AddSlave(MediaSlaveType.Subtitle, subtitleFile, true);
             if (_seekOnStart is { } seek)
             {
                 _seekOnStart = null;
@@ -299,8 +302,10 @@ public sealed partial class VlcPlayerEngine
         var player = _player!;
         var tracks = _media?.Tracks ?? [];
 
-        _audioTracks = Describe(player.AudioTrackDescription, tracks);
-        _subtitleTracks = Describe(player.SpuDescription, tracks);
+        var audioTracks = Describe(player.AudioTrackDescription, tracks);
+        var subtitleTracks = Describe(player.SpuDescription, tracks);
+        var audio = player.AudioTrack;
+        SetTracks(audioTracks, subtitleTracks, new SelectedTracks(audio >= 0 ? audio : null, Math.Max(-1, player.Spu)));
 
         VideoFormat? format = null;
         _hasVideo = false;
@@ -342,6 +347,28 @@ public sealed partial class VlcPlayerEngine
         }
 
         return result;
+    }
+
+    private void SetSelected(SelectedTracks selected) => SetTracks(_audioTracks, _subtitleTracks, selected);
+
+    private void SetTracks(
+        IReadOnlyList<TrackInfo> audio, IReadOnlyList<TrackInfo> subtitles, SelectedTracks selected)
+    {
+        var changed = selected != _selected
+            || !audio.SequenceEqual(_audioTracks)
+            || !subtitles.SequenceEqual(_subtitleTracks);
+
+        _audioTracks = audio;
+        _subtitleTracks = subtitles;
+        _selected = selected;
+        if (changed)
+            Raise(() => TracksChanged?.Invoke(this, EventArgs.Empty));
+    }
+
+    /// <summary>Null means not known. A subtitle id of -1 means subtitles are off.</summary>
+    private sealed record SelectedTracks(int? Audio, int? Subtitle)
+    {
+        public static SelectedTracks Unknown { get; } = new(null, null);
     }
 
     private void SetFormat(VideoFormat? format)

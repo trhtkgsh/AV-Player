@@ -59,9 +59,9 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     private int _volume = 100;
     private int? _audioTrackId;
     private int? _subtitleTrackId;
-    private long _audioDelayMs;
-    private long _subtitleDelayMs;
-    private SubtitleStyle _subtitleStyle = SubtitleStyle.Default;
+    private long _audioDelayMs;      // read from other threads through Interlocked
+    private long _subtitleDelayMs;   // read from other threads through Interlocked
+    private volatile SubtitleStyle _subtitleStyle = SubtitleStyle.Default;
 
     private long _startMs;
     private bool _pauseRequested;
@@ -77,11 +77,18 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     private volatile PlayerSnapshot _snapshot = PlayerSnapshot.Idle;
     private volatile IReadOnlyList<TrackInfo> _audioTracks = [];
     private volatile IReadOnlyList<TrackInfo> _subtitleTracks = [];
+    private volatile SelectedTracks _selected = SelectedTracks.Unknown;
 
     public PlayerSnapshot Snapshot => _snapshot;
     public event EventHandler<PlayerSnapshot>? SnapshotChanged;
     public IReadOnlyList<TrackInfo> AudioTracks => _audioTracks;
     public IReadOnlyList<TrackInfo> SubtitleTracks => _subtitleTracks;
+    public event EventHandler? TracksChanged;
+    public int? CurrentAudioTrackId => _selected.Audio;
+    public int? CurrentSubtitleTrackId => _selected.Subtitle;
+    public long AudioDelayMs => Interlocked.Read(ref _audioDelayMs);
+    public long SubtitleDelayMs => Interlocked.Read(ref _subtitleDelayMs);
+    public SubtitleStyle SubtitleStyle => _subtitleStyle;
 
     /// <summary>A LibVLC input exists and accepts commands.</summary>
     private bool Live =>
@@ -108,8 +115,8 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             _speed = Math.Clamp(settings.Speed, 0.25f, 4f);
             _audioTrackId = settings.AudioTrackId;
             _subtitleTrackId = settings.SubtitleTrackId;
-            _audioDelayMs = settings.AudioDelayMs;
-            _subtitleDelayMs = settings.SubtitleDelayMs;
+            Interlocked.Exchange(ref _audioDelayMs, settings.AudioDelayMs);
+            Interlocked.Exchange(ref _subtitleDelayMs, settings.SubtitleDelayMs);
             _subtitleStyle = settings.SubtitleStyle;
             _subtitleFileUri = null;
             _pauseRequested = startPaused;
@@ -226,13 +233,18 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     public Task SelectAudioTrackAsync(int trackId, CancellationToken ct) => _queue.Enqueue(() =>
     {
         _audioTrackId = trackId;
-        if (Live)
-            _player!.SetAudioTrack(trackId);
+        if (!Live)
+            return;
+
+        _player!.SetAudioTrack(trackId);
+
+        // LibVLC confirms with ESSelected a moment later; the request is reported at once.
+        SetSelected(_selected with { Audio = trackId });
     }, ct);
 
     public Task SetAudioDelayAsync(long delayMs, CancellationToken ct) => _queue.Enqueue(() =>
     {
-        _audioDelayMs = delayMs;
+        Interlocked.Exchange(ref _audioDelayMs, delayMs);
         if (Live)
             _player!.SetAudioDelay(delayMs * 1000);
     }, ct);
@@ -240,13 +252,16 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     public Task SelectSubtitleTrackAsync(int trackId, CancellationToken ct) => _queue.Enqueue(() =>
     {
         _subtitleTrackId = trackId;
-        if (Live)
-            _player!.SetSpu(trackId);
+        if (!Live)
+            return;
+
+        _player!.SetSpu(trackId);
+        SetSelected(_selected with { Subtitle = trackId });
     }, ct);
 
     public Task SetSubtitleDelayAsync(long delayMs, CancellationToken ct) => _queue.Enqueue(() =>
     {
-        _subtitleDelayMs = delayMs;
+        Interlocked.Exchange(ref _subtitleDelayMs, delayMs);
         if (Live)
             _player!.SetSpuDelay(delayMs * 1000);
     }, ct);
@@ -261,15 +276,28 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
                 throw new InvalidOperationException("The subtitle file could not be loaded.");
 
             // Remembered so that a decoder switch or a video restart loads it again.
+            // LibVLC selects the new track, so an earlier track choice no longer applies.
             _subtitleFileUri = uri;
+            _subtitleTrackId = null;
         }, ct);
     }
 
-    /// <summary>Takes effect when playback next starts. A live update is a Phase 2 task.</summary>
+    /// <summary>
+    /// LibVLC 3 reads the text renderer options when the input starts, so a change restarts the
+    /// input at the current position (docs/specs/03, known risk).
+    /// </summary>
     public Task SetSubtitleStyleAsync(SubtitleStyle style, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(style);
-        return _queue.Enqueue(() => _subtitleStyle = style, ct);
+        return _queue.Enqueue(() =>
+        {
+            if (_subtitleStyle == style)
+                return;
+
+            _subtitleStyle = style;
+            if (Live)
+                Start(CurrentPositionMs);
+        }, ct);
     }
 
     public void Dispose()
@@ -373,8 +401,7 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         _savedVideoTrack = null;
         _startedWithoutVideo = false;
         _hasVideo = false;
-        _audioTracks = [];
-        _subtitleTracks = [];
+        SetTracks([], [], SelectedTracks.Unknown);
     }
 
     private void Fail(string message)
