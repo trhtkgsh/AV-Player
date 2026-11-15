@@ -97,6 +97,12 @@ public interface IVideoSurface
 
     void SetAspect(AspectMode mode);
 
+    /// <summary>
+    /// True hides the status and navigation bars while the player is on screen (a swipe from an edge shows
+    /// them for a moment). False restores the normal window. Safe from any thread.
+    /// </summary>
+    void SetImmersive(bool enabled);
+
     /// <summary>The transform is clamped to 100% .. 400% and the pan keeps the picture on screen.</summary>
     void SetTransform(ViewTransform transform);
 
