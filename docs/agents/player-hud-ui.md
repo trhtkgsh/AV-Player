@@ -72,6 +72,7 @@
 - Double tap: a tap in the middle third (`FocusX` 1/3 up to 2/3) toggles play and pause. The left and right thirds skip as before; the direction rules, including Hebrew, are unchanged.
 - Bottom bar: row spacing 6 to 2, transport column spacing 20 to 12, transport icons 26/36 to 22/30, transport touch targets 44 (`HudIconButton.TouchHeight`), padding 8 to 4 top and bottom.
 - R7-21 (2026-11-15): the seek row is a fixed 32 units (slider and row `HeightRequest` 32), there is no spacing between the seek row and the transport row, and the padding is 2 top and bottom plus the bottom inset. The bar is about 80 units plus the inset.
+- R7-22 (2026-11-15, review fixes): the screen stays on only when the picture is shown (Playing, the file has video, video enabled). A settings sheet keeps the flag (`SetSheetOpen`). Writes are forced on page activation and on foreground. The restart answer counts only while the page is active, the same file is open, the position is above the threshold, and no PiP started; otherwise it counts as No. The seek slider is 44 units with a -6 vertical margin, so its touch area reaches past the row without changing the bar height.
 
 **Out of scope.** Touch recognition, surface rendering, engine code, settings pages, PiP implementation.
 

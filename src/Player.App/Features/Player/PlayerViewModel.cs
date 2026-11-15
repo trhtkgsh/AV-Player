@@ -273,15 +273,23 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
 
         _restartAsking = true;
+        int activation = _activation;
+        MediaItem? asked = _coordinator.Current;
         CancelHideTimer();
         try
         {
-            if (await AskRestartAsync()) await RunAsync(() => _coordinator.PreviousAsync(CancellationToken.None));
+            bool yes = await AskRestartAsync();
+            // Yes only while the page is still the active one, the same file is open, the position is still above
+            // the threshold and no Picture-in-Picture started meanwhile. Any other case counts as No.
+            bool still = activation == _activation && _active && !_pip.IsActive && !_pipActive
+                && asked is not null && _coordinator.Current?.Id == asked.Id
+                && _engine.Snapshot.PositionMs > RestartConfirmMs;
+            if (yes && still) await RunAsync(() => _coordinator.PreviousAsync(CancellationToken.None));
         }
         finally
         {
             _restartAsking = false;
-            RestartHideTimer();
+            if (_active) RestartHideTimer();
         }
     }
 
@@ -553,6 +561,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         try
         {
             // The sheet covers the HUD: stop the countdown and hide it. ActivateAsync shows it again.
+            _screenKeeper.SetSheetOpen(true); // the picture stays on the screen under the sheet (Deactivate runs when it covers the page)
             CancelHideTimer();
             IsHudVisible = false;
             _returnFromSheet = true;
@@ -561,6 +570,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         catch (Exception ex)
         {
             // The route may not exist yet; the sheet is then simply not opened. Give the user the controls back.
+            _screenKeeper.SetSheetOpen(false);
             _returnFromSheet = false;
             IsHudVisible = true;
             RestartHideTimer();

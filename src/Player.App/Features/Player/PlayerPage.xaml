@@ -237,8 +237,8 @@
                     <Slider
                         Grid.Column="1"
                         VerticalOptions="Center"
-                        HeightRequest="32"
-                        MinimumHeightRequest="32"
+                        HeightRequest="44"
+                        Margin="0,-6"
                         Minimum="0"
                         Maximum="{Binding DurationMs}"
                         Value="{Binding PositionMs, Mode=TwoWay}"
