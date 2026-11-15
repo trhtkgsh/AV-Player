@@ -46,6 +46,28 @@
                 TextColor="{DynamicResource ColorHudOnBackground}" />
         </Border>
 
+        <!-- (c3) Unlock button while the screen is locked. A round background keeps it visible on a bright picture. -->
+        <Border
+            HorizontalOptions="Start"
+            VerticalOptions="Center"
+            Margin="16,0"
+            WidthRequest="56"
+            HeightRequest="56"
+            IsVisible="{Binding IsUnlockVisible}"
+            BackgroundColor="{DynamicResource ColorHudBackground}"
+            Stroke="Transparent"
+            StrokeThickness="0"
+            StrokeShape="RoundRectangle 28">
+            <controls:HudIconButton
+                IconData="F0 M6 10 H18 V21 H6 Z M11 14 H13 V17 H11 Z M8 10 V6 A4 4 0 0 1 16 6 H14 A2 2 0 0 0 10 6 V10 Z"
+                IconSize="30"
+                WidthRequest="56"
+                HeightRequest="56"
+                IconColor="{DynamicResource ColorHudOnBackground}"
+                Command="{Binding UnlockCommand}"
+                SemanticProperties.Description="{loc:T Player.Unlock}" />
+        </Border>
+
         <!-- (d) HUD. Only the top and bottom bars have a background and catch input; the middle lets taps through. -->
         <Grid IsVisible="{Binding IsHudVisible}" RowDefinitions="Auto,*,Auto">
 

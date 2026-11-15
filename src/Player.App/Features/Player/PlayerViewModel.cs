@@ -15,6 +15,7 @@ namespace Player.App.Features.PlayerHud;
 public sealed partial class PlayerViewModel : ObservableObject
 {
     private const int StatusRefreshSeconds = 15;
+    private const int UnlockVisibleSeconds = 3;
 
     private readonly IPlayerEngine _engine;
     private readonly IPlaybackCoordinator _coordinator;
@@ -22,6 +23,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private readonly IPlaybackStateRecorder _recorder;
     private readonly ILocalizer _localizer;
     private readonly IVideoSurface _surface;
+    private readonly IGestureSource _gestures;
     private readonly PlayerGestureHandler _gestureHandler;
 
     private UiSettings _settings = new();
@@ -35,6 +37,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private double _enginePositionMs;
     private CancellationTokenSource? _hideCts;
     private CancellationTokenSource? _statusCts;
+    private CancellationTokenSource? _unlockCts;
 
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private double _positionMs;
@@ -48,6 +51,8 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private string _speedText = "1.0x";
     [ObservableProperty] private bool _showStatus;
     [ObservableProperty] private string _statusText = "";
+    [ObservableProperty] private bool _isLocked;
+    [ObservableProperty] private bool _isUnlockVisible;
 
     /// <summary>The on-screen indicator of gesture values.</summary>
     public OsdViewModel Osd { get; }
@@ -70,6 +75,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _recorder = recorder;
         _localizer = localizer;
         _surface = surface;
+        _gestures = gestures;
         Osd = new OsdViewModel();
         _gestureHandler = new PlayerGestureHandler(
             gestures, engine, coordinator, surface, localizer, Osd, () => _settings, ToggleHud);
@@ -112,6 +118,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _coordinator.Changed -= OnCoordinatorChanged;
         _uiSettings.Changed -= OnUiSettingsChanged;
         _gestureHandler.Detach(); // the window stays immersive: a settings sheet may open on top
+        ReleaseLock(); // the lock never survives the page
         CancelHideTimer();
         StopStatus();
     }
@@ -165,8 +172,51 @@ public sealed partial class PlayerViewModel : ObservableObject
     [RelayCommand]
     private void ToggleHud()
     {
+        if (IsLocked)
+        {
+            ShowUnlockButton(); // while locked the HUD never shows; a tap only reveals the unlock button
+            return;
+        }
+
         IsHudVisible = !IsHudVisible;
         RestartHideTimer();
+    }
+
+    /// <summary>While locked: shows the unlock button for 3 seconds. A new call restarts the 3 seconds.</summary>
+    public void ShowUnlockButton()
+    {
+        IsUnlockVisible = true;
+        CancelUnlockTimer();
+        var cts = new CancellationTokenSource();
+        _unlockCts = cts;
+        _ = HideUnlockAfterDelayAsync(cts.Token);
+    }
+
+    [RelayCommand]
+    private void Lock()
+    {
+        _gestures.Locked = true;
+        IsLocked = true;
+        CancelHideTimer();
+        IsHudVisible = false;
+        Osd.Show(_localizer["Player.Locked"]);
+    }
+
+    [RelayCommand]
+    private void Unlock()
+    {
+        ReleaseLock();
+        IsHudVisible = true;
+        RestartHideTimer();
+    }
+
+    /// <summary>Clears the lock in the gesture source and on the page. Safe to call when not locked.</summary>
+    private void ReleaseLock()
+    {
+        _gestures.Locked = false;
+        IsLocked = false;
+        CancelUnlockTimer();
+        IsUnlockVisible = false;
     }
 
     [RelayCommand]
@@ -218,11 +268,17 @@ public sealed partial class PlayerViewModel : ObservableObject
     private async Task CloseAsync()
     {
         if (_closing) return;
+        if (IsLocked)
+        {
+            ShowUnlockButton(); // Back while locked: do not close, show the unlock button like a tap
+            return;
+        }
         _closing = true;
 
         try
         {
             await _coordinator.CloseAsync(CancellationToken.None);
+            ReleaseLock();
             _surface.SetImmersive(false);
             _surface.SetWindowBrightness(null);
             if (Shell.Current is { } shell) await shell.GoToAsync("..");
@@ -341,6 +397,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         {
             System.Diagnostics.Debug.WriteLine($"Playback error: {message}");
             await ShowAlertAsync(_localizer["Player.CannotPlay"], _localizer["Player.CannotPlayMessage"]);
+            ReleaseLock(); // an error close must not be blocked by the lock
             await CloseAsync();
         }
         catch (Exception ex)
@@ -352,7 +409,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private void RestartHideTimer()
     {
         CancelHideTimer();
-        if (!_active) return;
+        if (!_active || IsLocked) return;
 
         var cts = new CancellationTokenSource();
         _hideCts = cts;
@@ -379,6 +436,27 @@ public sealed partial class PlayerViewModel : ObservableObject
 
         // Only while playing. A restart that arrived during the wait cancels this token, so re-check it.
         if (!ct.IsCancellationRequested && IsPlaying && !_dragging) IsHudVisible = false;
+    }
+
+    private void CancelUnlockTimer()
+    {
+        _unlockCts?.Cancel();
+        _unlockCts?.Dispose();
+        _unlockCts = null;
+    }
+
+    private async Task HideUnlockAfterDelayAsync(CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(UnlockVisibleSeconds), ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (!ct.IsCancellationRequested) IsUnlockVisible = false;
     }
 
     /// <summary>The status line runs only while active and ShowStatus is on.</summary>
