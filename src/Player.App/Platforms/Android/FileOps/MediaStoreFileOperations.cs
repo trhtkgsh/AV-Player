@@ -43,6 +43,7 @@ public sealed class MediaStoreFileOperations : IFileOperations
 			return new FileOperationResult(FileOperationStatus.Success, item, null);
 		}
 
+		var committed = false;
 		try
 		{
 			var uri = AndroidUri.Parse(item.ContentUri)!;
@@ -59,24 +60,43 @@ public sealed class MediaStoreFileOperations : IFileOperations
 				return failure;
 			}
 
-			var updated = await Task.Run(() => ReadUpdated(item, uri), ct).ConfigureAwait(false);
-			if (updated is null)
-			{
-				return FileOperationRules.Failed("The renamed file could not be read back.");
-			}
-
-			await FollowIdentityAsync(item.Id, updated.Id, ct).ConfigureAwait(false);
-			return new FileOperationResult(FileOperationStatus.Success, updated, null);
+			committed = true;
+			return await FinishRenameAsync(item, uri, newDisplayName).ConfigureAwait(false);
 		}
-		catch (OperationCanceledException)
+		catch (OperationCanceledException) when (!committed)
 		{
 			return FileOperationRules.Cancelled();
 		}
-		catch (Exception ex)
+		catch (Exception ex) when (!committed)
 		{
 			Log.Warn(Tag, $"Rename failed: {ex}");
 			return FileOperationRules.Failed(ex.Message);
 		}
+	}
+
+	// The write is done: nothing here may change the outcome, so no caller token and no exception escapes.
+	private async Task<FileOperationResult> FinishRenameAsync(MediaItem item, AndroidUri uri, string newName)
+	{
+		var updated = item with { DisplayName = newName };
+		try
+		{
+			var readBack = await Task.Run(() => ReadUpdated(item, uri)).ConfigureAwait(false);
+			if (readBack is null)
+			{
+				Log.Warn(Tag, "The renamed row could not be read back; reporting the requested name.");
+			}
+			else
+			{
+				updated = readBack;
+				await FollowIdentityAsync(item.Id, updated.Id).ConfigureAwait(false);
+			}
+		}
+		catch (Exception ex)
+		{
+			Log.Warn(Tag, $"Reading back the renamed file failed: {ex}");
+		}
+
+		return new FileOperationResult(FileOperationStatus.Success, updated, null);
 	}
 
 	public async Task<FileOperationResult> TrashAsync(IReadOnlyList<MediaItem> items, CancellationToken ct)
@@ -87,51 +107,68 @@ public sealed class MediaStoreFileOperations : IFileOperations
 			return new FileOperationResult(FileOperationStatus.Success, null, null);
 		}
 
+		var removed = new List<MediaItem>();
 		try
 		{
 			var uris = items.Select(i => AndroidUri.Parse(i.ContentUri)!).ToList();
 			FileOperationResult? failure;
 			if (OperatingSystem.IsAndroidVersionAtLeast(30))
 			{
-				failure = await AskAsync(TrashRequest(uris), ct).ConfigureAwait(false);
+				var sender = await Task.Run(() => OperatingSystem.IsAndroidVersionAtLeast(30) ? TrashRequest(uris) : null!, ct).ConfigureAwait(false);
+				failure = await AskAsync(sender, ct).ConfigureAwait(false);
+				if (failure is null)
+				{
+					removed.AddRange(items);
+				}
 			}
 			else if (OperatingSystem.IsAndroidVersionAtLeast(29))
 			{
 				failure = null;
-				foreach (var uri in uris)
+				for (var i = 0; i < uris.Count; i++)
 				{
+					var uri = uris[i];
 					failure = await RunWithConsentAsync(() => DeleteRow(uri), [uri], ct).ConfigureAwait(false);
 					if (failure is not null)
 					{
 						break;
 					}
+
+					removed.Add(items[i]);
 				}
 			}
 			else
 			{
-				failure = await RunLegacyAsync(() => DeleteLegacy(uris), ct).ConfigureAwait(false);
+				failure = await RunLegacyAsync(() => DeleteLegacy(items, uris, removed), ct).ConfigureAwait(false);
 			}
 
 			if (failure is not null)
 			{
+				await DeleteStatesAsync(removed).ConfigureAwait(false);
 				return failure;
 			}
 
-			foreach (var item in items)
-			{
-				await DeleteStateAsync(item.Id, ct).ConfigureAwait(false);
-			}
-
+			await DeleteStatesAsync(removed).ConfigureAwait(false);
 			return new FileOperationResult(FileOperationStatus.Success, null, null);
-		}
-		catch (OperationCanceledException)
-		{
-			return FileOperationRules.Cancelled();
 		}
 		catch (Exception ex)
 		{
+			// A throw after a partial removal still cleans the state of what is gone.
+			await DeleteStatesAsync(removed).ConfigureAwait(false);
+			if (ex is OperationCanceledException)
+			{
+				return FileOperationRules.Cancelled();
+			}
+
 			Log.Warn(Tag, $"Trash failed: {ex}");
 			return FileOperationRules.Failed(ex.Message);
+		}
+	}
+
+	private async Task DeleteStatesAsync(List<MediaItem> removed)
+	{
+		foreach (var item in removed)
+		{
+			await DeleteStateAsync(item.Id).ConfigureAwait(false);
 		}
 	}
 
@@ -256,10 +293,11 @@ public sealed class MediaStoreFileOperations : IFileOperations
 		Resolver.Update(uri, values, null, null);
 	}
 
-	private void DeleteLegacy(List<AndroidUri> uris)
+	private void DeleteLegacy(IReadOnlyList<MediaItem> items, List<AndroidUri> uris, List<MediaItem> removed)
 	{
-		foreach (var uri in uris)
+		for (var i = 0; i < uris.Count; i++)
 		{
+			var uri = uris[i];
 			var path = ReadString(uri, "_data");
 			if (path is not null)
 			{
@@ -271,6 +309,7 @@ public sealed class MediaStoreFileOperations : IFileOperations
 			}
 
 			Resolver.Delete(uri, null, null);
+			removed.Add(items[i]);
 		}
 	}
 
@@ -280,15 +319,34 @@ public sealed class MediaStoreFileOperations : IFileOperations
 		if (!OperatingSystem.IsAndroidVersionAtLeast(29))
 		{
 			var path = ReadString(uri, "_data");
-			return path is not null && new JavaFile(new JavaFile(path).ParentFile, name).Exists();
+			var siblings = path is null ? null : new JavaFile(path).ParentFile?.List();
+			return siblings is not null && siblings.Any(s => string.Equals(s, name, StringComparison.OrdinalIgnoreCase));
 		}
 
-		var collection = item.Kind == MediaKind.Video ? MediaStore.Video.Media.ExternalContentUri! : MediaStore.Audio.Media.ExternalContentUri!;
+		// The row itself tells the volume and folder; MediaStore.Files also finds files of another kind.
+		string? volume;
+		string? relativePath;
+		using (var row = Resolver.Query(uri, ["volume_name", "relative_path"], null, null, null))
+		{
+			if (row is null || !row.MoveToFirst())
+			{
+				return false;
+			}
+
+			volume = row.IsNull(0) ? null : row.GetString(0);
+			relativePath = row.IsNull(1) ? null : row.GetString(1);
+		}
+
+		if (volume is null || relativePath is null)
+		{
+			return false;
+		}
+
 		using var cursor = Resolver.Query(
-			collection,
+			MediaStore.Files.GetContentUri(volume)!,
 			["_id"],
-			"relative_path = ? AND _display_name = ? AND _id != ?",
-			[item.RelativePath, name, item.Id.MediaStoreId.ToString(System.Globalization.CultureInfo.InvariantCulture)],
+			"relative_path = ? AND _display_name = ? COLLATE NOCASE AND _id != ?",
+			[relativePath, name, item.Id.MediaStoreId.ToString(System.Globalization.CultureInfo.InvariantCulture)],
 			null);
 		return cursor is not null && cursor.MoveToFirst();
 	}
@@ -315,13 +373,14 @@ public sealed class MediaStoreFileOperations : IFileOperations
 		};
 	}
 
-	private async Task FollowIdentityAsync(MediaFileId before, MediaFileId after, CancellationToken ct)
+	private async Task FollowIdentityAsync(MediaFileId before, MediaFileId after)
 	{
 		if (!FileOperationRules.IdentityChanged(before, after))
 		{
 			return;
 		}
 
+		var ct = CancellationToken.None;
 		try
 		{
 			var state = await _stateStore.GetAsync(before, ct).ConfigureAwait(false);
@@ -332,19 +391,19 @@ public sealed class MediaStoreFileOperations : IFileOperations
 
 			await _stateStore.DeleteAsync(before, ct).ConfigureAwait(false);
 		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
+		catch (Exception ex)
 		{
 			Log.Warn(Tag, $"Moving the playback state failed: {ex}");
 		}
 	}
 
-	private async Task DeleteStateAsync(MediaFileId id, CancellationToken ct)
+	private async Task DeleteStateAsync(MediaFileId id)
 	{
 		try
 		{
-			await _stateStore.DeleteAsync(id, ct).ConfigureAwait(false);
+			await _stateStore.DeleteAsync(id, CancellationToken.None).ConfigureAwait(false);
 		}
-		catch (Exception ex) when (ex is not OperationCanceledException)
+		catch (Exception ex)
 		{
 			Log.Warn(Tag, $"Deleting the playback state failed: {ex}");
 		}
