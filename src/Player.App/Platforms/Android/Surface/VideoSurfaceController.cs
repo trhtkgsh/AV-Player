@@ -18,11 +18,24 @@ internal sealed class VideoSurfaceController : IVideoSurface
     private AspectMode _aspect = AspectMode.Fit;
     private ViewTransform _transform = ViewTransform.Identity;
     private double _brightness = SystemBrightness;
+    private bool _immersive;
+    private VideoFormat? _layoutFormat;   // the last known format: kept after the engine stops, so the last picture is not stretched
 
     public VideoSurfaceController(IVideoOutputBinding binding)
     {
         _binding = binding;
-        _binding.FormatChanged += (_, _) => Relayout();
+        _layoutFormat = binding.Format;
+        _binding.FormatChanged += (_, format) =>
+        {
+            // A stop reports "no format". The surface keeps its shape until the next file reports its own,
+            // otherwise the last picture would fill the whole container while the page closes.
+            if (format is null)
+                return;
+
+            lock (_sync)
+                _layoutFormat = format;
+            Relayout();
+        };
     }
 
     public AspectMode Aspect { get { lock (_sync) return _aspect; } }
@@ -50,7 +63,7 @@ internal sealed class VideoSurfaceController : IVideoSurface
         {
             var container = _container;
             _transform = SurfaceGeometry.Clamp(
-                _binding.Format, container?.Width ?? 0, container?.Height ?? 0, _aspect, transform);
+                _layoutFormat, container?.Width ?? 0, container?.Height ?? 0, _aspect, transform);
         }
 
         Relayout();
@@ -74,16 +87,67 @@ internal sealed class VideoSurfaceController : IVideoSurface
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// Hides the status and navigation bars and lets the picture use the area of a display cutout.
+    /// A swipe from an edge shows the bars for a moment. False restores the normal window.
+    /// </summary>
+    public void SetImmersive(bool enabled)
+    {
+        lock (_sync)
+            _immersive = enabled;
+
+        MainThread.BeginInvokeOnMainThread(ApplyImmersive);
+    }
+
+    /// <summary>Also runs when a container attaches: a recreated activity starts with visible bars.</summary>
+    private void ApplyImmersive()
+    {
+        bool immersive;
+        lock (_sync)
+            immersive = _immersive;
+
+        if (Platform.CurrentActivity?.Window is not { DecorView: { } decor } window)
+            return;
+
+        if (AndroidX.Core.View.WindowCompat.GetInsetsController(window, decor) is not { } insets)
+            return;
+
+        if (immersive)
+        {
+            insets.SystemBarsBehavior = AndroidX.Core.View.WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;
+            insets.Hide(AndroidX.Core.View.WindowInsetsCompat.Type.SystemBars());
+        }
+        else
+        {
+            insets.Show(AndroidX.Core.View.WindowInsetsCompat.Type.SystemBars());
+        }
+
+        if (OperatingSystem.IsAndroidVersionAtLeast(28) && window.Attributes is { } attributes)
+        {
+            attributes.LayoutInDisplayCutoutMode = immersive
+                ? Android.Views.LayoutInDisplayCutoutMode.ShortEdges
+                : Android.Views.LayoutInDisplayCutoutMode.Default;
+            window.Attributes = attributes;
+        }
+    }
+
     internal SurfaceRect ComputeRect(int containerWidth, int containerHeight)
     {
         lock (_sync)
-            return SurfaceGeometry.Compute(_binding.Format, containerWidth, containerHeight, _aspect, _transform);
+            return SurfaceGeometry.Compute(_layoutFormat, containerWidth, containerHeight, _aspect, _transform);
     }
 
     internal void Attach(VideoSurfaceContainer container)
     {
         lock (_sync)
+        {
             _container = container;
+
+            // A page for a file whose format is not known yet must not start with the previous file's shape.
+            _layoutFormat = _binding.Format;
+        }
+
+        ApplyImmersive();
     }
 
     // The three surface reports below run on the UI thread (surface holder callbacks and the handler).
