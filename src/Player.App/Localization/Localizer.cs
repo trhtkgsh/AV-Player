@@ -13,6 +13,7 @@ namespace Player.App.Localization;
 public sealed class Localizer : ILocalizer
 {
     private const string LogTag = "ArielL10n";
+    private const int NoChoice = -1;
 
     // Text objects created by XAML before the localizer exists; the first localizer adopts them.
     private static readonly Dictionary<string, LocalizedString> Pending = new(StringComparer.Ordinal);
@@ -22,14 +23,15 @@ public sealed class Localizer : ILocalizer
     private readonly IUiSettingsStore _settings;
     private readonly string _deviceLanguage;
     private readonly Dictionary<string, LocalizedString> _texts = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _loggedUnknown = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _logged = new(StringComparer.Ordinal);
     private readonly ConditionalWeakTable<Window, object> _hookedWindows = new();
     private readonly object _gate = new();
 
-    private volatile string _languageCode;
-    private volatile bool _isRightToLeft;
-    private volatile int _language = (int)AppLanguage.System;
+    // The latest AppLanguage asked for, or NoChoice. Every apply reads it, so the last request always wins.
+    private int _requested = NoChoice;
+    private volatile LanguageState _state;
     private volatile bool _initialized;
+    private Application? _hookedApp;
 
     /// <summary>
     /// Merges the string sources and starts following the UI settings. Before <see cref="InitializeAsync"/> has run
@@ -41,18 +43,19 @@ public sealed class Localizer : ILocalizer
         ArgumentNullException.ThrowIfNull(settings);
 
         _catalog = new StringCatalog(sources);
-#if DEBUG
         if (_catalog.DuplicateKeys.Count > 0)
         {
-            throw new InvalidOperationException(
-                "Duplicate string keys: " + string.Join(", ", _catalog.DuplicateKeys));
-        }
+            var message = "Duplicate string keys: " + string.Join(", ", _catalog.DuplicateKeys);
+#if DEBUG
+            throw new InvalidOperationException(message);
+#else
+            LogOnce("duplicates", message);
 #endif
+        }
 
         _settings = settings;
         _deviceLanguage = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
-        _languageCode = StringCatalog.ResolveLanguageCode(AppLanguage.System, _deviceLanguage);
-        _isRightToLeft = StringCatalog.IsRightToLeft(_languageCode);
+        _state = CreateState(AppLanguage.System);
 
         lock (StaticGate)
         {
@@ -68,7 +71,7 @@ public sealed class Localizer : ILocalizer
             Current = this;
         }
 
-        RefreshTexts();
+        RefreshTexts(_state.Code);
         _settings.Changed += OnSettingsChanged;
     }
 
@@ -76,35 +79,52 @@ public sealed class Localizer : ILocalizer
     public static Localizer? Current { get; private set; }
 
     /// <inheritdoc />
-    public AppLanguage Language => (AppLanguage)_language;
+    public AppLanguage Language => _state.Language;
 
     /// <inheritdoc />
-    public string LanguageCode => _languageCode;
+    public string LanguageCode => _state.Code;
 
     /// <inheritdoc />
-    public bool IsRightToLeft => _isRightToLeft;
+    public bool IsRightToLeft => _state.IsRightToLeft;
+
+    /// <summary>True once <see cref="InitializeAsync"/> has finished, also when the store could not be read.</summary>
+    public bool IsInitialized => _initialized;
 
     /// <inheritdoc />
     public event EventHandler? Changed;
 
     /// <inheritdoc />
-    public string this[string key] => Resolve(key, _languageCode, static (c, k, l) => c.Get(k, l));
+    public string this[string key] => Resolve(key, _state.Code, static (c, k, l) => c.Get(k, l));
 
     /// <inheritdoc />
     public string Format(string key, params object?[] args) =>
-        Resolve(key, _languageCode, (c, k, l) => c.Format(k, l, args));
+        Resolve(key, _state.Code, (c, k, l) => c.Format(k, l, args));
 
     /// <inheritdoc />
     public string Plural(string key, int count) =>
-        Resolve(count == 1 ? key + ".One" : key + ".Many", _languageCode, (c, k, l) => c.Format(k, l, count));
+        Resolve(count == 1 ? key + ".One" : key + ".Many", _state.Code, (c, k, l) => c.Format(k, l, count));
 
     /// <inheritdoc />
     public async Task InitializeAsync(CancellationToken ct)
     {
-        var stored = await _settings.GetAsync(ct).ConfigureAwait(false);
-        ct.ThrowIfCancellationRequested();
-        await ApplyAsync(stored.Language, force: true).ConfigureAwait(false);
-        _initialized = true;
+        try
+        {
+            var stored = await _settings.GetAsync(ct).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+
+            // A change that arrived while the store was read is newer than the stored value.
+            Interlocked.CompareExchange(ref _requested, (int)stored.Language, NoChoice);
+            await ApplyAsync(force: true).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            LogOnce("init:" + ex.GetType().Name, $"Reading the language failed, the System rule stays: {ex.Message}");
+            await ApplyAsync(force: false).ConfigureAwait(false);
+        }
+        finally
+        {
+            _initialized = true;
+        }
     }
 
     /// <summary>
@@ -133,11 +153,15 @@ public sealed class Localizer : ILocalizer
 
     /// <summary>
     /// Sets the layout direction of a window and its page, and keeps it for pages and modal pages shown later.
-    /// Call it for every window the app creates, for example in <c>App.CreateWindow</c>.
+    /// Windows that show a page after the localizer was initialized are also found by themselves; calling this
+    /// for every window the app creates (for example in <c>App.CreateWindow</c>) covers the time before that.
+    /// Call it on the UI thread.
     /// </summary>
     public void ApplyFlowDirection(Window window)
     {
         ArgumentNullException.ThrowIfNull(window);
+
+        EnsureApplicationHooked();
 
         // Modal pages and pages that arrive later do not reliably inherit the direction, so they are set explicitly.
         if (!_hookedWindows.TryGetValue(window, out _))
@@ -162,7 +186,13 @@ public sealed class Localizer : ILocalizer
     }
 
     private FlowDirection CurrentFlowDirection =>
-        _isRightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+        _state.IsRightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+
+    private LanguageState CreateState(AppLanguage choice)
+    {
+        var code = StringCatalog.ResolveLanguageCode(choice, _deviceLanguage);
+        return new LanguageState(choice, code, StringCatalog.IsRightToLeft(code));
+    }
 
     private LocalizedString GetOrCreateText(string key)
     {
@@ -171,7 +201,7 @@ public sealed class Localizer : ILocalizer
             if (!_texts.TryGetValue(key, out var text))
             {
                 text = new LocalizedString(key);
-                text.Refresh(Resolve(key, _languageCode, static (c, k, l) => c.Get(k, l)));
+                text.Refresh(Resolve(key, _state.Code, static (c, k, l) => c.Get(k, l)));
                 _texts[key] = text;
             }
 
@@ -183,30 +213,29 @@ public sealed class Localizer : ILocalizer
     {
         if (!_catalog.Contains(key))
         {
-            LogUnknown(key);
+            LogOnce("unknown:" + key, $"Unknown string key: {key}");
         }
 
         return read(_catalog, key, languageCode);
     }
 
-    private void LogUnknown(string key)
+    private void LogOnce(string id, string message)
     {
         lock (_gate)
         {
-            if (!_loggedUnknown.Add(key))
+            if (!_logged.Add(id))
             {
                 return;
             }
         }
 
-        var message = $"Unknown string key: {key}";
         System.Diagnostics.Debug.WriteLine($"{LogTag}: {message}");
 #if ANDROID
         Android.Util.Log.Warn(LogTag, message);
 #endif
     }
 
-    private void RefreshTexts()
+    private void RefreshTexts(string code)
     {
         LocalizedString[] texts;
         lock (_gate)
@@ -214,7 +243,6 @@ public sealed class Localizer : ILocalizer
             texts = [.. _texts.Values];
         }
 
-        var code = _languageCode;
         foreach (var text in texts)
         {
             text.Refresh(Resolve(text.Key, code, static (c, k, l) => c.Get(k, l)));
@@ -223,55 +251,50 @@ public sealed class Localizer : ILocalizer
 
     private void OnSettingsChanged(object? sender, UiSettings settings)
     {
-        if ((int)settings.Language == _language && _initialized)
-        {
-            return;
-        }
-
-        _ = ApplySafeAsync(settings.Language);
+        Interlocked.Exchange(ref _requested, (int)settings.Language);
+        _ = ApplySafeAsync();
     }
 
-    private async Task ApplySafeAsync(AppLanguage choice)
+    private async Task ApplySafeAsync()
     {
         try
         {
-            await ApplyAsync(choice, force: false).ConfigureAwait(false);
+            await ApplyAsync(force: false).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"{LogTag}: applying the language failed: {ex}");
-#if ANDROID
-            Android.Util.Log.Warn(LogTag, $"Applying the language failed: {ex.Message}");
-#endif
+            LogOnce("apply:" + ex.GetType().Name, $"Applying the language failed: {ex.Message}");
         }
     }
 
-    private Task ApplyAsync(AppLanguage choice, bool force)
+    private Task ApplyAsync(bool force)
     {
         if (MainThread.IsMainThread)
         {
-            ApplyOnMainThread(choice, force);
+            ApplyOnMainThread(force);
             return Task.CompletedTask;
         }
 
-        return MainThread.InvokeOnMainThreadAsync(() => ApplyOnMainThread(choice, force));
+        return MainThread.InvokeOnMainThreadAsync(() => ApplyOnMainThread(force));
     }
 
-    private void ApplyOnMainThread(AppLanguage choice, bool force)
+    // Reads the latest requested choice, never an argument, so dispatches that run late or out of order end right.
+    private void ApplyOnMainThread(bool force)
     {
-        var code = StringCatalog.ResolveLanguageCode(choice, _deviceLanguage);
-        var changed = force || !string.Equals(code, _languageCode, StringComparison.Ordinal);
+        EnsureApplicationHooked();
 
-        _language = (int)choice;
-        _languageCode = code;
-        _isRightToLeft = StringCatalog.IsRightToLeft(code);
+        var requested = Volatile.Read(ref _requested);
+        var choice = requested == NoChoice ? AppLanguage.System : (AppLanguage)requested;
+        var next = CreateState(choice);
+        var codeChanged = !string.Equals(next.Code, _state.Code, StringComparison.Ordinal);
 
-        if (!changed)
+        _state = next;
+        if (!codeChanged && !force)
         {
             return;
         }
 
-        RefreshTexts();
+        RefreshTexts(next.Code);
 
         if (Application.Current is { } app)
         {
@@ -282,6 +305,27 @@ public sealed class Localizer : ILocalizer
         }
 
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    // Application.PageAppearing is the only app-wide signal from inside these paths that a window shows a page.
+    private void EnsureApplicationHooked()
+    {
+        var app = Application.Current;
+        if (app is null || ReferenceEquals(app, _hookedApp))
+        {
+            return;
+        }
+
+        _hookedApp = app;
+        app.PageAppearing += OnPageAppearing;
+    }
+
+    private void OnPageAppearing(object? sender, Page page)
+    {
+        if (page.Window is { } window && !_hookedWindows.TryGetValue(window, out _))
+        {
+            ApplyFlowDirection(window);
+        }
     }
 
     private void OnModalPushing(object? sender, ModalPushingEventArgs e) =>
@@ -297,4 +341,6 @@ public sealed class Localizer : ILocalizer
             page.FlowDirection = CurrentFlowDirection;
         }
     }
+
+    private sealed record LanguageState(AppLanguage Language, string Code, bool IsRightToLeft);
 }
