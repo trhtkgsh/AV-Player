@@ -107,6 +107,7 @@ public sealed class UiSettingsStore : IUiSettingsStore
 		SortField = value.SortField.ToString(),
 		SortDirection = value.SortDirection.ToString(),
 		NewTagDays = value.NewTagDays,
+		Language = value.Language.ToString(),
 	};
 
 	// Each field falls back on its own: a missing or unreadable field takes the record default
@@ -130,6 +131,7 @@ public sealed class UiSettingsStore : IUiSettingsStore
 			SortField = ParseEnum(dto.SortField, defaults.SortField),
 			SortDirection = ParseEnum(dto.SortDirection, defaults.SortDirection),
 			NewTagDays = dto.NewTagDays ?? defaults.NewTagDays,
+			Language = ParseEnum(dto.Language, defaults.Language),
 		};
 	}
 
@@ -170,6 +172,7 @@ public sealed class UiSettingsStore : IUiSettingsStore
 			ViewMode = Enum.IsDefined(value.ViewMode) ? value.ViewMode : defaults.ViewMode,
 			SortField = Enum.IsDefined(value.SortField) ? value.SortField : defaults.SortField,
 			SortDirection = Enum.IsDefined(value.SortDirection) ? value.SortDirection : defaults.SortDirection,
+			Language = Enum.IsDefined(value.Language) ? value.Language : defaults.Language,
 		};
 
 		return normalized == value ? value : normalized;
