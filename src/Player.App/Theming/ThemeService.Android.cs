@@ -12,11 +12,15 @@ public sealed partial class ThemeService
     // Icon brightness goes through WindowInsetsControllerCompat on every level. Bars are never hidden or shown here.
     partial void ApplyBarsCore(uint surface, bool dark)
     {
-        var window = Platform.CurrentActivity?.Window;
+        var activity = Platform.CurrentActivity;
+        var window = activity?.Window;
         if (window is null)
         {
             return;
         }
+
+        // The strip behind the status bar from API 35 on, and the app bars Shell creates later.
+        AppBarTinter.Apply(activity, surface, CurrentBarSurface);
 
         if (!OperatingSystem.IsAndroidVersionAtLeast(35))
         {
@@ -32,6 +36,14 @@ public sealed partial class ThemeService
         {
             controller.AppearanceLightStatusBars = !dark;
             controller.AppearanceLightNavigationBars = !dark;
+        }
+    }
+
+    private uint? CurrentBarSurface()
+    {
+        lock (_stateLock)
+        {
+            return _hasTheme ? _barSurface : null;
         }
     }
 }
