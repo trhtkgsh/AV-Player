@@ -1,8 +1,9 @@
 # Phase 1 device checklist
 
 - Phase: 1 (file explorer, player and HUD basics, app shell, theme)
-- Date: 2026-11-14
-- Build to install: `dotnet build src\Player.App -f net10.0-android -t:Install`
+- Date: 2026-11-14, updated 2026-11-15
+- APK to install on a phone: `artifacts\ArielPlayer-phase1-r2.apk` (copy it to the phone and open it, or `adb install -r artifacts\ArielPlayer-phase1-r2.apk`)
+- Developer build to an emulator or a phone with USB debugging: `dotnet build src\Player.App -f net10.0-android -t:Install`
 
 ## Phone under test
 
@@ -17,6 +18,7 @@
 - `[emulator ok]`: can be run on an emulator.
 - `[physical device required]`: must be run on a phone.
 - `[emulator ok, verified 2026-11-14]`: the orchestrator already checked this on an emulator (Pixel 5 AVD, API 34). It still needs its normal run on the phone when the normal marker says physical.
+- `[emulator ok, verified 2026-11-15]`: the orchestrator checked the item on emulators with API 34 and API 36.
 - Phase 1 behaviour (temporary): when the app goes to the background, playback pauses. When the app comes back, the picture is restored and you press Play.
 - Progress bar and "watched" mark are not in this checklist: they need a saved playback position, which comes in Phase 2.
 
@@ -160,23 +162,23 @@ Accessories: none needed in Phase 1 (no wired or Bluetooth headset).
 ### Playback
 
 - [ ] **PLY-1** `[physical device required]`
-  - Action: Open the 1080p H.264 file. If the decoder button shows SW, tap it so that it shows HW.
-  - Expected: The video plays smoothly with picture and sound. The decoder button shows HW. If it shows SW, write that in the report.
+  - Action: Open the 1080p H.264 file. If the decoder label shows SW, tap it so that it shows HW.
+  - Expected: The video plays smoothly with picture and sound. The decoder label shows HW. If it shows SW, write that in the report.
   - Source: (spec 02, acceptance 2; spec 02, req 2; agent report: player-engine)
 - [ ] **PLY-2** `[physical device required]`
-  - Action: Open the 1080p H.264 file. If the decoder button shows HW, tap it so that it shows SW.
-  - Expected: The video plays smoothly with picture and sound. The decoder button shows SW.
+  - Action: Open the 1080p H.264 file. If the decoder label shows HW, tap it so that it shows SW.
+  - Expected: The video plays smoothly with picture and sound. The decoder label shows SW.
   - Source: (spec 02, acceptance 2; spec 02, req 2; agent report: player-engine)
 - [ ] **PLY-3** `[physical device required]`
-  - Action: Open the 1080p HEVC file. If the decoder button shows SW, tap it so that it shows HW.
-  - Expected: The video plays smoothly with picture and sound. The decoder button shows HW. If it shows SW, write that in the report.
+  - Action: Open the 1080p HEVC file. If the decoder label shows SW, tap it so that it shows HW.
+  - Expected: The video plays smoothly with picture and sound. The decoder label shows HW. If it shows SW, write that in the report.
   - Source: (spec 02, acceptance 2; spec 02, req 2; agent report: player-engine)
 - [ ] **PLY-4** `[physical device required]`
-  - Action: Open the 1080p HEVC file. If the decoder button shows HW, tap it so that it shows SW.
-  - Expected: The video plays smoothly with picture and sound. The decoder button shows SW.
+  - Action: Open the 1080p HEVC file. If the decoder label shows HW, tap it so that it shows SW.
+  - Expected: The video plays smoothly with picture and sound. The decoder label shows SW.
   - Source: (spec 02, acceptance 2; spec 02, req 2; agent report: player-engine)
 - [ ] **PLY-5** `[physical device required]` `[emulator ok, verified 2026-11-14]`
-  - Action: Play the 1080p H.264 file to about 30 seconds. Tap the decoder button once.
+  - Action: Play the 1080p H.264 file to about 30 seconds. Tap the decoder label once.
   - Expected: Playback continues at the same position (about 30 seconds) within 1 second.
   - Source: (spec 02, acceptance 2; spec 02, req 2; agent report: player-engine)
 - [ ] **PLY-6** `[physical device required]` `[emulator ok, verified 2026-11-14]`
@@ -232,7 +234,7 @@ Accessories: none needed in Phase 1 (no wired or Bluetooth headset).
 
 - [ ] **HUD-1** `[emulator ok]` `[emulator ok, verified 2026-11-14]`
   - Action: While a video plays with the HUD hidden, tap the picture once.
-  - Expected: The HUD appears with the seek bar and the buttons.
+  - Expected: The HUD appears with the seek bar and the symbols (back arrow, previous, play or pause, next) and the HW/SW label.
   - Source: (spec 02, req 3; agent report: player-hud-ui)
 - [ ] **HUD-2** `[emulator ok]` `[emulator ok, verified 2026-11-14]`
   - Action: With the HUD shown, tap the picture once.
@@ -250,29 +252,29 @@ Accessories: none needed in Phase 1 (no wired or Bluetooth headset).
   - Action: Drag the seek bar to another point and release it.
   - Expected: While you drag, the target time is shown. The video jumps to that time on release, not during the drag.
   - Source: (spec 02, req 3; agent report: player-hud-ui)
-- [ ] **HUD-6** `[emulator ok]` `[emulator ok, verified 2026-11-14]`
-  - Action: While a video plays, tap the play/pause button.
-  - Expected: Playback pauses. Tapping the button again resumes playback.
+- [ ] **HUD-6** `[emulator ok]` `[emulator ok, verified 2026-11-14]` `[emulator ok, verified 2026-11-15]`
+  - Action: While a video plays, tap the pause symbol (two bars).
+  - Expected: Playback pauses and the symbol changes to a play triangle. Tapping it resumes playback and the symbol changes back to two bars.
   - Source: (spec 02, req 3; agent report: player-hud-ui)
 - [ ] **HUD-7** `[emulator ok]`
-  - Action: In the folder with `ep2.mp4` and `ep10.mp4`, play `ep2.mp4` and tap Next.
+  - Action: In the folder with `ep2.mp4` and `ep10.mp4`, play `ep2.mp4` and tap the next symbol.
   - Expected: The next file of the folder (`ep10.mp4`) starts.
   - Source: (agent report: player-hud-ui; agent report: playback-coordinator)
 - [ ] **HUD-8** `[emulator ok]`
-  - Action: Play the second file of the folder for more than 3 seconds and tap Prev.
+  - Action: Play the second file of the folder for more than 3 seconds and tap the previous symbol.
   - Expected: The current file restarts from the beginning. The previous file does not open.
   - Source: (agent report: playback-coordinator)
 - [ ] **HUD-9** `[emulator ok]`
-  - Action: Play the second file of the folder and tap Prev within its first 3 seconds.
+  - Action: Play the second file of the folder and tap the previous symbol within its first 3 seconds.
   - Expected: The previous file of the folder starts.
   - Source: (agent report: playback-coordinator)
 - [ ] **HUD-10** `[physical device required]` `[emulator ok, verified 2026-11-14]`
-  - Action: Tap the decoder button to switch between HW and SW during playback.
-  - Expected: The button shows HW or SW and changes with each tap. The label shows the decoder that is in use.
+  - Action: Tap the decoder label (HW or SW) to switch between HW and SW during playback.
+  - Expected: The label shows HW or SW and changes with each tap. The label shows the decoder that is in use.
   - Source: (spec 02, req 2; agent report: player-hud-ui)
 - [ ] **HUD-11** `[physical device required]` (developer check: needs adb)
-  - Action: Run `adb shell setprop log.tag.ArielEngine DEBUG`, restart the app, and play a file while `adb logcat -s ArielEngine` runs. Tap the decoder button to switch between HW and SW.
-  - Expected: When the button shows HW, the log shows `using video decoder module "mediacodec"`. When the button shows SW, the log shows `using video decoder module "avcodec"`.
+  - Action: Run `adb shell setprop log.tag.ArielEngine DEBUG`, restart the app, and play a file while `adb logcat -s ArielEngine` runs. Tap the decoder label (HW or SW) to switch between HW and SW.
+  - Expected: When the label shows HW, the log shows `using video decoder module "mediacodec"`. When the label shows SW, the log shows `using video decoder module "avcodec"`.
   - Source: (spec 02, req 2; agent report: player-engine, step 4)
 - [ ] **HUD-12** `[emulator ok]`
   - Action: Show the HUD and look at the clock.
@@ -282,6 +284,14 @@ Accessories: none needed in Phase 1 (no wired or Bluetooth headset).
   - Action: While a video plays, press the hardware Back button.
   - Expected: The player closes and the item list is shown.
   - Source: (agent report: player-hud-ui)
+- [ ] **HUD-14** `[emulator ok]` `[emulator ok, verified 2026-11-15]`
+  - Action: Show the HUD and look at the controls.
+  - Expected: Back, previous, play or pause, and next are white symbols with no colored background. The decoder label is white text in a thin white outline. No control shows a word such as "Back" or "Next".
+  - Source: (owner feedback 2026-11-15; task P1-29)
+- [ ] **HUD-15** `[emulator ok]` `[emulator ok, verified 2026-11-15]`
+  - Action: Show the HUD and tap the back arrow at the top left.
+  - Expected: The player closes and the item list is shown.
+  - Source: (task P1-29)
 
 ### Playback order
 
@@ -294,7 +304,7 @@ Accessories: none needed in Phase 1 (no wired or Bluetooth headset).
   - Expected: Playback stops at the end. It does not restart and does not move to another file.
   - Source: (agent report: playback-coordinator)
 - [ ] **COORD-3** `[emulator ok]`
-  - Action: After COORD-2, tap Play.
+  - Action: After COORD-2, tap the play symbol.
   - Expected: The last file starts again from the beginning.
   - Source: (agent report: playback-coordinator)
 
@@ -312,6 +322,26 @@ Accessories: none needed in Phase 1 (no wired or Bluetooth headset).
   - Action: Open the folder list and then an item list. Look at the navigation bar and its back arrow.
   - Expected: The dark theme is used on every page, including the navigation bar and its back arrow.
   - Source: (agent report: theming-engine)
+- [ ] **APP-3** `[physical device required]`
+  - Action: Copy `ArielPlayer-phase1-r2.apk` to the phone and install it. If the phone refuses, write down the exact message.
+  - Expected: The app installs. Write the phone model and the Android version in the table at the top.
+  - Source: (owner feedback 2026-11-15; task P1-30)
+- [ ] **APP-4** `[emulator ok]` `[emulator ok, verified 2026-11-15]`
+  - Action: Find the app in the phone's app list.
+  - Expected: The icon is a white play triangle on a blue background, with the name "Ariel Player". It is not the purple ".NET" icon.
+  - Source: (owner feedback 2026-11-15; task P1-30)
+- [ ] **APP-5** `[emulator ok]` `[emulator ok, verified 2026-11-15]`
+  - Action: Close the app completely (swipe it away from the recent apps) and start it from the launcher. Watch the first second.
+  - Expected: A black screen with the app symbol (a white play triangle in a blue circle) appears, then the folder list. No purple screen appears.
+  - Source: (owner feedback 2026-11-15; task P1-30)
+- [ ] **THEME-2** `[emulator ok]` `[emulator ok, verified 2026-11-15]`
+  - Action: Open the folder list and an item list. Look at the Android status bar at the top (clock, battery, signal, notifications).
+  - Expected: The status bar has the same dark color as the app's top bar, with white icons. It is not purple.
+  - Source: (owner feedback 2026-11-15; spec 07, req 7; task P1-30)
+- [ ] **THEME-3** `[emulator ok]`
+  - Action: Open an item list and tap the search field.
+  - Expected: The line under the search field and the cursor are blue, not purple.
+  - Source: (task P1-30)
 
 ## Regression
 
