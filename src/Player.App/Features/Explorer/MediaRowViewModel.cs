@@ -45,6 +45,10 @@ public sealed partial class MediaRowViewModel : ObservableObject
     [ObservableProperty]
     private bool _isWatched;
 
+    // True while the row is part of the selection of the selection mode.
+    [ObservableProperty]
+    private bool _isSelected;
+
     // The font size of the file name: the base size times the explorer font scale. Set by the ViewModel.
     [ObservableProperty]
     private double _nameFontSize;

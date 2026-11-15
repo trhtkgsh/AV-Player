@@ -32,6 +32,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private readonly IUiSettingsStore _uiSettings;
     private readonly IPlaybackCoordinator _coordinator;
     private readonly IFileOperations _fileOperations;
+    private readonly SelectionOperations _operations;
     private readonly TimeProvider _timeProvider;
     private readonly ILocalizer _localizer;
 
@@ -112,6 +113,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         IUiSettingsStore uiSettings,
         IPlaybackCoordinator coordinator,
         IFileOperations fileOperations,
+        SelectionOperations operations,
         TimeProvider timeProvider,
         ILocalizer localizer)
     {
@@ -121,6 +123,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         _uiSettings = uiSettings;
         _coordinator = coordinator;
         _fileOperations = fileOperations;
+        _operations = operations;
         _timeProvider = timeProvider;
         _localizer = localizer;
     }
@@ -152,6 +155,8 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     {
         StopSession();
         _loadVersion++;
+        _selection.Clear();
+        UpdateSelection();
     }
 
     public void VisibleRangeChanged(int firstIndex, int lastIndex)
@@ -201,8 +206,14 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     [RelayCommand]
     private async Task Open(MediaRowViewModel row)
     {
-        if (_fileOperationRunning)
+        if (_fileOperationRunning || Environment.TickCount64 < _tapGuardUntil)
         {
+            return;
+        }
+
+        if (IsSelecting)
+        {
+            ToggleSelect(row);
             return;
         }
 
@@ -619,7 +630,13 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             }
         }
 
+        foreach (var id in _selection.Keys.Where(id => !_rows.ContainsKey(id)).ToList())
+        {
+            _selection.Remove(id);
+        }
+
         UpdateIsEmpty();
+        UpdateSelection();
         VisibleRangeChanged(0, InitialLastIndex());
     }
 
@@ -760,7 +777,9 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
 
     // All media has its own title; a folder shows its name, which is not translated.
     private void RebuildTitle() =>
-        Title = _bucketId is null ? _localizer["Explorer.AllMedia"] : _folderTitle;
+        Title = IsSelecting
+            ? _localizer.Format("Explorer.SelectedCount", _selection.Count)
+            : _bucketId is null ? _localizer["Explorer.AllMedia"] : _folderTitle;
 
     // Only the load owns IsLoading and IsRefreshing; a failed command reports through ErrorMessage alone.
     private void ReportError(Exception ex) => ErrorMessage = ex.Message;

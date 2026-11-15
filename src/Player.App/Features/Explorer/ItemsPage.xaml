@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<ContentPage x:Class="Player.App.Features.Explorer.ItemsPage"
+    <ContentPage x:Name="Page"
+                 x:Class="Player.App.Features.Explorer.ItemsPage"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:explorer="clr-namespace:Player.App.Features.Explorer"
@@ -7,12 +8,15 @@
              x:DataType="explorer:ItemsViewModel"
              Title="{Binding Title}">
 
-    <ContentPage.ToolbarItems>
-        <ToolbarItem Text="{loc:T Explorer.Sort}" Command="{Binding ChooseSortCommand}" />
-        <ToolbarItem Text="{Binding LayoutText}" Command="{Binding ToggleLayoutCommand}" />
-    </ContentPage.ToolbarItems>
-
     <ContentPage.Resources>
+        <!-- The toolbar: the browse items and the selection items. The code-behind shows one set at a time. -->
+        <ToolbarItem x:Key="SortItem" Text="{loc:T Explorer.Sort}" Command="{Binding ChooseSortCommand}" />
+        <ToolbarItem x:Key="LayoutItem" Text="{Binding LayoutText}" Command="{Binding ToggleLayoutCommand}" />
+        <ToolbarItem x:Key="SelectAllItem" Text="{loc:T Explorer.SelectAll}" Command="{Binding SelectAllCommand}" />
+        <ToolbarItem x:Key="RenameItem" Text="{loc:T Explorer.Rename}" Command="{Binding RenameSelectedCommand}"
+                     IsEnabled="{Binding CanRename}" />
+        <ToolbarItem x:Key="DeleteItem" Text="{loc:T Explorer.Delete}" Command="{Binding DeleteSelectedCommand}" />
+
         <!-- The ⋮ button: no border, transparent, muted, with a touch area of 44 x 44 (as on the folder rows). -->
         <Style x:Key="OptionsButton" TargetType="Button">
             <Setter Property="BackgroundColor" Value="Transparent" />
@@ -31,6 +35,15 @@
                         Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
                         CommandParameter="{Binding .}" />
                 </Grid.GestureRecognizers>
+                <Grid.Behaviors>
+                    <explorer:LongPressBehavior
+                        Command="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsViewModel}"
+                        CommandParameter="{Binding .}" />
+                </Grid.Behaviors>
+
+                <!-- The selected row is marked by a tint behind its content. -->
+                <BoxView Grid.ColumnSpan="3" Color="{DynamicResource ColorAccent}" Opacity="0.2"
+                         InputTransparent="True" IsVisible="{Binding IsSelected}" />
 
                 <VerticalStackLayout Grid.Column="0" Spacing="4">
                     <Image Source="{Binding ThumbnailPath}"
@@ -55,6 +68,7 @@
 
                 <Button Grid.Column="2" Text="⋮" SemanticProperties.Description="{loc:T Explorer.FileOptions}"
                         Style="{StaticResource OptionsButton}" VerticalOptions="Center"
+                        IsVisible="{Binding IsBrowsing, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
                         Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
                         CommandParameter="{Binding .}" />
             </Grid>
@@ -67,7 +81,14 @@
                         Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
                         CommandParameter="{Binding .}" />
                 </Grid.GestureRecognizers>
+                <Grid.Behaviors>
+                    <explorer:LongPressBehavior
+                        Command="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsViewModel}"
+                        CommandParameter="{Binding .}" />
+                </Grid.Behaviors>
 
+                <BoxView Grid.RowSpan="5" Color="{DynamicResource ColorAccent}" Opacity="0.2"
+                         InputTransparent="True" IsVisible="{Binding IsSelected}" />
                 <Image Grid.Row="0" Source="{Binding ThumbnailPath}" HorizontalOptions="Fill"
                        HeightRequest="{Binding ThumbnailHeight}"
                        Aspect="AspectFill" BackgroundColor="{DynamicResource ColorSurface}" />
@@ -75,6 +96,7 @@
                 <Button Grid.Row="0" Text="⋮" HorizontalOptions="End" VerticalOptions="Start"
                         SemanticProperties.Description="{loc:T Explorer.FileOptions}"
                         Style="{StaticResource OptionsButton}"
+                        IsVisible="{Binding IsBrowsing, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
                         Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
                         CommandParameter="{Binding .}" />
                 <ProgressBar Grid.Row="1" Progress="{Binding Progress}" IsVisible="{Binding HasProgress}" />
@@ -104,6 +126,18 @@
 
             <ActivityIndicator IsRunning="{Binding ShowBusy}" IsVisible="{Binding ShowBusy}"
                                HorizontalOptions="Center" VerticalOptions="Center" />
+
+            <!-- A running batch covers the list. The tap gesture takes input so the list below gets none. -->
+            <Grid IsVisible="{Binding IsOperationRunning}" BackgroundColor="{DynamicResource ColorSurface}" Opacity="0.92"
+                  RowDefinitions="*,Auto,*" Padding="24">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer />
+                </Grid.GestureRecognizers>
+                <VerticalStackLayout Grid.Row="1" Spacing="12" HorizontalOptions="Center">
+                    <ActivityIndicator IsRunning="{Binding IsOperationRunning}" HorizontalOptions="Center" />
+                    <Label Text="{Binding OperationName}" HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+            </Grid>
 
             <Label Text="{loc:T Explorer.NoFiles}" IsVisible="{Binding IsEmpty}"
                    HorizontalOptions="Center" VerticalOptions="Center" />

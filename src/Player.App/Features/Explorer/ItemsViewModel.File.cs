@@ -142,7 +142,7 @@ public sealed partial class ItemsViewModel
     {
         var ct = SessionToken;
         var question = _localizer.Format(
-            DeleteWordingIsTrash ? "Explorer.TrashConfirm" : "Explorer.DeleteConfirm",
+            SelectionOperations.DeleteWordingIsTrash ? "Explorer.TrashConfirm" : "Explorer.DeleteConfirm",
             item.DisplayName);
 
         var confirmed = await shell.DisplayAlertAsync(
@@ -174,9 +174,7 @@ public sealed partial class ItemsViewModel
         }
     }
 
-    // Android 11 (API 30) and later move the file to the system trash, with the system dialog.
-    private static bool DeleteWordingIsTrash =>
-        DeviceInfo.Platform == DevicePlatform.Android && DeviceInfo.Version.Major >= 11;
+    // Android 11 (API 30) and later: see SelectionOperations.DeleteWordingIsTrash.
 
     // The file that is open in playback (also in background audio or Picture-in-Picture) is closed first.
     private async Task CloseIfOpenAsync(MediaItem item, CancellationToken ct)

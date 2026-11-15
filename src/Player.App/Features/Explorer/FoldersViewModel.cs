@@ -26,6 +26,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     private readonly IFolderSettingsStore _folderSettings;
     private readonly IPlaybackStateStore _playbackStates;
     private readonly ILocalizer _localizer;
+    private readonly SelectionOperations _operations;
 
     // The folders of the last successful load, and the per-folder settings read with them.
     // The rows are rebuilt from them when the language or a setting changes.
@@ -129,13 +130,14 @@ public sealed partial class FoldersViewModel : ObservableObject
     [ObservableProperty]
     private bool _showBusy;
 
-    public FoldersViewModel(IMediaLibrary library, IUiSettingsStore uiSettings, IFolderSettingsStore folderSettings, ILocalizer localizer, IPlaybackStateStore playbackStates)
+    public FoldersViewModel(IMediaLibrary library, IUiSettingsStore uiSettings, IFolderSettingsStore folderSettings, ILocalizer localizer, IPlaybackStateStore playbackStates, SelectionOperations operations)
     {
         _library = library;
         _uiSettings = uiSettings;
         _folderSettings = folderSettings;
         _localizer = localizer;
         _playbackStates = playbackStates;
+        _operations = operations;
     }
 
     public ObservableCollection<FolderRow> Folders { get; } = new();
@@ -157,6 +159,8 @@ public sealed partial class FoldersViewModel : ObservableObject
     {
         StopSession();
         _loadVersion++;
+        _selection.Clear();
+        UpdateSelection();
     }
 
     [RelayCommand]
@@ -169,6 +173,25 @@ public sealed partial class FoldersViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenRow(FolderRow row)
     {
+        if (_fileOperationRunning || Environment.TickCount64 < _tapGuardUntil)
+        {
+            return;
+        }
+
+        // In the selection mode a media folder toggles, a file-browser container still goes one level down, and the files row does nothing.
+        if (IsSelecting)
+        {
+            if (row.Kind == FolderRowKind.Folder)
+            {
+                ToggleSelect(row);
+            }
+
+            if (row.Kind != FolderRowKind.Container)
+            {
+                return;
+            }
+        }
+
         // A file-browser node that holds more goes one level down in this page.
         if (row.Kind == FolderRowKind.Container && row.TreePath is { } path)
         {
@@ -247,6 +270,8 @@ public sealed partial class FoldersViewModel : ObservableObject
                 return;
             }
 
+            _selection.Clear();
+            UpdateSelection();
             await SetViewModeAsync(mode, ct);
         }
         catch (OperationCanceledException)
@@ -797,6 +822,9 @@ public sealed partial class FoldersViewModel : ObservableObject
         var empty = _loaded && !PermissionDenied && Folders.Count == 0;
         ShowNoFavorites = empty && mode == ExplorerViewMode.Favorites;
         ShowNoFolders = empty && mode != ExplorerViewMode.Favorites;
+
+        PruneSelection();
+        UpdateSelection();
     }
 
     // When the current directory is gone (refresh, library change, audio-only switch), the path goes up
