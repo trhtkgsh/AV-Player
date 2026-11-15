@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Player.App.Features.PlaybackSettings.SpeedSheet"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:vm="clr-namespace:Player.App.Features.PlaybackSettings"
+    x:DataType="vm:SpeedSheetViewModel"
+    Shell.PresentationMode="ModalNotAnimated"
+    Shell.NavBarIsVisible="False"
+    BackgroundColor="Transparent">
+
+    <Grid RowDefinitions="*,Auto">
+
+        <!-- (a) The video stays visible here. A tap outside the panel closes the sheet. -->
+        <ContentView Grid.Row="0" BackgroundColor="Transparent">
+            <ContentView.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding CloseCommand}" />
+            </ContentView.GestureRecognizers>
+        </ContentView>
+
+        <!-- (b) The translucent panel. -->
+        <VerticalStackLayout
+            Grid.Row="1"
+            Padding="16,12,16,24"
+            Spacing="12"
+            BackgroundColor="{DynamicResource ColorHudBackground}">
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label
+                    Grid.Column="0"
+                    Text="Speed"
+                    VerticalOptions="Center"
+                    TextColor="{DynamicResource ColorHudOnBackground}" />
+                <Label
+                    Grid.Column="1"
+                    Text="{Binding SpeedText}"
+                    VerticalOptions="Center"
+                    TextColor="{DynamicResource ColorHudOnBackground}" />
+            </Grid>
+
+            <Slider
+                Minimum="0.25"
+                Maximum="4.0"
+                Value="{Binding SliderValue, Mode=TwoWay}"
+                DragCompletedCommand="{Binding ApplySliderCommand}" />
+
+            <Grid ColumnDefinitions="*,*,*,*,*" ColumnSpacing="8">
+                <Button
+                    Grid.Column="0"
+                    Text="0.5x"
+                    Command="{Binding SetPresetCommand}"
+                    CommandParameter="0.5"
+                    BackgroundColor="Transparent"
+                    TextColor="{DynamicResource ColorHudOnBackground}"
+                    BorderColor="{DynamicResource ColorHudOnBackground}"
+                    BorderWidth="1"
+                    Padding="4,6"
+                    FontSize="14" />
+                <Button
+                    Grid.Column="1"
+                    Text="1.0x"
+                    Command="{Binding SetPresetCommand}"
+                    CommandParameter="1.0"
+                    BackgroundColor="Transparent"
+                    TextColor="{DynamicResource ColorHudOnBackground}"
+                    BorderColor="{DynamicResource ColorHudOnBackground}"
+                    BorderWidth="1"
+                    Padding="4,6"
+                    FontSize="14" />
+                <Button
+                    Grid.Column="2"
+                    Text="1.25x"
+                    Command="{Binding SetPresetCommand}"
+                    CommandParameter="1.25"
+                    BackgroundColor="Transparent"
+                    TextColor="{DynamicResource ColorHudOnBackground}"
+                    BorderColor="{DynamicResource ColorHudOnBackground}"
+                    BorderWidth="1"
+                    Padding="4,6"
+                    FontSize="14" />
+                <Button
+                    Grid.Column="3"
+                    Text="1.5x"
+                    Command="{Binding SetPresetCommand}"
+                    CommandParameter="1.5"
+                    BackgroundColor="Transparent"
+                    TextColor="{DynamicResource ColorHudOnBackground}"
+                    BorderColor="{DynamicResource ColorHudOnBackground}"
+                    BorderWidth="1"
+                    Padding="4,6"
+                    FontSize="14" />
+                <Button
+                    Grid.Column="4"
+                    Text="2.0x"
+                    Command="{Binding SetPresetCommand}"
+                    CommandParameter="2.0"
+                    BackgroundColor="Transparent"
+                    TextColor="{DynamicResource ColorHudOnBackground}"
+                    BorderColor="{DynamicResource ColorHudOnBackground}"
+                    BorderWidth="1"
+                    Padding="4,6"
+                    FontSize="14" />
+            </Grid>
+
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                TextColor="{DynamicResource ColorDanger}" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>
