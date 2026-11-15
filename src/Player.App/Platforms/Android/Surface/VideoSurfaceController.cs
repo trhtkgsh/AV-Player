@@ -21,7 +21,11 @@ internal sealed class VideoSurfaceController : IVideoSurface
     private bool _immersive;
     private bool _barsVisible;
     private EdgeInsets _insets;
+    private SavedBars? _savedBars;        // UI thread only: how the bars looked before player mode
+    private bool _edgeToEdge;             // UI thread only: this class made the window edge to edge (up to API 34)
     private VideoFormat? _layoutFormat;   // the last known format: kept after the engine stops, so the last picture is not stretched
+
+    private readonly record struct SavedBars(int StatusColor, int NavigationColor, bool LightStatus, bool LightNavigation);
 
     public VideoSurfaceController(IVideoOutputBinding binding)
     {
@@ -148,10 +152,17 @@ internal sealed class VideoSurfaceController : IVideoSurface
         // Up to API 34 the window is not edge to edge by itself: without this the content would be
         // resized every time the bars appear.
         if (!OperatingSystem.IsAndroidVersionAtLeast(35))
+        {
             AndroidX.Core.View.WindowCompat.SetDecorFitsSystemWindows(window, !immersive);
+            if (_edgeToEdge && !immersive)
+                ClearBarPaddingOfContent(decor);
+            _edgeToEdge = immersive;
+        }
 
         if (AndroidX.Core.View.WindowCompat.GetInsetsController(window, decor) is not { } insets)
             return;
+
+        ApplyBarLook(window, insets, immersive);
 
         if (immersive && !barsVisible)
         {
@@ -173,6 +184,89 @@ internal sealed class VideoSurfaceController : IVideoSurface
         }
 
         RefreshInsets(decor);
+    }
+
+    /// <summary>
+    /// The pages under the player are padded by MAUI for the bars while the window is edge to edge.
+    /// Once the window fits the bars again, Android uses up the bar insets at the top of the view tree
+    /// and does not pass them on (a used-up dispatch stops there), so MAUI never hears that the bars
+    /// take no space inside the content any more: the padding would stay, an empty band above the
+    /// navigation bar. The content is told directly, now and once more after the next layout.
+    /// </summary>
+    private static void ClearBarPaddingOfContent(Android.Views.View decor)
+    {
+        DispatchInsetsInsideBars(decor);
+        if (decor.ViewTreeObserver is { IsAlive: true } observer)
+            observer.AddOnGlobalLayoutListener(new InsetsAfterLayout(decor));
+    }
+
+    private static void DispatchInsetsInsideBars(Android.Views.View decor)
+    {
+        if (decor.FindViewById(Android.Resource.Id.Content) is not { } content
+            || AndroidX.Core.View.ViewCompat.GetRootWindowInsets(decor) is not { } root)
+            return;
+
+        // Zero, but not marked as used up: a used-up dispatch would not reach the children.
+        var none = AndroidX.Core.Graphics.Insets.None;
+        var builder = new AndroidX.Core.View.WindowInsetsCompat.Builder(root);
+        builder.SetInsets(AndroidX.Core.View.WindowInsetsCompat.Type.SystemBars(), none);
+        builder.SetInsets(AndroidX.Core.View.WindowInsetsCompat.Type.DisplayCutout(), none);
+        AndroidX.Core.View.ViewCompat.DispatchApplyWindowInsets(content, builder.Build());
+    }
+
+    private sealed class InsetsAfterLayout(Android.Views.View decor)
+        : Java.Lang.Object, Android.Views.ViewTreeObserver.IOnGlobalLayoutListener
+    {
+        public void OnGlobalLayout()
+        {
+            if (decor.ViewTreeObserver is { IsAlive: true } observer)
+                observer.RemoveOnGlobalLayoutListener(this);
+
+            DispatchInsetsInsideBars(decor);
+        }
+    }
+
+    /// <summary>
+    /// In player mode the bars lie over the picture: they are transparent with white symbols, in every
+    /// theme. Up to API 34 the window paints the bars in the theme's color, which would cover the edges
+    /// of the picture. The look the theme had set is kept and put back when player mode ends.
+    /// </summary>
+    private void ApplyBarLook(
+        Android.Views.Window window, AndroidX.Core.View.WindowInsetsControllerCompat insets, bool immersive)
+    {
+        var paintsBars = !OperatingSystem.IsAndroidVersionAtLeast(35);
+        if (immersive)
+        {
+#pragma warning disable CA1422 // Bar colors are obsolete from API 35 only; guarded by paintsBars.
+            _savedBars ??= new SavedBars(
+                paintsBars ? window.StatusBarColor : 0,
+                paintsBars ? window.NavigationBarColor : 0,
+                insets.AppearanceLightStatusBars,
+                insets.AppearanceLightNavigationBars);
+
+            // Set on every call: a recreated activity starts with the theme's look again.
+            if (paintsBars)
+            {
+                window.SetStatusBarColor(Android.Graphics.Color.Transparent);
+                window.SetNavigationBarColor(Android.Graphics.Color.Transparent);
+            }
+
+            insets.AppearanceLightStatusBars = false;
+            insets.AppearanceLightNavigationBars = false;
+        }
+        else if (_savedBars is { } saved)
+        {
+            _savedBars = null;
+            if (paintsBars)
+            {
+                window.SetStatusBarColor(new Android.Graphics.Color(saved.StatusColor));
+                window.SetNavigationBarColor(new Android.Graphics.Color(saved.NavigationColor));
+            }
+#pragma warning restore CA1422
+
+            insets.AppearanceLightStatusBars = saved.LightStatus;
+            insets.AppearanceLightNavigationBars = saved.LightNavigation;
+        }
     }
 
     /// <summary>
