@@ -8,8 +8,9 @@ namespace Player.App.Background;
 
 /// <summary>
 /// Builds the media notification of the playback service: title, previous, play or pause, next, close.
-/// From API 33 the system draws the buttons from the media session; the actions here serve older versions
-/// and the close button.
+/// From API 33 the system draws the buttons of a media notification from the media session (which
+/// offers its own close action); the actions here serve older versions. Swiping the notification away
+/// while paused closes playback.
 /// </summary>
 internal sealed class PlaybackNotification(ILocalizer localizer)
 {
@@ -39,6 +40,8 @@ internal sealed class PlaybackNotification(ILocalizer localizer)
                 context, 0, launch, PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent));
         }
 
+        builder.SetDeleteIntent(Pending(context, ActionClose, 5));
+
         builder.AddAction(Action(context, Android.Resource.Drawable.IcMediaPrevious, "Service.Previous", ActionPrevious, 1));
         builder.AddAction(playing
             ? Action(context, Android.Resource.Drawable.IcMediaPause, "Service.Pause", ActionToggle, 2)
@@ -54,13 +57,14 @@ internal sealed class PlaybackNotification(ILocalizer localizer)
         return builder.Build()!;
     }
 
-    private Notification.Action Action(Context context, int icon, string textKey, string action, int requestCode)
-    {
-        var intent = new Intent(context, typeof(PlaybackService)).SetAction(action)!;
-        var pending = PendingIntent.GetService(
-            context, requestCode, intent, PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent);
-        return new Notification.Action.Builder(Icon.CreateWithResource(context, icon), localizer[textKey], pending).Build()!;
-    }
+    private Notification.Action Action(Context context, int icon, string textKey, string action, int requestCode) =>
+        new Notification.Action.Builder(
+            Icon.CreateWithResource(context, icon), localizer[textKey], Pending(context, action, requestCode)).Build()!;
+
+    private static PendingIntent? Pending(Context context, string action, int requestCode) =>
+        PendingIntent.GetService(
+            context, requestCode, new Intent(context, typeof(PlaybackService)).SetAction(action)!,
+            PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent);
 
     /// <summary>Creating a channel that exists only updates its name (the language may have changed).</summary>
     private void EnsureChannel(Context context)
