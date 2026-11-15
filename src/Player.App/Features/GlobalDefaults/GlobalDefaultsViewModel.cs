@@ -6,6 +6,7 @@ using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 using Player.Core.Contracts;
 using Player.Core.Models;
+using Player.Data.GlobalDefaultsStorage;
 
 namespace Player.App.Features.DefaultsSettings;
 
@@ -66,10 +67,13 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
     private bool _resumeFromLastPosition;
 
     [ObservableProperty]
-    private bool _backgroundAudio;
+    private bool _isLeaveWindow;
 
     [ObservableProperty]
-    private bool _pictureInPictureOnLeave;
+    private bool _isLeaveSound;
+
+    [ObservableProperty]
+    private bool _isLeavePause;
 
     [ObservableProperty]
     private string _preferredAudioLanguage = string.Empty;
@@ -124,8 +128,10 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
             IsRepeatFile = stored.Repeat == RepeatMode.File;
             IsRepeatFolder = stored.Repeat == RepeatMode.Folder;
             ResumeFromLastPosition = stored.ResumeFromLastPosition;
-            BackgroundAudio = stored.BackgroundAudio;
-            PictureInPictureOnLeave = stored.PictureInPictureOnLeave;
+            var leave = LeaveChoiceMap.FromFields(stored.PictureInPictureOnLeave, stored.BackgroundAudio);
+            IsLeaveWindow = leave == LeaveChoice.Window;
+            IsLeaveSound = leave == LeaveChoice.Sound;
+            IsLeavePause = leave == LeaveChoice.Pause;
             PreferredAudioLanguage = stored.PreferredAudioLanguage ?? string.Empty;
             AudioDelayMs = stored.AudioDelayMs;
             SubtitlesEnabled = stored.SubtitlesEnabled;
@@ -158,26 +164,6 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
         _ = SaveAsync(d => d with { ResumeFromLastPosition = value });
     }
 
-    partial void OnBackgroundAudioChanged(bool value)
-    {
-        if (_loading)
-        {
-            return;
-        }
-
-        _ = SetBackgroundAudioAsync(value);
-    }
-
-    partial void OnPictureInPictureOnLeaveChanged(bool value)
-    {
-        if (_loading)
-        {
-            return;
-        }
-
-        _ = SaveAsync(d => d with { PictureInPictureOnLeave = value });
-    }
-
     partial void OnSubtitlesEnabledChanged(bool value)
     {
         if (_loading)
@@ -186,6 +172,36 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
         }
 
         _ = SaveAsync(d => d with { SubtitlesEnabled = value });
+    }
+
+    partial void OnIsLeaveWindowChanged(bool value)
+    {
+        if (_loading || !value)
+        {
+            return;
+        }
+
+        _ = SetLeaveChoiceAsync(LeaveChoice.Window);
+    }
+
+    partial void OnIsLeaveSoundChanged(bool value)
+    {
+        if (_loading || !value)
+        {
+            return;
+        }
+
+        _ = SetLeaveChoiceAsync(LeaveChoice.Sound);
+    }
+
+    partial void OnIsLeavePauseChanged(bool value)
+    {
+        if (_loading || !value)
+        {
+            return;
+        }
+
+        _ = SetLeaveChoiceAsync(LeaveChoice.Pause);
     }
 
     // A radio button saves only when it becomes selected; the one that is deselected is ignored.
@@ -376,12 +392,14 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
         }
     }
 
-    // The notification permission is asked once, after the switch is turned on and the save succeeded.
-    // Playback works without it: the result is ignored, and a failure (for example the manifest declaration
-    // is not there yet) is only logged, never shown.
-    private async Task SetBackgroundAudioAsync(bool value)
+    // Both fields are written in one save. The notification permission is asked after a choice that keeps
+    // the sound (window or sound) was saved. Playback works without it: the result is ignored, and a failure
+    // (for example the manifest declaration is not there yet) is only logged, never shown.
+    private async Task SetLeaveChoiceAsync(LeaveChoice choice)
     {
-        if (!await SaveAsync(d => d with { BackgroundAudio = value }) || !value)
+        var (pictureInPicture, backgroundAudio) = LeaveChoiceMap.ToFields(choice);
+        if (!await SaveAsync(d => d with { PictureInPictureOnLeave = pictureInPicture, BackgroundAudio = backgroundAudio })
+            || !backgroundAudio)
         {
             return;
         }

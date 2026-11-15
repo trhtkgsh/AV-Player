@@ -33,6 +33,8 @@
 
 **Decisions made in Phase 4 (orchestrator).** The section "Background" shows "Keep playing sound in the background" (`BackgroundAudio`) and "Picture-in-Picture when leaving the player" (`PictureInPictureOnLeave`), both off by default; "Reset all to defaults" covers them. Turning the first one on asks for the notification permission (MAUI `Permissions.PostNotifications`); the answer is ignored.
 
+**Decision of 2026-11-15 (spec 13, item 13; R7-50).** The two Phase 4 switches become one choice, "When leaving the player while a video plays", with three values: "Small window (Picture-in-Picture)" (`PictureInPictureOnLeave` true, `BackgroundAudio` true), "Keep playing the sound" (false, true), "Pause" (both false). A stored pair with Picture-in-Picture on reads as "Small window", whatever the sound field says. Both fields are written in one save. The mapping is the pure static class `LeaveChoiceMap` in Player.Data (namespace `Player.Data.GlobalDefaultsStorage`), with `LeaveChoice FromFields(bool pictureInPictureOnLeave, bool backgroundAudio)` and `(bool PictureInPictureOnLeave, bool BackgroundAudio) ToFields(LeaveChoice choice)`. The hint under the choice says that the sound choice also applies when the screen is turned off. No contract and no store-format change. The notification permission is still asked after a choice that keeps the sound is saved.
+
 **Out of scope.** The resolver (core-contracts). Per-file state. UI settings. Applying defaults to playback (playback-coordinator).
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.
