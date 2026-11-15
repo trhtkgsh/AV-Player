@@ -12,10 +12,13 @@ public sealed partial class ItemsViewModel
 {
     private bool _choosingFileOptions;
 
+    // True from the start of a rename or delete until its result is applied. Opening files is blocked meanwhile.
+    private bool _fileOperationRunning;
+
     [RelayCommand]
     private async Task OpenOptions(MediaRowViewModel row)
     {
-        if (_choosingFileOptions)
+        if (_choosingFileOptions || _fileOperationRunning)
         {
             return;
         }
@@ -98,24 +101,39 @@ public sealed partial class ItemsViewModel
                 continue;
             }
 
-            await CloseIfOpenAsync(item, ct);
-            var result = await _fileOperations.RenameAsync(item, FileNameRules.BuildName(input, extension), ct);
-            await ApplyFileResultAsync(result, "Explorer.RenameFailed", ct, updated =>
+            _fileOperationRunning = true;
+            try
             {
-                _items = MediaListEdits.Replace(_items, item.Id, updated);
-                // Keep the row's state on screen under the new id until the next reload.
-                if (_states.Remove(item.Id, out var state))
+                await CloseIfOpenAsync(item, ct);
+                var result = await _fileOperations.RenameAsync(item, FileNameRules.BuildName(input, extension), ct);
+                await ApplyFileResultAsync(result, "Explorer.RenameFailed", requiresItem: true, updated =>
                 {
-                    _states[updated.Id] = state;
-                }
+                    // Success without an item is handled by the reload in ApplyFileResultAsync.
+                    if (updated is null)
+                    {
+                        return;
+                    }
 
-                if (_metadata.Remove(item.Id, out var metadata))
-                {
-                    _metadata[updated.Id] = metadata;
-                }
+                    _items = MediaListEdits.Replace(_items, item.Id, updated);
+                    // Keep the row's state on screen under the new id until the next reload.
+                    if (_states.Remove(item.Id, out var state))
+                    {
+                        _states[updated.Id] = state;
+                    }
 
-                RebuildRows();
-            });
+                    if (_metadata.Remove(item.Id, out var metadata))
+                    {
+                        _metadata[updated.Id] = metadata;
+                    }
+
+                    RebuildRows();
+                });
+            }
+            finally
+            {
+                _fileOperationRunning = false;
+            }
+
             return;
         }
     }
@@ -137,15 +155,23 @@ public sealed partial class ItemsViewModel
             return;
         }
 
-        await CloseIfOpenAsync(item, ct);
-        var result = await _fileOperations.TrashAsync([item], ct);
-        await ApplyFileResultAsync(result, "Explorer.DeleteFailed", ct, _ =>
+        _fileOperationRunning = true;
+        try
         {
-            _items = MediaListEdits.Remove(_items, item.Id);
-            _states.Remove(item.Id);
-            _metadata.Remove(item.Id);
-            RebuildRows();
-        });
+            await CloseIfOpenAsync(item, ct);
+            var result = await _fileOperations.TrashAsync([item], ct);
+            await ApplyFileResultAsync(result, "Explorer.DeleteFailed", requiresItem: false, _ =>
+            {
+                _items = MediaListEdits.Remove(_items, item.Id);
+                _states.Remove(item.Id);
+                _metadata.Remove(item.Id);
+                RebuildRows();
+            });
+        }
+        finally
+        {
+            _fileOperationRunning = false;
+        }
     }
 
     // Android 11 (API 30) and later move the file to the system trash, with the system dialog.
@@ -161,17 +187,18 @@ public sealed partial class ItemsViewModel
         }
     }
 
-    // Success applies the change in place, or reloads when no item came back. Denied and Failed show a message.
+    // Success applies the edit in place. A rename that comes back without an item reloads instead.
+    // Denied and Failed show a message. Cancelled does nothing.
     private async Task ApplyFileResultAsync(
         FileOperationResult result,
         string failedKey,
-        CancellationToken ct,
-        Action<MediaItem> applyUpdate)
+        bool requiresItem,
+        Action<MediaItem?> applyEdit)
     {
         switch (result.Status)
         {
-            case FileOperationStatus.Success when result.Updated is { } updated:
-                applyUpdate(updated);
+            case FileOperationStatus.Success when !requiresItem || result.Updated is not null:
+                await EditInPlaceAsync(() => applyEdit(result.Updated));
                 break;
 
             case FileOperationStatus.Success:
@@ -184,6 +211,19 @@ public sealed partial class ItemsViewModel
             default:
                 ErrorMessage = FileFailureText(result, failedKey);
                 break;
+        }
+    }
+
+    // A running load would overwrite the edit with its older result, so it is dropped first.
+    // Then one fresh load runs, so the list ends consistent with the store.
+    private async Task EditInPlaceAsync(Action edit)
+    {
+        var loadWasRunning = IsLoading;
+        _loadVersion++;
+        edit();
+        if (loadWasRunning)
+        {
+            await LoadAsync();
         }
     }
 

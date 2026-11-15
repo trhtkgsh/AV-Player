@@ -32,18 +32,18 @@ public static class FileNameRules
             : (displayName[..dot], displayName[dot..]);
     }
 
-    /// <summary>The trimmed typed base name followed by the extension.</summary>
+    /// <summary>The typed base name with surrounding spaces and trailing dots or spaces removed.</summary>
     public static string BuildName(string typedBaseName, string extension)
     {
         ArgumentNullException.ThrowIfNull(typedBaseName);
         ArgumentNullException.ThrowIfNull(extension);
 
-        return typedBaseName.Trim() + extension;
+        return Normalize(typedBaseName) + extension;
     }
 
     /// <summary>
-    /// Validates the typed base name. The checks run on the trimmed text and on the full new name
-    /// (base name plus extension) for the length and the unchanged test.
+    /// Validates the typed base name. "." and ".." are reserved before the trailing dots are removed,
+    /// so they report as reserved. The length and the unchanged test use the full new name.
     /// </summary>
     public static FileNameProblem Check(string typedBaseName, string extension, string currentDisplayName)
     {
@@ -57,17 +57,23 @@ public static class FileNameRules
             return FileNameProblem.Empty;
         }
 
-        if (trimmed.IndexOfAny(InvalidChars) >= 0)
-        {
-            return FileNameProblem.InvalidCharacter;
-        }
-
         if (trimmed is "." or "..")
         {
             return FileNameProblem.Reserved;
         }
 
-        var full = trimmed + extension;
+        if (trimmed.IndexOfAny(InvalidChars) >= 0)
+        {
+            return FileNameProblem.InvalidCharacter;
+        }
+
+        var stripped = Normalize(trimmed);
+        if (stripped.Length == 0)
+        {
+            return FileNameProblem.Empty;
+        }
+
+        var full = stripped + extension;
         if (full.Length > MaxLength)
         {
             return FileNameProblem.TooLong;
@@ -77,4 +83,8 @@ public static class FileNameRules
             ? FileNameProblem.Unchanged
             : FileNameProblem.None;
     }
+
+    private static string Normalize(string typedBaseName) =>
+        typedBaseName.Trim().TrimEnd('.', ' ');
 }
+

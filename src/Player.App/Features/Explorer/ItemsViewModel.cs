@@ -192,6 +192,11 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     [RelayCommand]
     private async Task Open(MediaRowViewModel row)
     {
+        if (_fileOperationRunning)
+        {
+            return;
+        }
+
         try
         {
             await _coordinator.OpenAsync(row.Item, Rows.Select(r => r.Item).ToList(), SessionToken);
@@ -631,7 +636,9 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         try
         {
             var metadata = await _metadataService.GetOrCreateAsync(item, request.Token);
-            if (metadata is null || request.Token.IsCancellationRequested || _session is null)
+            // A file renamed or deleted meanwhile is no longer in the list: its result is dropped.
+            if (metadata is null || request.Token.IsCancellationRequested || _session is null
+                || !_items.Any(i => i.Id == id))
             {
                 return;
             }
