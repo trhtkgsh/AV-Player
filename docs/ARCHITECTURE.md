@@ -44,6 +44,7 @@ App id: `com.arielplayer.app`. Min API 26, target API 36.
 | `src/Player.App/Features/GlobalDefaults/**`, `src/Player.Data/GlobalDefaults/**` | global-defaults-store |
 | `src/Player.App/Features/UiSettings/**`, `src/Player.Data/UiSettings/**` | ui-settings |
 | `src/Player.App/Localization/**`, `src/Player.Core/Logic/Localization/**` | localization (added in Phase 3) |
+| `src/Player.Data/FolderSettings/**` | folder-settings-store (added in the Phase 3 revision) |
 | `tests/**` | test-writer |
 | `docs/qa/**` | device-qa |
 | none (read-only) | reviewer |
