@@ -29,6 +29,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private UiSettings _settings = new();
     private bool _active;
     private bool _sheetOpening;
+    private bool _menuOpen;
     private bool _returnFromSheet;
     private int _activation;
     private bool _dragging;
@@ -171,6 +172,53 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     [RelayCommand]
     private Task OpenSubtitlesAsync() => OpenSheetAsync("player-subtitles");
+
+    /// <summary>
+    /// The menu of the controls: Subtitles, Audio track, Repeat and the decoder. The controls stay visible while
+    /// the sheet is open, and a second tap while it is open is ignored. Never throws.
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenMenuAsync()
+    {
+        if (_menuOpen) return;
+        _menuOpen = true;
+        CancelHideTimer();
+
+        string subtitles = _localizer["Player.Subtitles"];
+        string audio = _localizer["Player.AudioTrack"];
+        string repeat = _localizer["Player.Repeat"];
+        string decoder = _localizer.Format("Player.MenuDecoder", DecoderText);
+        string? choice = null;
+        try
+        {
+            if (Shell.Current is { } shell)
+            {
+                choice = await shell.DisplayActionSheetAsync(
+                    _localizer["Player.Menu"],
+                    _localizer["Common.Cancel"],
+                    null,
+                    subtitles,
+                    audio,
+                    repeat,
+                    decoder);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Menu failed: {ex}");
+        }
+        finally
+        {
+            _menuOpen = false;
+        }
+
+        // A cancelled or dismissed sheet gives no matching text: the controls simply count down again.
+        if (choice == subtitles) await OpenSubtitlesAsync();
+        else if (choice == audio) await OpenAudioAsync();
+        else if (choice == repeat) await OpenRepeatAsync();
+        else if (choice == decoder) await ToggleDecoderAsync();
+        else RestartHideTimer();
+    }
 
     [RelayCommand]
     private void ToggleHud()
