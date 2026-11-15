@@ -396,6 +396,7 @@ public sealed partial class PlaybackCoordinator : IPlaybackCoordinator, IDisposa
             var state = await SafeGetStateAsync(item.Id, token).ConfigureAwait(false);
             var defaults = await LoadDefaultsAsync(token).ConfigureAwait(false);
             var settings = PlaybackSettingsResolver.Resolve(state, defaults);
+            token.ThrowIfCancellationRequested();
             try
             {
                 _videoSurface?.SetAspect(settings.Aspect);
