@@ -5,6 +5,8 @@ using Player.App.Features.Explorer;
 using Player.App.Features.InterfaceSettings;
 using Player.App.Features.PlaybackSettings;
 using Player.App.Features.PlayerHud;
+using Player.App.Gestures;
+using Player.App.Localization;
 using Player.App.Platforms.Android.Library;
 using Player.App.Platforms.Android.Thumbnails;
 using Player.App.Subtitles;
@@ -34,6 +36,7 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 			});
 		builder.UseVideoSurface();
+		builder.UseGestureOverlay();
 
 		builder.Services.AddPlayerDatabase(Path.Combine(FileSystem.AppDataDirectory, "player.db3"));
 		builder.Services.AddAppInfrastructure();
@@ -47,6 +50,8 @@ public static class MauiProgram
 		builder.Services.AddTheming();
 		builder.Services.AddSingleton<IPlaybackCoordinator, PlaybackCoordinator>();
 		builder.Services.AddSubtitlesAudio();
+		builder.Services.AddGestures();
+		builder.Services.AddLocalization();
 		builder.Services.AddExplorer();
 		builder.Services.AddPlayerHud();
 		builder.Services.AddPlaybackSettings();
