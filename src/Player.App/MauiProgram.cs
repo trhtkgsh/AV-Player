@@ -1,6 +1,7 @@
 using Player.App.Background;
 using Player.App.Composition;
 using Player.App.Engine;
+using Player.App.FileOps;
 using Player.App.Features.DefaultsSettings;
 using Player.App.Features.Explorer;
 using Player.App.Features.InterfaceSettings;
@@ -65,6 +66,7 @@ public static class MauiProgram
 		builder.Services.AddMediaSession();
 		builder.Services.AddPictureInPicture();
 		builder.Services.AddMediaService();
+		builder.Services.AddFileOps();
 
 		return builder.Build();
 	}
