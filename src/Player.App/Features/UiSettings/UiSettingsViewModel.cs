@@ -73,6 +73,25 @@ public sealed partial class UiSettingsViewModel : ObservableObject
 
     public async Task LoadAsync()
     {
+        await _saveGate.WaitAsync();
+        try
+        {
+            await PopulateAsync();
+            ErrorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _saveGate.Release();
+        }
+    }
+
+    // Reads the stored record and shows it. Callers hold the save gate.
+    private async Task PopulateAsync()
+    {
         _loading = true;
         try
         {
@@ -86,31 +105,31 @@ public sealed partial class UiSettingsViewModel : ObservableObject
             ShowPath = settings.ExplorerFields.HasFlag(ExplorerInfoFields.Path);
             NewTagDays = settings.NewTagDays;
         }
-        catch (Exception ex)
-        {
-            ErrorMessage = ex.Message;
-        }
         finally
         {
             _loading = false;
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private Task SaveHudAutoHide()
     {
         // Snap the slider to the value that is saved, so the thumb shows the stored number.
-        var seconds = ClampRound(HudAutoHideSeconds, HudMinSeconds, HudMaxSeconds);
-        HudAutoHideSeconds = seconds;
-        return SaveAsync(current => current with { HudAutoHideSeconds = seconds });
+        HudAutoHideSeconds = ClampRound(HudAutoHideSeconds, HudMinSeconds, HudMaxSeconds);
+        return SaveAsync(current => current with
+        {
+            HudAutoHideSeconds = ClampRound(HudAutoHideSeconds, HudMinSeconds, HudMaxSeconds),
+        });
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private Task SaveNewTagDays()
     {
-        var days = ClampRound(NewTagDays, NewTagMinDays, NewTagMaxDays);
-        NewTagDays = days;
-        return SaveAsync(current => current with { NewTagDays = days });
+        NewTagDays = ClampRound(NewTagDays, NewTagMinDays, NewTagMaxDays);
+        return SaveAsync(current => current with
+        {
+            NewTagDays = ClampRound(NewTagDays, NewTagMinDays, NewTagMaxDays),
+        });
     }
 
     partial void OnShowClockChanged(bool value)
@@ -156,6 +175,17 @@ public sealed partial class UiSettingsViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+
+            // Show the stored values again, so the page does not keep a value that was not saved.
+            // The save error stays visible if the reload fails too.
+            try
+            {
+                await PopulateAsync();
+            }
+            catch (Exception)
+            {
+                // The save error above stays visible.
+            }
         }
         finally
         {
@@ -164,5 +194,5 @@ public sealed partial class UiSettingsViewModel : ObservableObject
     }
 
     private static int ClampRound(double value, int min, int max) =>
-        Math.Clamp((int)Math.Round(value), min, max);
+        Math.Clamp((int)Math.Round(value, MidpointRounding.AwayFromZero), min, max);
 }

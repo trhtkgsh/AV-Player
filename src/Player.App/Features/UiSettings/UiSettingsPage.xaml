@@ -9,9 +9,9 @@
     <ScrollView>
         <VerticalStackLayout Padding="16" Spacing="8">
 
-            <Label Text="Player" Style="{StaticResource LabelMuted}" />
+            <Label Text="Player" Style="{StaticResource LabelSection}" />
 
-            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="*,Auto">
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
                 <Label Grid.Column="0" Text="Hide the controls after" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="{Binding HudAutoHideText}" VerticalOptions="Center" />
             </Grid>
@@ -19,36 +19,36 @@
                     Value="{Binding HudAutoHideSeconds, Mode=TwoWay}"
                     DragCompletedCommand="{Binding SaveHudAutoHideCommand}" />
 
-            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="*,Auto">
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
                 <Label Grid.Column="0" Text="Show the clock" VerticalOptions="Center" />
                 <Switch Grid.Column="1" IsToggled="{Binding ShowClock, Mode=TwoWay}" />
             </Grid>
 
-            <Label Text="File list" Style="{StaticResource LabelMuted}" Margin="0,16,0,0" />
+            <Label Text="File list" Style="{StaticResource LabelSection}" Margin="0,16,0,0" />
 
             <Label Text="Details shown for each file" />
-            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*">
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="Auto,*">
                 <CheckBox Grid.Column="0" IsChecked="{Binding ShowDuration, Mode=TwoWay}" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="Duration" VerticalOptions="Center" />
             </Grid>
-            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*">
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="Auto,*">
                 <CheckBox Grid.Column="0" IsChecked="{Binding ShowResolution, Mode=TwoWay}" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="Resolution" VerticalOptions="Center" />
             </Grid>
-            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*">
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="Auto,*">
                 <CheckBox Grid.Column="0" IsChecked="{Binding ShowSize, Mode=TwoWay}" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="Size" VerticalOptions="Center" />
             </Grid>
-            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*">
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="Auto,*">
                 <CheckBox Grid.Column="0" IsChecked="{Binding ShowDate, Mode=TwoWay}" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="Date" VerticalOptions="Center" />
             </Grid>
-            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*">
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="Auto,*">
                 <CheckBox Grid.Column="0" IsChecked="{Binding ShowPath, Mode=TwoWay}" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="Folder path" VerticalOptions="Center" />
             </Grid>
 
-            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="*,Auto">
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
                 <Label Grid.Column="0" Text="Mark files as new for" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="{Binding NewTagDaysText}" VerticalOptions="Center" />
             </Grid>

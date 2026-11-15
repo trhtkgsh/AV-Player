@@ -12,7 +12,9 @@
 
 **Inputs.** docs/specs/03, docs/specs/07 (token keys), docs/CONTRACTS.md.
 
-**Deliverables.** `SpeedSheet`, `RepeatSheet`, `AudioSheet`, `SubtitleSheet`, `SubtitleStyleSheet` with one ViewModel each, `AddPlaybackSettings()` DI extension that registers the routes `player/speed`, `player/repeat`, `player/audio`, `player/subtitles`, `player/subtitle-style`.
+**Deliverables.** `SpeedSheet`, `RepeatSheet`, `AudioSheet`, `SubtitleSheet`, `SubtitleStyleSheet` with one ViewModel each, `AddPlaybackSettings()` DI extension that registers the routes `player-speed`, `player-repeat`, `player-audio`, `player-subtitles`, `player-subtitle-style`.
+
+**Decisions made in Phase 2 (they win over the steps below).** Route names are flat (no `/`). A sheet is a modal `ContentPage` with a transparent background, a tap area that closes it and a bottom panel on `ColorHudBackground` (verified see-through over the video, SPIKE finding 18). The current values come from the engine (`CurrentAudioTrackId`, `CurrentSubtitleTrackId`, `AudioDelayMs`, `SubtitleDelayMs`, `SubtitleStyle`, `TracksChanged`). Point A of an A-B range lives in a singleton `AbRepeatDraft`, so it survives closing the sheet. Sidecar files are listed by name from `ISubtitleService.FindSidecarsAsync` (`SubtitleFile` records). A style change restarts the playback (SPIKE finding 14), so the style sheet applies it 500 ms after the last change. Step buttons use `[RelayCommand(AllowConcurrentExecutions = true)]`.
 
 **Steps.**
 1. Each sheet is a modal page that keeps the video visible behind a translucent panel (`ColorHudBackground`).

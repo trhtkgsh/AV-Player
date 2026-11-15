@@ -12,7 +12,9 @@
 
 **Inputs.** docs/specs/06, docs/ARCHITECTURE.md section 4 (`settings` row `ui_settings`), docs/specs/07 (token keys), docs/CONTRACTS.md.
 
-**Deliverables.** `UiSettingsStore` (Player.Data), `UiSettingsPage` + ViewModel, `SettingsHomePage` (a plain list linking to the settings routes `settings/defaults`, `settings/ui`, `settings/theme`), `AddUiSettings()` DI extension (in Player.Data) and `AddUiSettingsUi()` (in the feature folder) that registers the routes `settings` and `settings/ui`.
+**Deliverables.** `UiSettingsStore` (Player.Data), `UiSettingsPage` + ViewModel, `SettingsHomePage` (a plain list linking to the settings routes `settings-defaults`, `settings-ui`, and from Phase 3 `settings-theme`), `AddUiSettings()` DI extension (in Player.Data) and `AddUiSettingsUi()` (in the feature folder) that registers the routes `settings` and `settings-ui`.
+
+**Decisions made in Phase 2 (they win over the steps below).** Route names are flat (no `/`). Namespaces: `Player.Data.UiSettingsStorage` and `Player.App.Features.InterfaceSettings`, because a namespace named like the model type hides it. The store reads and writes a private DTO with nullable fields and merges it onto `new UiSettings()`: the JSON source generator would reset missing fields. The page does not show `SkipSeconds` and `ShowBattery` until Phase 3; it keeps their stored values. Steppers are replaced by sliders that save on release.
 
 **Steps.**
 1. `GetAsync`: read the row with key `ui_settings`, deserialize with System.Text.Json, return `new UiSettings()` when missing or invalid. Cache the value in memory after the first read.

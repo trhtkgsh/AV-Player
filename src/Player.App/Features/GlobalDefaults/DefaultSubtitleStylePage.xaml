@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="Player.App.Features.DefaultsSettings.DefaultSubtitleStylePage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:Player.App.Features.DefaultsSettings"
+             x:DataType="local:DefaultSubtitleStyleViewModel"
+             Title="Subtitle style">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="8">
+
+            <Label Text="Applies to text subtitles (for example .srt). Subtitles in the ASS format keep their own style."
+                   Style="{StaticResource LabelMuted}" />
+
+            <Label Text="Text size" />
+            <HorizontalStackLayout Spacing="8">
+                <Label Text="{Binding FontScaleText}" VerticalOptions="Center" />
+                <Button Text="Smaller" Style="{StaticResource ButtonQuiet}" Command="{Binding FontScaleDownCommand}" />
+                <Button Text="Larger" Style="{StaticResource ButtonQuiet}" Command="{Binding FontScaleUpCommand}" />
+            </HorizontalStackLayout>
+
+            <Label Text="Text color" />
+            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding TextColors}" Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="local:ColorSwatch">
+                        <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 8"
+                                BackgroundColor="{Binding Color}" Stroke="{DynamicResource ColorDivider}"
+                                StrokeThickness="1" SemanticProperties.Description="{Binding Name}">
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                    <Setter Property="Stroke" Value="{DynamicResource ColorAccent}" />
+                                    <Setter Property="StrokeThickness" Value="3" />
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding SelectTextColorCommand, Source={RelativeSource AncestorType={x:Type local:DefaultSubtitleStyleViewModel}}, x:DataType=local:DefaultSubtitleStyleViewModel}"
+                                    CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </HorizontalStackLayout>
+
+            <Label Text="Outline color" />
+            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding OutlineColors}" Spacing="10">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="local:ColorSwatch">
+                        <Border WidthRequest="40" HeightRequest="40" StrokeShape="RoundRectangle 8"
+                                BackgroundColor="{Binding Color}" Stroke="{DynamicResource ColorDivider}"
+                                StrokeThickness="1" SemanticProperties.Description="{Binding Name}">
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                    <Setter Property="Stroke" Value="{DynamicResource ColorAccent}" />
+                                    <Setter Property="StrokeThickness" Value="3" />
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer
+                                    Command="{Binding SelectOutlineColorCommand, Source={RelativeSource AncestorType={x:Type local:DefaultSubtitleStyleViewModel}}, x:DataType=local:DefaultSubtitleStyleViewModel}"
+                                    CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </HorizontalStackLayout>
+
+            <Label Text="Outline thickness" />
+            <HorizontalStackLayout Spacing="8">
+                <Label Text="{Binding OutlineThicknessText}" VerticalOptions="Center" />
+                <Button Text="Thinner" Style="{StaticResource ButtonQuiet}" Command="{Binding OutlineThinnerCommand}" />
+                <Button Text="Thicker" Style="{StaticResource ButtonQuiet}" Command="{Binding OutlineThickerCommand}" />
+            </HorizontalStackLayout>
+
+            <Label Text="Background" />
+            <HorizontalStackLayout Spacing="8">
+                <Label Text="{Binding BackgroundOpacityText}" VerticalOptions="Center" />
+                <Button Text="Lighter" Style="{StaticResource ButtonQuiet}" Command="{Binding BackgroundLighterCommand}" />
+                <Button Text="Darker" Style="{StaticResource ButtonQuiet}" Command="{Binding BackgroundDarkerCommand}" />
+            </HorizontalStackLayout>
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="Bold" VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding Bold, Mode=TwoWay}" />
+            </Grid>
+
+            <Label Text="Distance from the bottom" />
+            <HorizontalStackLayout Spacing="8">
+                <Label Text="{Binding BottomMarginText}" VerticalOptions="Center" />
+                <Button Text="Lower" Style="{StaticResource ButtonQuiet}" Command="{Binding BottomMarginLowerCommand}" />
+                <Button Text="Higher" Style="{StaticResource ButtonQuiet}" Command="{Binding BottomMarginHigherCommand}" />
+            </HorizontalStackLayout>
+
+            <Button Text="Reset style" Style="{StaticResource ButtonQuiet}" Command="{Binding ResetStyleCommand}" />
+
+            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
+                   TextColor="{DynamicResource ColorDanger}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

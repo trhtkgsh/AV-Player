@@ -22,7 +22,7 @@ internal static class SubtitleFileStore
     /// <summary>Writes the UTF-8 copy under a stable name from the source key, or from the text when there is no key.</summary>
     public static string Write(string text, string? sourceKey, string extension)
     {
-        var key = sourceKey ?? "content:" + text;
+        var key = "v2|" + (sourceKey ?? "content:" + text); // bump the version when the decoding rules change
         var name = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)), 0, 8).ToLowerInvariant() + extension;
         Directory.CreateDirectory(Folder);
         var path = Path.Combine(Folder, name);
