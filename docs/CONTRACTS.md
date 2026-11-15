@@ -7,6 +7,9 @@ Changes after the freeze (orchestrator only, each one logged in PROGRESS.md):
 - 2026-11-15, Phase 2: `IPlayerEngine` gained `TracksChanged`, `CurrentAudioTrackId`, `CurrentSubtitleTrackId`,
   `AudioDelayMs`, `SubtitleDelayMs` and `SubtitleStyle`. The in-player settings sheets need the values in effect, and
   the engine is the only place that knows them (a track picked by LibVLC itself is in no store). Additions only.
+- 2026-11-15, Phase 2: `ISubtitleService.FindSidecarsAsync` returns `SubtitleFile` records (content URI, file name,
+  language suffix) instead of bare URI strings. The subtitle sheet lists the files, and a content URI has no name.
+  The only implementation and the only caller were written in the same phase.
 
 Namespaces: `Player.Core.Models`, `Player.Core.Contracts`. All types are public. Nullable enabled.
 
@@ -53,6 +56,8 @@ public sealed record MediaMetadata(MediaFileId Id, long DurationMs, int Width, i
 public sealed record MediaQuery(long? BucketId, MediaKind? Kind);
 
 public sealed record TrackInfo(int Id, string Name, string? Language);
+
+public sealed record SubtitleFile(string ContentUri, string DisplayName, string? Language);   // a subtitle file next to a media file
 
 public sealed record SubtitleStyle(
     double FontScale, uint TextColorArgb, uint OutlineColorArgb, int OutlineThickness,
@@ -293,7 +298,7 @@ public interface IThemeService
 // --- Subtitles and audio tracks (subtitles-audio). Policy on top of the engine primitives.
 public interface ISubtitleService
 {
-    Task<IReadOnlyList<string>> FindSidecarsAsync(MediaItem item, CancellationToken ct);   // content URIs
+    Task<IReadOnlyList<SubtitleFile>> FindSidecarsAsync(MediaItem item, CancellationToken ct);   // best match first
     Task<bool> LoadExternalAsync(string contentUri, CancellationToken ct);
     Task<bool> PickAndLoadAsync(CancellationToken ct);                                      // system file picker
     Task ApplyPreferredTracksAsync(GlobalDefaults defaults, CancellationToken ct);
