@@ -283,8 +283,10 @@ public sealed partial class VlcPlayerEngine
             // file is opened: its decoder then begins on a key frame. An input started with :no-video
             // cannot select a video track at all, and selecting the track again in mid-stream gave a
             // broken picture for seconds on a phone (the decoder began between two key frames).
+            // While paused the last published position is used: LibVLC can still report the time from
+            // before a seek that was issued a moment ago (during a seek drag: the key frame before it).
             if (_item!.Kind == MediaKind.Video)
-                Start(CurrentPositionMs);
+                Start(_pauseRequested ? _positionMs : CurrentPositionMs);
         }
     }
 
