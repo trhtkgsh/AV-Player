@@ -25,6 +25,9 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
     // True while LoadAsync copies the stored record into the properties: no property change saves then.
     private bool _loading;
 
+    // Saves run one at a time: each one reads the stored record, changes one field and writes it back.
+    private readonly SemaphoreSlim _saveGate = new(1, 1);
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SpeedText))]
     private double _speed = 1.0;
@@ -81,7 +84,7 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
 
     public string SubtitleDelayText => FormatDelay(SubtitleDelayMs);
 
-    /// <summary>Copies the stored defaults into the page. Throws when the store fails.</summary>
+    /// <summary>Copies the stored defaults into the page. Store failures are shown in <see cref="ErrorMessage"/>.</summary>
     public async Task LoadAsync()
     {
         _loading = true;
@@ -100,6 +103,10 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
             SubtitlesEnabled = stored.SubtitlesEnabled;
             PreferredSubtitleLanguage = stored.PreferredSubtitleLanguage ?? string.Empty;
             SubtitleDelayMs = stored.SubtitleDelayMs;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
         }
         finally
         {
@@ -184,11 +191,14 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private Task SaveSpeed()
+    private async Task SaveSpeed()
     {
         var speed = RoundSpeed(Speed);
         Speed = speed;
-        return SaveAsync(d => d with { Speed = (float)speed });
+        await SaveAsync(d => d with { Speed = (float)speed });
+
+        // The thumb shows the value that was stored. Speed has no change-triggered save, so this does not save again.
+        Speed = (float)speed;
     }
 
     [RelayCommand]
@@ -289,6 +299,7 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
     // Every save starts from the stored record, so fields this page does not show are preserved.
     private async Task SaveAsync(Func<GlobalDefaults, GlobalDefaults> change)
     {
+        await _saveGate.WaitAsync(CancellationToken.None);
         try
         {
             var current = await _store.GetAsync(CancellationToken.None);
@@ -298,6 +309,10 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _saveGate.Release();
         }
     }
 
