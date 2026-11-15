@@ -2,17 +2,27 @@
 <ContentPage x:Class="Player.App.Features.InterfaceSettings.UiSettingsPage"
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:loc="clr-namespace:Player.App.Localization"
              xmlns:vm="clr-namespace:Player.App.Features.InterfaceSettings"
              x:DataType="vm:UiSettingsViewModel"
-             Title="Interface">
+             Title="{loc:T Interface.Title}">
 
     <ScrollView>
         <VerticalStackLayout Padding="16" Spacing="8">
 
-            <Label Text="Player" Style="{StaticResource LabelSection}" />
+            <Label Text="{loc:T Interface.Language}" Style="{StaticResource LabelSection}" />
+
+            <RadioButton Content="{loc:T Common.Language.System}" GroupName="Language"
+                         IsChecked="{Binding IsLanguageSystem, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Common.Language.English}" GroupName="Language"
+                         IsChecked="{Binding IsLanguageEnglish, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Common.Language.Hebrew}" GroupName="Language"
+                         IsChecked="{Binding IsLanguageHebrew, Mode=TwoWay}" />
+
+            <Label Text="{loc:T Interface.Player}" Style="{StaticResource LabelSection}" Margin="0,16,0,0" />
 
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
-                <Label Grid.Column="0" Text="Hide the controls after" VerticalOptions="Center" />
+                <Label Grid.Column="0" Text="{loc:T Interface.HideControlsAfter}" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="{Binding HudAutoHideText}" VerticalOptions="Center" />
             </Grid>
             <Slider Minimum="1" Maximum="10"
@@ -20,36 +30,48 @@
                     DragCompletedCommand="{Binding SaveHudAutoHideCommand}" />
 
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
-                <Label Grid.Column="0" Text="Show the clock" VerticalOptions="Center" />
+                <Label Grid.Column="0" Text="{loc:T Interface.SkipLength}" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding SkipLengthText}" VerticalOptions="Center" />
+            </Grid>
+            <Slider Minimum="0" Maximum="4"
+                    Value="{Binding SkipIndex, Mode=TwoWay}"
+                    DragCompletedCommand="{Binding SaveSkipLengthCommand}" />
+
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{loc:T Interface.ShowClock}" VerticalOptions="Center" />
                 <Switch Grid.Column="1" IsToggled="{Binding ShowClock, Mode=TwoWay}" />
             </Grid>
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{loc:T Interface.ShowBattery}" VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding ShowBattery, Mode=TwoWay}" />
+            </Grid>
 
-            <Label Text="File list" Style="{StaticResource LabelSection}" Margin="0,16,0,0" />
+            <Label Text="{loc:T Interface.FileList}" Style="{StaticResource LabelSection}" Margin="0,16,0,0" />
 
-            <Label Text="Details shown for each file" />
+            <Label Text="{loc:T Interface.DetailsShown}" />
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="Auto,*">
                 <CheckBox Grid.Column="0" IsChecked="{Binding ShowDuration, Mode=TwoWay}" VerticalOptions="Center" />
-                <Label Grid.Column="1" Text="Duration" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{loc:T Interface.Duration}" VerticalOptions="Center" />
             </Grid>
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="Auto,*">
                 <CheckBox Grid.Column="0" IsChecked="{Binding ShowResolution, Mode=TwoWay}" VerticalOptions="Center" />
-                <Label Grid.Column="1" Text="Resolution" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{loc:T Interface.Resolution}" VerticalOptions="Center" />
             </Grid>
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="Auto,*">
                 <CheckBox Grid.Column="0" IsChecked="{Binding ShowSize, Mode=TwoWay}" VerticalOptions="Center" />
-                <Label Grid.Column="1" Text="Size" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{loc:T Interface.Size}" VerticalOptions="Center" />
             </Grid>
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="Auto,*">
                 <CheckBox Grid.Column="0" IsChecked="{Binding ShowDate, Mode=TwoWay}" VerticalOptions="Center" />
-                <Label Grid.Column="1" Text="Date" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{loc:T Interface.Date}" VerticalOptions="Center" />
             </Grid>
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="Auto,*">
                 <CheckBox Grid.Column="0" IsChecked="{Binding ShowPath, Mode=TwoWay}" VerticalOptions="Center" />
-                <Label Grid.Column="1" Text="Folder path" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{loc:T Interface.FolderPath}" VerticalOptions="Center" />
             </Grid>
 
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
-                <Label Grid.Column="0" Text="Mark files as new for" VerticalOptions="Center" />
+                <Label Grid.Column="0" Text="{loc:T Interface.MarkNewFor}" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="{Binding NewTagDaysText}" VerticalOptions="Center" />
             </Grid>
             <Slider Minimum="1" Maximum="30"

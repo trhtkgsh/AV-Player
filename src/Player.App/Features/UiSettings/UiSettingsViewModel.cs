@@ -16,7 +16,11 @@ public sealed partial class UiSettingsViewModel : ObservableObject
     private const int NewTagMinDays = 1;
     private const int NewTagMaxDays = 30;
 
+    // The values of the skip length slider, in seconds, ascending.
+    private static readonly int[] SkipOptions = [5, 10, 15, 30, 60];
+
     private readonly IUiSettingsStore _store;
+    private readonly ILocalizer _localizer;
 
     // Saves are serialized: each one reads the stored record, so two overlapping saves would drop a change.
     private readonly SemaphoreSlim _saveGate = new(1, 1);
@@ -32,7 +36,23 @@ public sealed partial class UiSettingsViewModel : ObservableObject
     private double _newTagDays = 7;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SkipLengthText))]
+    private double _skipIndex;
+
+    [ObservableProperty]
     private bool _showClock;
+
+    [ObservableProperty]
+    private bool _showBattery;
+
+    [ObservableProperty]
+    private bool _isLanguageSystem;
+
+    [ObservableProperty]
+    private bool _isLanguageEnglish;
+
+    [ObservableProperty]
+    private bool _isLanguageHebrew;
 
     [ObservableProperty]
     private bool _showDuration;
@@ -53,23 +73,42 @@ public sealed partial class UiSettingsViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasError))]
     private string? _errorMessage;
 
-    public UiSettingsViewModel(IUiSettingsStore store)
+    public UiSettingsViewModel(IUiSettingsStore store, ILocalizer localizer)
     {
         _store = store;
+        _localizer = localizer;
     }
 
-    public string HudAutoHideText => $"{ClampRound(HudAutoHideSeconds, HudMinSeconds, HudMaxSeconds)} s";
+    public string HudAutoHideText =>
+        _localizer.Format("Interface.SecondsShort", ClampRound(HudAutoHideSeconds, HudMinSeconds, HudMaxSeconds));
 
-    public string NewTagDaysText
-    {
-        get
-        {
-            var days = ClampRound(NewTagDays, NewTagMinDays, NewTagMaxDays);
-            return days == 1 ? "1 day" : $"{days} days";
-        }
-    }
+    public string SkipLengthText =>
+        _localizer.Format("Interface.Seconds", SkipOptions[ClampRound(SkipIndex, 0, SkipOptions.Length - 1)]);
+
+    public string NewTagDaysText =>
+        _localizer.Plural("Interface.Days", ClampRound(NewTagDays, NewTagMinDays, NewTagMaxDays));
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+
+    /// <summary>Called when the page appears: follows language changes and refreshes the texts built in code.</summary>
+    public void Attach()
+    {
+        _localizer.Changed -= OnLocalizerChanged;
+        _localizer.Changed += OnLocalizerChanged;
+        RaiseBuiltTexts();
+    }
+
+    /// <summary>Called when the page disappears: stops following language changes.</summary>
+    public void Detach() => _localizer.Changed -= OnLocalizerChanged;
+
+    private void OnLocalizerChanged(object? sender, EventArgs e) => RaiseBuiltTexts();
+
+    private void RaiseBuiltTexts()
+    {
+        OnPropertyChanged(nameof(HudAutoHideText));
+        OnPropertyChanged(nameof(SkipLengthText));
+        OnPropertyChanged(nameof(NewTagDaysText));
+    }
 
     public async Task LoadAsync()
     {
@@ -104,6 +143,11 @@ public sealed partial class UiSettingsViewModel : ObservableObject
             ShowDate = settings.ExplorerFields.HasFlag(ExplorerInfoFields.Date);
             ShowPath = settings.ExplorerFields.HasFlag(ExplorerInfoFields.Path);
             NewTagDays = settings.NewTagDays;
+            SkipIndex = NearestSkipIndex(settings.SkipSeconds);
+            ShowBattery = settings.ShowBattery;
+            IsLanguageSystem = settings.Language == AppLanguage.System;
+            IsLanguageEnglish = settings.Language == AppLanguage.English;
+            IsLanguageHebrew = settings.Language == AppLanguage.Hebrew;
         }
         finally
         {
@@ -132,12 +176,48 @@ public sealed partial class UiSettingsViewModel : ObservableObject
         });
     }
 
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task SaveSkipLength()
+    {
+        // Snap the slider to the value that is saved, so the thumb shows the stored number.
+        SkipIndex = ClampRound(SkipIndex, 0, SkipOptions.Length - 1);
+        return SaveAsync(current => current with
+        {
+            SkipSeconds = SkipOptions[ClampRound(SkipIndex, 0, SkipOptions.Length - 1)],
+        });
+    }
+
     partial void OnShowClockChanged(bool value)
     {
         if (!_loading)
         {
             _ = SaveAsync(current => current with { ShowClock = value });
         }
+    }
+
+    partial void OnShowBatteryChanged(bool value)
+    {
+        if (!_loading)
+        {
+            _ = SaveAsync(current => current with { ShowBattery = value });
+        }
+    }
+
+    partial void OnIsLanguageSystemChanged(bool value) => SaveLanguage(value, AppLanguage.System);
+
+    partial void OnIsLanguageEnglishChanged(bool value) => SaveLanguage(value, AppLanguage.English);
+
+    partial void OnIsLanguageHebrewChanged(bool value) => SaveLanguage(value, AppLanguage.Hebrew);
+
+    // A radio button that is switched off is ignored: the newly checked one saves.
+    private void SaveLanguage(bool isChosen, AppLanguage language)
+    {
+        if (_loading || !isChosen)
+        {
+            return;
+        }
+
+        _ = SaveAsync(current => current with { Language = language });
     }
 
     partial void OnShowDurationChanged(bool value) => SaveExplorerField(ExplorerInfoFields.Duration, value);
@@ -191,6 +271,21 @@ public sealed partial class UiSettingsViewModel : ObservableObject
         {
             _saveGate.Release();
         }
+    }
+
+    // The index of the skip option nearest to the stored value; on a tie the shorter one.
+    private static double NearestSkipIndex(int seconds)
+    {
+        var nearest = 0;
+        for (var i = 1; i < SkipOptions.Length; i++)
+        {
+            if (Math.Abs(SkipOptions[i] - seconds) < Math.Abs(SkipOptions[nearest] - seconds))
+            {
+                nearest = i;
+            }
+        }
+
+        return nearest;
     }
 
     private static int ClampRound(double value, int min, int max) =>
