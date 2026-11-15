@@ -51,17 +51,14 @@
 
             <Label Text="{loc:T Defaults.Background}" Style="{StaticResource LabelSection}" />
 
-            <Grid ColumnDefinitions="*,Auto">
-                <Label Text="{loc:T Defaults.BackgroundAudio}" VerticalOptions="Center" />
-                <Switch Grid.Column="1" IsToggled="{Binding BackgroundAudio, Mode=TwoWay}" />
-            </Grid>
-            <Label Text="{loc:T Defaults.BackgroundAudio.Detail}" Style="{StaticResource LabelMuted}" />
-
-            <Grid ColumnDefinitions="*,Auto">
-                <Label Text="{loc:T Defaults.PictureInPicture}" VerticalOptions="Center" />
-                <Switch Grid.Column="1" IsToggled="{Binding PictureInPictureOnLeave, Mode=TwoWay}" />
-            </Grid>
-            <Label Text="{loc:T Defaults.PictureInPicture.Detail}" Style="{StaticResource LabelMuted}" />
+            <Label Text="{loc:T Defaults.LeaveChoice}" />
+            <RadioButton Content="{loc:T Defaults.LeaveChoice.Window}" GroupName="LeaveChoice"
+                         IsChecked="{Binding IsLeaveWindow, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Defaults.LeaveChoice.Sound}" GroupName="LeaveChoice"
+                         IsChecked="{Binding IsLeaveSound, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Defaults.LeaveChoice.Pause}" GroupName="LeaveChoice"
+                         IsChecked="{Binding IsLeavePause, Mode=TwoWay}" />
+            <Label Text="{loc:T Defaults.LeaveChoice.Hint}" Style="{StaticResource LabelMuted}" />
 
             <Label Text="{loc:T Defaults.Audio}" Style="{StaticResource LabelSection}" />
 
