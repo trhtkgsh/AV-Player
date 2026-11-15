@@ -8,7 +8,11 @@ using Player.App.Surface;
 using Player.App.Theming;
 using Player.Core.Contracts;
 using Player.Core.Logic.Playback;
+using Player.Core.Logic.StateRecording;
 using Player.Data.Database;
+using Player.Data.GlobalDefaultsStorage;
+using Player.Data.PlaybackStateStorage;
+using Player.Data.UiSettingsStorage;
 using Microsoft.Maui.Storage;
 
 namespace Player.App;
@@ -29,6 +33,10 @@ public static class MauiProgram
 
 		builder.Services.AddPlayerDatabase(Path.Combine(FileSystem.AppDataDirectory, "player.db3"));
 		builder.Services.AddAppInfrastructure();
+		builder.Services.AddPlaybackStateStore();
+		builder.Services.AddGlobalDefaults();
+		builder.Services.AddUiSettings();
+		builder.Services.AddSingleton<IPlaybackStateRecorder, PlaybackStateRecorder>();
 		builder.Services.AddPlayerEngine();
 		builder.Services.AddMediaLibrary();
 		builder.Services.AddThumbnailCache();
