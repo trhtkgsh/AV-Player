@@ -103,6 +103,17 @@ public sealed partial class ItemsViewModel
             await ApplyFileResultAsync(result, "Explorer.RenameFailed", ct, updated =>
             {
                 _items = MediaListEdits.Replace(_items, item.Id, updated);
+                // Keep the row's state on screen under the new id until the next reload.
+                if (_states.Remove(item.Id, out var state))
+                {
+                    _states[updated.Id] = state;
+                }
+
+                if (_metadata.Remove(item.Id, out var metadata))
+                {
+                    _metadata[updated.Id] = metadata;
+                }
+
                 RebuildRows();
             });
             return;
@@ -131,6 +142,8 @@ public sealed partial class ItemsViewModel
         await ApplyFileResultAsync(result, "Explorer.DeleteFailed", ct, _ =>
         {
             _items = MediaListEdits.Remove(_items, item.Id);
+            _states.Remove(item.Id);
+            _metadata.Remove(item.Id);
             RebuildRows();
         });
     }

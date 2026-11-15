@@ -50,7 +50,8 @@
 - Delete wording: "Move {0} to the trash?" on Android 11 and later, otherwise "Delete {0}?" (`DeviceInfo`, so no Android types in the module).
 - Success updates the list in place (`MediaListEdits`), with no reload. Cancelled does nothing; Denied and Failed show a short message with the error.
 - If the file is the one in playback (including background audio or PiP), playback is closed through `IPlaybackCoordinator.CloseAsync` before the operation.
-- Per-file state and metadata are keyed by `MediaFileId` (includes date-modified), so a rename orphans them. Not migrated here; decision for the orchestrator.
+- Per-file state and metadata are keyed by `MediaFileId` (includes date-modified). The file-ops task moves the saved state to the new id on rename and deletes it on trash. The view model re-keys its in-memory `_states` and `_metadata` entries the same way (P5-21), so the row keeps its thumbnail, duration and progress until the next reload.
+- Known gap (accepted): the coordinator's queue can still hold a renamed or deleted item; a later Next may use the stale item. Left alone, no coordinator change.
 
 **Out of scope.** MediaStore access, thumbnail decoding, file operations, the player page, settings pages.
 
