@@ -41,6 +41,8 @@ public sealed class PlayerGestureHandler
     private bool _horizontalActive;
     private bool _pinchActive;
     private bool _panActive;
+    private bool _longPressActive;
+    private float? _longPressRestoreSpeed; // set while a long press plays faster; the speed to return to
     private int _lastBrightnessPercent = -1;
     private ViewTransform _zoomStart = new(1, 0, 0);
     private ViewTransform _panStart = new(1, 0, 0);
@@ -71,7 +73,8 @@ public sealed class PlayerGestureHandler
     {
         _gestures.Gesture -= OnGesture;
         if (_horizontalActive) EndSeek(_seeking ? _seekStart : null); // a drag cut off by Detach counts as cancelled
-        _verticalActive = _horizontalActive = _pinchActive = _panActive = false; // a gesture cut off by Detach is over
+        RestoreSpeed();
+        _verticalActive = _horizontalActive = _pinchActive = _panActive = _longPressActive = false; // a gesture cut off by Detach is over
         _osd.Hide();
     }
 
@@ -96,6 +99,9 @@ public sealed class PlayerGestureHandler
                 break;
             case GestureKind.Pan:
                 if (Admit(ref _panActive, e.Phase)) Guard(nameof(Pan), () => Pan(e));
+                break;
+            case GestureKind.LongPress:
+                if (Admit(ref _longPressActive, e.Phase)) Guard(nameof(LongPress), () => LongPress(e));
                 break;
             default:
                 break;
@@ -214,6 +220,41 @@ public sealed class PlayerGestureHandler
                 EndSeek(_seeking ? _seekStart : null); // the picture returns to the start position
                 break;
         }
+    }
+
+    /// <summary>
+    /// Holding still plays at <see cref="UiSettings.LongPressSpeed"/> until the finger lifts. Only while playing.
+    /// The file's saved speed is not touched: nothing is recorded, and the speed from before comes back.
+    /// </summary>
+    private void LongPress(GestureEvent e)
+    {
+        switch (e.Phase)
+        {
+            case GesturePhase.Began:
+                var snapshot = _engine.Snapshot;
+                if (snapshot.Status != PlayerStatus.Playing) return;
+
+                float speed = _settings().LongPressSpeed;
+                _longPressRestoreSpeed = snapshot.Speed;
+                Fire(() => _engine.SetSpeedAsync(speed, CancellationToken.None));
+                _osd.Hold(_localizer.Format("Player.Osd.Speed", speed.ToString("0.0#", CultureInfo.InvariantCulture)));
+                break;
+
+            case GesturePhase.Ended:
+            case GesturePhase.Cancelled:
+                RestoreSpeed();
+                break;
+        }
+    }
+
+    /// <summary>Returns to the speed from before a long press. Does nothing when no long press changed it.</summary>
+    private void RestoreSpeed()
+    {
+        if (_longPressRestoreSpeed is not float restore) return;
+
+        _longPressRestoreSpeed = null;
+        Fire(() => _engine.SetSpeedAsync(restore, CancellationToken.None));
+        _osd.Release();
     }
 
     private void Pinch(GestureEvent e)

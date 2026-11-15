@@ -25,6 +25,7 @@ internal sealed class PlayerStrings : IStringSource
         ["Player.Next"] = new("Next", "הבא"),
         ["Player.Osd.Brightness"] = new("Brightness {0}%", "בהירות {0}%"),
         ["Player.Osd.Seconds"] = new("{0} s", "{0} שנ'"),
+        ["Player.Osd.Speed"] = new("Speed {0}x", "מהירות {0}x"),
         ["Player.Osd.Volume"] = new("Volume {0}%", "עוצמת קול {0}%"),
         ["Player.Osd.Zoom"] = new("Zoom {0}%", "זום {0}%"),
         ["Player.Pause"] = new("Pause", "השהה"),
