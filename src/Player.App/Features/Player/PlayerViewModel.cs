@@ -497,9 +497,9 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     private void RestartHideTimer()
     {
-        CancelHideTimer();
-        if (!_active || IsLocked) return;
+        if (!_active || IsLocked || _menuOpen) return; // the menu's action sheet keeps the controls up
 
+        CancelHideTimer();
         var cts = new CancellationTokenSource();
         _hideCts = cts;
         _ = HideAfterDelayAsync(cts.Token);
