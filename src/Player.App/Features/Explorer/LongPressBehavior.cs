@@ -4,32 +4,35 @@ using Microsoft.Maui.Controls;
 namespace Player.App.Features.Explorer;
 
 /// <summary>
-/// A long press on a row or tile, which MAUI has no recognizer for. On Android the native view gets the
-/// <c>LongClick</c>; the row's tap recognizer and the ⋮ button keep their own touch handling.
-/// <see cref="Command"/> runs with <see cref="CommandParameter"/> when the long press happens.
+/// The tap and the long press of a row or tile. The row has no MAUI <c>TapGestureRecognizer</c>: MAUI's touch
+/// listener would take the touch stream, so the native view never got its long press. On Android the native view
+/// itself gets <c>Click</c> (runs <see cref="TapCommand"/>) and <c>LongClick</c> (runs <see cref="LongPressCommand"/>).
+/// The parameter is the row's <c>BindingContext</c>, read when the event fires, so a recycled row passes its current item.
+/// Android sends no <c>Click</c> after a <c>LongClick</c>; scrolling cancels both.
 /// </summary>
 public sealed class LongPressBehavior : Behavior
 {
-    public static readonly BindableProperty CommandProperty =
-        BindableProperty.Create(nameof(Command), typeof(ICommand), typeof(LongPressBehavior));
+    public static readonly BindableProperty TapCommandProperty =
+        BindableProperty.Create(nameof(TapCommand), typeof(ICommand), typeof(LongPressBehavior));
 
-    public static readonly BindableProperty CommandParameterProperty =
-        BindableProperty.Create(nameof(CommandParameter), typeof(object), typeof(LongPressBehavior));
+    public static readonly BindableProperty LongPressCommandProperty =
+        BindableProperty.Create(nameof(LongPressCommand), typeof(ICommand), typeof(LongPressBehavior));
 
-    public ICommand? Command
+    public ICommand? TapCommand
     {
-        get => (ICommand?)GetValue(CommandProperty);
-        set => SetValue(CommandProperty, value);
+        get => (ICommand?)GetValue(TapCommandProperty);
+        set => SetValue(TapCommandProperty, value);
     }
 
-    public object? CommandParameter
+    public ICommand? LongPressCommand
     {
-        get => GetValue(CommandParameterProperty);
-        set => SetValue(CommandParameterProperty, value);
+        get => (ICommand?)GetValue(LongPressCommandProperty);
+        set => SetValue(LongPressCommandProperty, value);
     }
 
 #if ANDROID
     private Android.Views.View? _native;
+    private VisualElement? _element;
 
     protected override void OnAttachedTo(BindableObject bindable)
     {
@@ -70,7 +73,10 @@ public sealed class LongPressBehavior : Behavior
         }
 
         _native = native;
+        _element = element;
+        native.Clickable = true;
         native.LongClickable = true;
+        native.Click += OnClick;
         native.LongClick += OnLongClick;
     }
 
@@ -81,16 +87,25 @@ public sealed class LongPressBehavior : Behavior
             return;
         }
 
+        _native.Click -= OnClick;
         _native.LongClick -= OnLongClick;
         _native.LongClickable = false;
+        _native.Clickable = false;
         _native = null;
+        _element = null;
     }
 
-    private void OnLongClick(object? sender, EventArgs e)
+    private void OnClick(object? sender, EventArgs e) => Run(TapCommand);
+
+    private void OnLongClick(object? sender, EventArgs e) => Run(LongPressCommand);
+
+    // The row's binding context is the item the row shows. Nothing runs without a row.
+    private void Run(ICommand? command)
     {
-        if (Command is { } command && command.CanExecute(CommandParameter))
+        var parameter = _element?.BindingContext;
+        if (command is not null && parameter is not null && command.CanExecute(parameter))
         {
-            command.Execute(CommandParameter);
+            command.Execute(parameter);
         }
     }
 #endif

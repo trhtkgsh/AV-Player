@@ -19,6 +19,9 @@ public partial class ItemsPage : ContentPage
         ApplyToolbar();
     }
 
+    // The rows' behaviors bind their tap and long-press commands through the page: a Behavior has no ancestor to search.
+    public ItemsViewModel ViewModel => _viewModel;
+
     // The selection mode replaces the sort and layout actions with the selection actions, and Back leaves the mode.
     private void ApplyToolbar()
     {

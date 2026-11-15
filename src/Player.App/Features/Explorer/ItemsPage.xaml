@@ -32,15 +32,11 @@
 
         <DataTemplate x:Key="ListItem" x:DataType="explorer:MediaRowViewModel">
             <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto">
-                <Grid.GestureRecognizers>
-                    <TapGestureRecognizer
-                        Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
-                        CommandParameter="{Binding .}" />
-                </Grid.GestureRecognizers>
+                <!-- The tap and the long press come from the behavior: a MAUI tap recognizer would block the long press. -->
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
-                        Command="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsViewModel}"
-                        CommandParameter="{Binding .}" />
+                        TapCommand="{Binding ViewModel.OpenCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}"
+                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}" />
                 </Grid.Behaviors>
 
                 <!-- The selected row is marked by a tint behind its content. -->
@@ -78,15 +74,10 @@
 
         <DataTemplate x:Key="GridItem" x:DataType="explorer:MediaRowViewModel">
             <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
-                <Grid.GestureRecognizers>
-                    <TapGestureRecognizer
-                        Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
-                        CommandParameter="{Binding .}" />
-                </Grid.GestureRecognizers>
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
-                        Command="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsViewModel}"
-                        CommandParameter="{Binding .}" />
+                        TapCommand="{Binding ViewModel.OpenCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}"
+                        LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}" />
                 </Grid.Behaviors>
 
                 <BoxView Grid.RowSpan="5" Color="{DynamicResource ColorAccent}" Opacity="0.2"

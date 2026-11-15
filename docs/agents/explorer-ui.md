@@ -79,3 +79,24 @@
 - App-side (not pure, for reference): `SelectionOperations` (`FilesAsync`, `ConfirmDeleteAsync`, `TrashAsync`, `MoveAsync`, `CopyAsync`, `ChooseTargetAsync`, `FailureText`); the constructor now takes `IUiSettingsStore`.
 - Texts (EN and HE, in `ExplorerStrings`): `Explorer.ChooseFolder`, `Explorer.Copy`, `Explorer.Move`, `Explorer.OperationCopy`, `Explorer.OperationMove`, `Explorer.SelectAll`, `Explorer.SelectedCount`, `Explorer.SomeNotCopied`, `Explorer.SomeNotDeleted`, `Explorer.SomeNotMoved`, `Explorer.FilesInFolders`, `Explorer.Files.One/Many`, `Explorer.OperationDelete`.
 - Not verified on a device: that `LongClick` coexists with the row's tap and the ⋮ button, and that the 600 ms guard is right. Known gap (from R7-40): queued coordinator items may keep a stale id after rename or delete.
+
+**Long press fix (2026-11-17, R7-42; it wins over the R7-41 text above on the long press and the tap).**
+- Cause: the R7-41 rows had a MAUI `TapGestureRecognizer`. MAUI installs a touch listener on the platform view that takes the touch stream, so Android's `onTouchEvent` never ran and `LongClick` never fired. The release then opened the file.
+- Fix: rows and tiles (items and folders pages, every mode) have no MAUI tap recognizer. `LongPressBehavior` (App, `#if ANDROID`) sets `Clickable` and `LongClickable` on the native view and hooks `Click` (runs `TapCommand`, i.e. `Open` or `OpenRow`) and `LongClick` (runs `LongPressCommand`, i.e. `BeginSelect`, with the row as parameter). It unhooks on detach and on handler change, since recycled rows get new native views. Android sends no `Click` after a `LongClick`, so the 600 ms tap guard was removed from both view models. The ⋮ button is a native button and takes its own clicks. Scrolling cancels both `Click` and `LongClick` on the native side.
+- Behavior properties: `TapCommand`, `LongPressCommand`, `CommandParameter` (the old `Command` is gone). Overlays that block input during a batch keep their MAUI `TapGestureRecognizer`; they are not rows.
+- Pure signatures: unchanged.
+- Not verified on a device: the user's emulator check of the long press, the tap, and the scroll.
+
+**Long press bindings (2026-11-15, R7-43; it fixes the R7-42 crash).**
+- Crash: the R7-42 behaviors bound `Source={RelativeSource AncestorType=...}`. A `Behavior` is not in the visual tree, so the ancestor search fails at start ("not a superclass of Element").
+- Also wrong in R7-41 and R7-42: `Source={x:Reference Page}` with `Path=BeginSelectCommand`. The page has no such property (the commands are on the view model), so the long-press command was null and did nothing.
+- Fix: each page exposes its view model as `ViewModel` (`ItemsPage`, `FoldersPage`). All four row and tile templates bind `TapCommand` and `LongPressCommand` through `Source={x:Reference Page}` with `Path=ViewModel.OpenCommand` (or `OpenRowCommand`, `BeginSelectCommand`). `CommandParameter` stays `{Binding .}`, the row.
+- Pure signatures: unchanged.
+- Not verified on a device: the user's emulator check that the app starts and that the long press enters the mode.
+
+**Row parameter from the view (2026-11-15, R7-44; it fixes the null parameter of R7-43).**
+- Cause: `CommandParameter="{Binding .}"` on the `Behavior` resolved to nothing, because the behavior has no `BindingContext` of its own. `OpenRow` then got null.
+- Fix: `LongPressBehavior` keeps a reference to the element it is attached to. When `Click` or `LongClick` fires, it passes that element's `BindingContext`, which is the row's current item (also right for recycled rows). The `CommandParameter` property and its XAML uses are removed. The ⋮ buttons keep their own `CommandParameter`, which is a normal button binding.
+- `Open`, `OpenRow` and `BeginSelect` (items and folders) return quietly for a null row.
+- Pure signatures: unchanged.
+- Not verified on a device: the user's emulator check that the tap opens the file and that the long press enters the mode.
