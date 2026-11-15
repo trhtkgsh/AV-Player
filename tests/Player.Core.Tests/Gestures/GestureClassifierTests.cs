@@ -150,12 +150,12 @@ public sealed class GestureClassifierTests
     }
 
     [Fact]
-    public void NextTickMs_WhileFirstTouchIsDown_IsNull()
+    public void NextTickMs_WhileFirstTouchIsDown_IsDownTimePlusLongPressMs()
     {
         var rig = new Rig();
-        rig.Down(500, 250);
+        rig.Down(500, 250, 100);
 
-        Assert.Null(rig.Classifier.NextTickMs);
+        Assert.Equal(600, rig.Classifier.NextTickMs);
     }
 
     [Fact]
@@ -324,14 +324,37 @@ public sealed class GestureClassifierTests
     }
 
     [Fact]
-    public void NextTickMs_WhileSecondTouchIsDown_IsNull()
+    public void NextTickMs_WhileSecondTouchIsDown_IsTheEarlierOfPendingTapDueAndItsLongPressTime()
     {
         var rig = new Rig();
         rig.TapAt(500, 250, 0, 50);
         rig.Down(510, 250, 100);
 
-        Assert.Null(rig.Classifier.NextTickMs);
-        rig.Tick(100_000);
+        // Pending tap is due at 50 + 300 = 350, the second touch's long press at 100 + 500 = 600.
+        Assert.Equal(350, rig.Classifier.NextTickMs);
+    }
+
+    [Fact]
+    public void NextTickMs_WhileSecondTouchIsDownAndItsLongPressIsEarlier_IsItsLongPressTime()
+    {
+        var rig = new Rig();
+        rig.Classifier.Options = new GestureClassifierOptions(LongPressMs: 100);
+        rig.TapAt(500, 250, 0, 50);
+        rig.Down(510, 250, 100);
+
+        // Long press at 100 + 100 = 200, pending tap due at 350.
+        Assert.Equal(200, rig.Classifier.NextTickMs);
+    }
+
+    [Fact]
+    public void Tick_WhileSecondTouchIsDownBeforeItsLongPress_ReportsNothing()
+    {
+        var rig = new Rig();
+        rig.TapAt(500, 250, 0, 50);
+        rig.Down(510, 250, 100);
+
+        rig.Tick(599);
+
         Assert.Empty(rig.Events);
     }
 
@@ -1078,6 +1101,414 @@ public sealed class GestureClassifierTests
         Assert.Empty(rig.Events);
     }
 
+    // ---------------------------------------------------------------- Long press
+
+    private const GestureKind LongPress = GestureKind.LongPress;
+
+    [Theory]
+    [InlineData(500)]
+    [InlineData(501)]
+    [InlineData(5000)]
+    public void Tick_AtOrAfterLongPressTime_ReportsLongPressBeganOnce(long now)
+    {
+        var rig = new Rig();
+        rig.Down(250, 100, 0);
+
+        rig.Tick(now);
+        rig.Tick(now + 1000);
+
+        Assert.Equal(new[] { E(LongPress, Began) }, rig.Shape());
+    }
+
+    [Theory]
+    [InlineData(250, 100, ScreenSide.Left, 0.25, 0.2)]
+    [InlineData(750, 400, ScreenSide.Right, 0.75, 0.8)]
+    public void Tick_LongPressBegan_HasSideAndFocusOfTheTouchDownPoint(
+        double x, double y, ScreenSide side, double focusX, double focusY)
+    {
+        var rig = new Rig();
+        rig.Down(x, y, 1000);
+        rig.Move(x + 5, y - 5, 1100);
+
+        rig.Tick(1500);
+
+        Assert.Equal(side, rig.Last.Side);
+        Assert.Equal(focusX, rig.Last.FocusX, 6);
+        Assert.Equal(focusY, rig.Last.FocusY, 6);
+        Assert.Equal(1.0, rig.Last.Scale);
+        Assert.Equal(0, rig.Last.DeltaX);
+        Assert.Equal(0, rig.Last.DeltaY);
+    }
+
+    [Fact]
+    public void Tick_BeforeLongPressTime_ReportsNothing()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+
+        rig.Tick(499);
+
+        Assert.Empty(rig.Events);
+        Assert.Equal(500, rig.Classifier.NextTickMs);
+    }
+
+    [Fact]
+    public void NextTickMs_AfterLongPressBegan_IsNull()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+        rig.Tick(500);
+
+        Assert.Null(rig.Classifier.NextTickMs);
+    }
+
+    [Fact]
+    public void NextTickMs_AfterLongPressEnded_IsNull()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+        rig.Tick(500);
+        rig.Up(500, 250, 900);
+
+        Assert.Null(rig.Classifier.NextTickMs);
+    }
+
+    [Fact]
+    public void Process_UpAfterLongPressBegan_ReportsLongPressEndedAndNoTap()
+    {
+        var rig = new Rig();
+        rig.Down(250, 100, 0);
+        rig.Tick(500);
+        rig.Up(255, 100, 800);
+        rig.Tick(100_000);
+
+        Assert.Equal(new[] { E(LongPress, Began), E(LongPress, Ended) }, rig.Shape());
+        Assert.Equal(ScreenSide.Left, rig.Last.Side);
+        Assert.Equal(0.25, rig.Last.FocusX, 6);
+        Assert.Equal(0.2, rig.Last.FocusY, 6);
+        Assert.Equal(1.0, rig.Last.Scale);
+        Assert.Equal(0, rig.Last.DeltaX);
+        Assert.Equal(0, rig.Last.DeltaY);
+    }
+
+    [Fact]
+    public void Process_UpAfterLongPressBeganAndAfterTheDoubleTapWindow_ReportsLongPressEndedAndNoTap()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+        rig.Tick(500);
+        rig.Up(500, 250, 5000);
+        rig.Tick(10_000);
+
+        Assert.Equal(new[] { E(LongPress, Began), E(LongPress, Ended) }, rig.Shape());
+        Assert.Null(rig.Classifier.NextTickMs);
+    }
+
+    [Theory]
+    [InlineData(10)]
+    [InlineData(16)]
+    [InlineData(200)]
+    public void Process_MoveAfterLongPressBegan_ReportsNothing(double dx)
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+        rig.Tick(500);
+
+        rig.Move(500 + dx, 250, 600);
+
+        Assert.Equal(new[] { E(LongPress, Began) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Process_MoveBeyondSlopAfterLongPressBegan_ThenUp_StillEndsTheLongPress()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+        rig.Tick(500);
+        rig.Move(700, 250, 600);
+        rig.Up(700, 250, 700);
+
+        Assert.Equal(new[] { E(LongPress, Began), E(LongPress, Ended) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Process_CancelAfterLongPressBegan_ReportsCancelled()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+        rig.Tick(500);
+        rig.Cancel(600);
+
+        Assert.Equal(new[] { E(LongPress, Began), E(LongPress, Cancelled) }, rig.Shape());
+        Assert.Null(rig.Classifier.NextTickMs);
+    }
+
+    [Fact]
+    public void Process_SecondPointerAfterLongPressBegan_CancelsItAndBeginsPinch()
+    {
+        var rig = new Rig();
+        rig.Down(400, 250, 0);
+        rig.Tick(500);
+        rig.PointerDown(2, 600, 250, 700);
+
+        Assert.Equal(
+            new[] { E(LongPress, Began), E(LongPress, Cancelled), E(Pinch, Began) },
+            rig.Shape());
+    }
+
+    [Fact]
+    public void Process_PinchAfterLongPress_EndsCleanlyAndNextTouchIsNew()
+    {
+        var rig = new Rig();
+        rig.Down(400, 250, 0);
+        rig.Tick(500);
+        rig.PointerDown(2, 600, 250, 700);
+        rig.PointerUp(2, 600, 250, 800);
+        rig.Up(400, 250, 900);
+        rig.TapAt(500, 250, 2000, 2050);
+        rig.Tick(2350);
+
+        Assert.Equal(
+            new[]
+            {
+                E(LongPress, Began), E(LongPress, Cancelled), E(Pinch, Began), E(Pinch, Ended),
+                E(Pan, Began), E(Pan, Ended), E(Tap, Ended),
+            },
+            rig.Shape());
+    }
+
+    [Fact]
+    public void Process_MoveInsideSlopAtOrAfterDueTimeWithoutTick_ReportsLongPressBeganFirst()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+
+        rig.Move(505, 250, 700);
+
+        Assert.Equal(new[] { E(LongPress, Began) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Process_UpAtOrAfterDueTimeWithoutTick_ReportsLongPressBeganThenEnded()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+
+        rig.Up(500, 250, 500);
+
+        Assert.Equal(new[] { E(LongPress, Began), E(LongPress, Ended) }, rig.Shape());
+        Assert.Null(rig.Classifier.NextTickMs);
+    }
+
+    [Fact]
+    public void Process_CancelAtOrAfterDueTimeWithoutTick_ReportsLongPressBeganThenCancelled()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+
+        rig.Cancel(700);
+
+        Assert.Equal(new[] { E(LongPress, Began), E(LongPress, Cancelled) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Process_PointerDownAtOrAfterDueTimeWithoutTick_ReportsLongPressBeganCancelledThenPinchBegan()
+    {
+        var rig = new Rig();
+        rig.Down(400, 250, 0);
+
+        rig.PointerDown(2, 600, 250, 500);
+
+        Assert.Equal(
+            new[] { E(LongPress, Began), E(LongPress, Cancelled), E(Pinch, Began) },
+            rig.Shape());
+    }
+
+    [Fact]
+    public void Process_PointerDownBeforeDueTime_IsAPinchWithoutLongPress()
+    {
+        var rig = new Rig();
+        rig.Down(400, 250, 0);
+
+        rig.PointerDown(2, 600, 250, 499);
+        rig.Tick(10_000);
+
+        Assert.Equal(new[] { E(Pinch, Began) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Process_PassedSlopBeforeDueTime_IsADragAndNeverALongPress()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+        rig.Move(540, 250, 100);
+        rig.Tick(500);
+        rig.Tick(10_000);
+        rig.Up(540, 250, 2000);
+
+        Assert.Equal(new[] { E(HDrag, Began), E(HDrag, Ended) }, rig.Shape());
+    }
+
+    [Fact]
+    public void NextTickMs_AfterDragBegan_IsNull()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+        rig.Move(540, 250, 100);
+
+        Assert.Null(rig.Classifier.NextTickMs);
+    }
+
+    [Fact]
+    public void Process_PassedSlopAndReturnedBeforeDueTime_StaysADragAndNeverALongPress()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+        rig.Move(540, 250, 100);
+        rig.Move(500, 250, 200);
+        rig.Tick(600);
+
+        Assert.Equal(new[] { E(HDrag, Began), E(HDrag, Changed) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Process_ReleasedBeforeDueTime_IsATapAndNeverALongPress()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+        rig.Up(500, 250, 499);
+        rig.Tick(499 + 300);
+
+        Assert.Equal(new[] { E(Tap, Ended) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Process_PendingTapBeforeLongSecondTouch_IsReportedBeforeLongPressBegan()
+    {
+        var rig = new Rig();
+        rig.TapAt(500, 250, 0, 50);
+        rig.Down(500, 250, 100);
+
+        rig.Tick(600);
+
+        Assert.Equal(new[] { E(Tap, Ended), E(LongPress, Began) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Process_LongSecondTouchReleased_IsNotADoubleTap()
+    {
+        var rig = new Rig();
+        rig.TapAt(500, 250, 0, 50);
+        rig.Down(500, 250, 100);
+        rig.Tick(600);
+        rig.Up(500, 250, 900);
+        rig.Tick(100_000);
+
+        Assert.Equal(
+            new[] { E(Tap, Ended), E(LongPress, Began), E(LongPress, Ended) },
+            rig.Shape());
+    }
+
+    [Fact]
+    public void Process_LongPressAfterEarlierTapWithoutSecondTouch_DoesNotRepeatThePendingTap()
+    {
+        var rig = new Rig();
+        rig.TapAt(100, 250, 0, 50);
+        rig.Tick(350);
+        rig.Down(100, 250, 1000);
+        rig.Tick(1500);
+
+        Assert.Equal(new[] { E(Tap, Ended), E(LongPress, Began) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Process_LockedHeldTouch_IsATapOnUpAndNoLongPress()
+    {
+        var rig = new Rig();
+        rig.Classifier.Locked = true;
+        rig.Down(500, 250, 0);
+
+        rig.Tick(500);
+        rig.Tick(5000);
+        Assert.Empty(rig.Events);
+
+        rig.Up(500, 250, 6000);
+
+        Assert.Equal(new[] { E(Tap, Ended) }, rig.Shape());
+    }
+
+    [Fact]
+    public void NextTickMs_LockedTouchIsDown_IsNull()
+    {
+        var rig = new Rig();
+        rig.Classifier.Locked = true;
+        rig.Down(500, 250, 0);
+
+        Assert.Null(rig.Classifier.NextTickMs);
+    }
+
+    [Fact]
+    public void Reset_DuringLongPress_EmitsNothingAndNextTouchStartsClean()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+        rig.Tick(500);
+        rig.Events.Clear();
+
+        rig.Classifier.Reset();
+        rig.Up(500, 250, 700);
+        rig.Tick(10_000);
+
+        Assert.Empty(rig.Events);
+        Assert.Null(rig.Classifier.NextTickMs);
+
+        rig.Down(100, 100, 2000);
+        rig.Tick(2500);
+        Assert.Equal(new[] { E(LongPress, Began) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Reset_BeforeLongPressTime_NeverReportsALongPress()
+    {
+        var rig = new Rig();
+        rig.Down(500, 250, 0);
+
+        rig.Classifier.Reset();
+        rig.Tick(10_000);
+
+        Assert.Empty(rig.Events);
+        Assert.Null(rig.Classifier.NextTickMs);
+    }
+
+    [Theory]
+    [InlineData(200)]
+    [InlineData(1000)]
+    public void Options_CustomLongPressMs_IsUsedForTheLongPressTime(long longPressMs)
+    {
+        var rig = new Rig();
+        rig.Classifier.Options = new GestureClassifierOptions(LongPressMs: longPressMs);
+        rig.Down(500, 250, 100);
+
+        Assert.Equal(100 + longPressMs, rig.Classifier.NextTickMs);
+        rig.Tick(100 + longPressMs - 1);
+        Assert.Empty(rig.Events);
+
+        rig.Tick(100 + longPressMs);
+        Assert.Equal(new[] { E(LongPress, Began) }, rig.Shape());
+    }
+
+    [Fact]
+    public void Options_CustomTouchSlop_IsUsedForTheLongPressBoundary()
+    {
+        var rig = new Rig();
+        rig.Classifier.Options = new GestureClassifierOptions(TouchSlop: 5);
+        rig.Down(500, 250, 0);
+        rig.Move(505, 250, 100);
+        rig.Tick(500);
+
+        Assert.Equal(new[] { E(LongPress, Began) }, rig.Shape());
+    }
+
     // ---------------------------------------------------------------- Other
 
     [Fact]
@@ -1294,6 +1725,7 @@ public sealed class GestureClassifierTests
         Assert.Equal(16, classifier.Options.TouchSlop);
         Assert.Equal(300, classifier.Options.DoubleTapWindowMs);
         Assert.Equal(100, classifier.Options.DoubleTapDistance);
+        Assert.Equal(500, classifier.Options.LongPressMs);
     }
 
     // ---------------------------------------------------------------- Invariant
@@ -1302,6 +1734,7 @@ public sealed class GestureClassifierTests
     public void Process_RandomEventSequences_EveryBeganIsClosedOnceBeforeTheNextBegan()
     {
         var random = new Random(20260515);
+        var runsWithLongPress = 0;
         for (var run = 0; run < 400; run++)
         {
             var rig = new Rig();
@@ -1344,7 +1777,11 @@ public sealed class GestureClassifierTests
 
             rig.Cancel(now);
             AssertBalanced(rig.Events, run, script);
+            if (rig.Events.Any(e => e.Kind == GestureKind.LongPress))
+                runsWithLongPress++;
         }
+
+        Assert.True(runsWithLongPress > 0, "the random sequences never produced a long press");
     }
 
     private static void AssertBalanced(IReadOnlyList<GestureEvent> events, int run, List<string> script)
