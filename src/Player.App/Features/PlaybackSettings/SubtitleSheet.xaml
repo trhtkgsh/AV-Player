@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Player.App.Features.PlaybackSettings.SubtitleSheet"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:Player.App.Features.PlaybackSettings"
+    x:DataType="local:SubtitleSheetViewModel"
+    Shell.PresentationMode="ModalNotAnimated"
+    Shell.NavBarIsVisible="False"
+    BackgroundColor="Transparent">
+
+    <Grid RowDefinitions="*,Auto">
+
+        <!-- (a) The video stays visible here. A tap outside the panel closes the sheet. -->
+        <ContentView Grid.Row="0" BackgroundColor="Transparent">
+            <ContentView.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding CloseCommand}" />
+            </ContentView.GestureRecognizers>
+        </ContentView>
+
+        <!-- (b) The translucent panel. -->
+        <ScrollView
+            Grid.Row="1"
+            MaximumHeightRequest="520"
+            BackgroundColor="{DynamicResource ColorHudBackground}">
+            <VerticalStackLayout
+                Padding="16,12,16,24"
+                Spacing="12">
+
+                <Label Text="Subtitles" Style="{StaticResource LabelHud}" />
+
+                <CollectionView
+                    ItemsSource="{Binding Tracks}"
+                    SelectionMode="None"
+                    MaximumHeightRequest="200">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="local:TrackRow">
+                            <Grid ColumnDefinitions="28,*" Padding="0,8">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding SelectTrackCommand, Source={RelativeSource AncestorType={x:Type local:SubtitleSheetViewModel}}, x:DataType=local:SubtitleSheetViewModel}"
+                                        CommandParameter="{Binding .}" />
+                                </Grid.GestureRecognizers>
+
+                                <Label
+                                    Grid.Column="0"
+                                    Text="✓"
+                                    IsVisible="{Binding IsSelected}"
+                                    WidthRequest="28"
+                                    Style="{StaticResource LabelHud}" />
+                                <Label
+                                    Grid.Column="1"
+                                    Text="{Binding Title}"
+                                    VerticalOptions="Center"
+                                    Style="{StaticResource LabelHud}" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <Label
+                    Text="Files next to the video"
+                    IsVisible="{Binding HasFiles}"
+                    Style="{StaticResource LabelHud}" />
+
+                <CollectionView
+                    ItemsSource="{Binding Files}"
+                    IsVisible="{Binding HasFiles}"
+                    SelectionMode="None"
+                    MaximumHeightRequest="140">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="local:SubtitleFileRow">
+                            <Label
+                                Text="{Binding Title}"
+                                Padding="0,8"
+                                Style="{StaticResource LabelHud}">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding LoadFileCommand, Source={RelativeSource AncestorType={x:Type local:SubtitleSheetViewModel}}, x:DataType=local:SubtitleSheetViewModel}"
+                                        CommandParameter="{Binding .}" />
+                                </Label.GestureRecognizers>
+                            </Label>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <Button
+                    Text="Open a subtitle file..."
+                    Command="{Binding PickFileCommand}"
+                    Style="{StaticResource ButtonHud}" />
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label
+                        Grid.Column="0"
+                        Text="Subtitle delay"
+                        VerticalOptions="Center"
+                        Style="{StaticResource LabelHud}" />
+                    <Label
+                        Grid.Column="1"
+                        Text="{Binding DelayText}"
+                        VerticalOptions="Center"
+                        Style="{StaticResource LabelHud}" />
+                </Grid>
+
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                    <Button
+                        Grid.Column="0"
+                        Text="-50 ms"
+                        Command="{Binding DelayDownCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                    <Button
+                        Grid.Column="1"
+                        Text="+50 ms"
+                        Command="{Binding DelayUpCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                    <Button
+                        Grid.Column="2"
+                        Text="Reset"
+                        Command="{Binding DelayResetCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                </Grid>
+
+                <Button
+                    Text="Style..."
+                    Command="{Binding OpenStyleCommand}"
+                    Style="{StaticResource ButtonHud}" />
+
+                <Label
+                    Text="{Binding ErrorMessage}"
+                    IsVisible="{Binding HasError}"
+                    TextColor="{DynamicResource ColorDanger}" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>
