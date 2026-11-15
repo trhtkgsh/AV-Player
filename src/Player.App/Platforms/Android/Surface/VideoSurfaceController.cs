@@ -23,6 +23,7 @@ internal sealed class VideoSurfaceController : IVideoSurface
     private EdgeInsets _insets;
     private SavedBars? _savedBars;        // UI thread only: how the bars looked before player mode
     private bool _edgeToEdge;             // UI thread only: this class made the window edge to edge (up to API 34)
+    private int _topInsetPx;              // the height of the status bar while in player mode, else 0
     private VideoFormat? _layoutFormat;   // the last known format: kept after the engine stops, so the last picture is not stretched
 
     private readonly record struct SavedBars(int StatusColor, int NavigationColor, bool LightStatus, bool LightNavigation);
@@ -284,12 +285,13 @@ internal sealed class VideoSurfaceController : IVideoSurface
             return;
 
         var insets = default(EdgeInsets);
+        var topPx = 0;
         bool immersive;
         lock (_sync)
             immersive = _immersive;
 
-        if (immersive && AndroidX.Core.View.ViewCompat.GetRootWindowInsets(view) is { } root
-            && root.GetInsetsIgnoringVisibility(
+        var root = immersive ? AndroidX.Core.View.ViewCompat.GetRootWindowInsets(view) : null;
+        if (root?.GetInsetsIgnoringVisibility(
                 AndroidX.Core.View.WindowInsetsCompat.Type.SystemBars()
                 | AndroidX.Core.View.WindowInsetsCompat.Type.DisplayCutout()) is { } bars)
         {
@@ -299,22 +301,42 @@ internal sealed class VideoSurfaceController : IVideoSurface
             insets = new EdgeInsets(bars.Left / density, bars.Top / density, bars.Right / density, bars.Bottom / density);
         }
 
+        // The small Picture-in-Picture window has no status bar of its own.
+        if (Platform.CurrentActivity is not { IsInPictureInPictureMode: true }
+            && root?.GetInsetsIgnoringVisibility(AndroidX.Core.View.WindowInsetsCompat.Type.StatusBars()) is { } status)
+            topPx = status.Top;
+
+        bool insetsChanged, topChanged;
         lock (_sync)
         {
-            if (_insets == insets)
-                return;
-
+            insetsChanged = _insets != insets;
+            topChanged = _topInsetPx != topPx;
             _insets = insets;
+            _topInsetPx = topPx;
         }
 
-        Changed?.Invoke(this, EventArgs.Empty);
+        if (topChanged)
+            Relayout();
+        if (insetsChanged)
+            Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// The picture is laid out below the status bar: it may reach the bar but never lie under it, whether
+    /// the bar is shown or hidden (so it does not move when the bar appears).
+    /// </summary>
     internal SurfaceRect ComputeRect(int containerWidth, int containerHeight)
     {
         lock (_sync)
-            return SurfaceGeometry.Compute(_layoutFormat, containerWidth, containerHeight, _aspect, _transform);
+        {
+            var top = Math.Clamp(_topInsetPx, 0, containerHeight / 2);
+            var rect = SurfaceGeometry.Compute(_layoutFormat, containerWidth, containerHeight - top, _aspect, _transform);
+            return top == 0 ? rect : rect with { Top = rect.Top + top };
+        }
     }
+
+    /// <summary>The height of the strip at the top of the container that the picture keeps clear of.</summary>
+    internal int TopInsetPx { get { lock (_sync) return _topInsetPx; } }
 
     internal void Attach(VideoSurfaceContainer container)
     {
