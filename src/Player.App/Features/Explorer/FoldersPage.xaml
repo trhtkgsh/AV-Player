@@ -8,7 +8,6 @@
              Title="{Binding Title, TargetNullValue='Ariel Player'}">
 
     <ContentPage.ToolbarItems>
-        <ToolbarItem Text="{loc:T Explorer.View}" Command="{Binding ChooseViewCommand}" />
         <ToolbarItem Text="{Binding LayoutText}" Command="{Binding ToggleLayoutCommand}" />
         <ToolbarItem Text="{loc:T Common.Settings}" Order="Secondary" Command="{Binding OpenSettingsCommand}" />
     </ContentPage.ToolbarItems>
@@ -22,6 +21,18 @@
             <Setter Property="TextColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
             <Setter Property="Padding" Value="10,0" />
             <Setter Property="MinimumWidthRequest" Value="44" />
+            <Setter Property="MinimumHeightRequest" Value="44" />
+        </Style>
+
+        <!-- A view-mode button: one line, no border. The marked mode gets its color and line from the row. -->
+        <Style x:Key="ModeButton" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="{DynamicResource ColorSurface}" />
+            <Setter Property="TextColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+            <Setter Property="BorderWidth" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="LineBreakMode" Value="NoWrap" />
+            <Setter Property="Padding" Value="4,0" />
             <Setter Property="MinimumHeightRequest" Value="44" />
         </Style>
 
@@ -88,22 +99,69 @@
         </DataTemplate>
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="*,Auto">
-        <RefreshView IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- The view modes sit under the title bar and do not scroll with the list. Each mode button is one column. -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,2" BackgroundColor="{DynamicResource ColorSurface}">
+            <Button Grid.Row="0" Grid.Column="0" Text="{loc:T Explorer.ViewFolders}" Style="{StaticResource ModeButton}"
+                    Command="{Binding SelectFoldersCommand}">
+                <Button.Triggers>
+                    <DataTrigger TargetType="Button" Binding="{Binding IsFoldersMode, x:DataType=explorer:FoldersViewModel}" Value="True">
+                        <Setter Property="TextColor" Value="{DynamicResource ColorAccent}" />
+                    </DataTrigger>
+                </Button.Triggers>
+            </Button>
+            <BoxView Grid.Row="1" Grid.Column="0" HeightRequest="2" BackgroundColor="{DynamicResource ColorAccent}"
+                     IsVisible="{Binding IsFoldersMode}" />
+
+            <Button Grid.Row="0" Grid.Column="1" Text="{loc:T Explorer.ViewTree}" Style="{StaticResource ModeButton}"
+                    Command="{Binding SelectBrowserCommand}">
+                <Button.Triggers>
+                    <DataTrigger TargetType="Button" Binding="{Binding IsBrowserMode, x:DataType=explorer:FoldersViewModel}" Value="True">
+                        <Setter Property="TextColor" Value="{DynamicResource ColorAccent}" />
+                    </DataTrigger>
+                </Button.Triggers>
+            </Button>
+            <BoxView Grid.Row="1" Grid.Column="1" HeightRequest="2" BackgroundColor="{DynamicResource ColorAccent}"
+                     IsVisible="{Binding IsBrowserMode}" />
+
+            <Button Grid.Row="0" Grid.Column="2" Text="{loc:T Explorer.ViewFavorites}" Style="{StaticResource ModeButton}"
+                    Command="{Binding SelectFavoritesCommand}">
+                <Button.Triggers>
+                    <DataTrigger TargetType="Button" Binding="{Binding IsFavoritesMode, x:DataType=explorer:FoldersViewModel}" Value="True">
+                        <Setter Property="TextColor" Value="{DynamicResource ColorAccent}" />
+                    </DataTrigger>
+                </Button.Triggers>
+            </Button>
+            <BoxView Grid.Row="1" Grid.Column="2" HeightRequest="2" BackgroundColor="{DynamicResource ColorAccent}"
+                     IsVisible="{Binding IsFavoritesMode}" />
+
+            <Button Grid.Row="0" Grid.Column="3" Text="{loc:T Explorer.ViewFlat}" Style="{StaticResource ModeButton}"
+                    Command="{Binding SelectAllFilesCommand}">
+                <Button.Triggers>
+                    <DataTrigger TargetType="Button" Binding="{Binding IsAllFilesMode, x:DataType=explorer:FoldersViewModel}" Value="True">
+                        <Setter Property="TextColor" Value="{DynamicResource ColorAccent}" />
+                    </DataTrigger>
+                </Button.Triggers>
+            </Button>
+            <BoxView Grid.Row="1" Grid.Column="3" HeightRequest="2" BackgroundColor="{DynamicResource ColorAccent}"
+                     IsVisible="{Binding IsAllFilesMode}" />
+        </Grid>
+
+        <RefreshView Grid.Row="1" IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
             <CollectionView x:Name="List" ItemsSource="{Binding Folders}" SelectionMode="None"
                             SizeChanged="OnListSizeChanged" />
         </RefreshView>
 
-        <ActivityIndicator IsRunning="{Binding ShowBusy}" IsVisible="{Binding ShowBusy}"
+        <ActivityIndicator Grid.Row="1" IsRunning="{Binding ShowBusy}" IsVisible="{Binding ShowBusy}"
                            HorizontalOptions="Center" VerticalOptions="Center" />
 
-        <Label Text="{loc:T Explorer.NoFolders}" IsVisible="{Binding ShowNoFolders}"
+        <Label Grid.Row="1" Text="{loc:T Explorer.NoFolders}" IsVisible="{Binding ShowNoFolders}"
                HorizontalOptions="Center" VerticalOptions="Center" />
 
-        <Label Text="{loc:T Explorer.NoFavorites}" IsVisible="{Binding ShowNoFavorites}"
+        <Label Grid.Row="1" Text="{loc:T Explorer.NoFavorites}" IsVisible="{Binding ShowNoFavorites}"
                HorizontalTextAlignment="Center" HorizontalOptions="Fill" VerticalOptions="Center" Margin="24" />
 
-        <VerticalStackLayout IsVisible="{Binding PermissionDenied}" Padding="24" Spacing="12"
+        <VerticalStackLayout Grid.Row="1" IsVisible="{Binding PermissionDenied}" Padding="24" Spacing="12"
                              HorizontalOptions="Fill" VerticalOptions="Center">
             <Label Text="{loc:T Explorer.PermissionNeeded}"
                    HorizontalTextAlignment="Center" />
@@ -111,7 +169,7 @@
             <Button Text="{loc:T Explorer.OpenAppSettings}" Command="{Binding OpenAppSettingsCommand}" />
         </VerticalStackLayout>
 
-        <Label Grid.Row="1" Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
+        <Label Grid.Row="2" Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
                TextColor="{DynamicResource ColorDanger}" Margin="16" />
     </Grid>
 

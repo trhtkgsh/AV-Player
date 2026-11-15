@@ -24,6 +24,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     private readonly IMediaLibrary _library;
     private readonly IUiSettingsStore _uiSettings;
     private readonly IFolderSettingsStore _folderSettings;
+    private readonly IPlaybackStateStore _playbackStates;
     private readonly ILocalizer _localizer;
 
     // The folders of the last successful load, and the per-folder settings read with them.
@@ -47,7 +48,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     private int _folderSettingsVersion;
     private bool _flatSeen;
     private bool _openingSettings;
-    private bool _choosingView;
+    private bool _changingView;
     private bool _choosingOptions;
     private bool _choosingLayout;
     private bool _opening;
@@ -81,6 +82,19 @@ public sealed partial class FoldersViewModel : ObservableObject
     [ObservableProperty]
     private int _columns = GridTiles.MinColumns;
 
+    // The view mode in effect. The mode buttons above the list show it.
+    [ObservableProperty]
+    private ExplorerViewMode _viewMode = ExplorerViewMode.Folders;
+
+    // The marks of the mode buttons: exactly one is true.
+    public bool IsFoldersMode => ViewMode == ExplorerViewMode.Folders;
+
+    public bool IsBrowserMode => ViewMode == ExplorerViewMode.Tree;
+
+    public bool IsFavoritesMode => ViewMode == ExplorerViewMode.Favorites;
+
+    public bool IsAllFilesMode => ViewMode == ExplorerViewMode.Flat;
+
     [ObservableProperty]
     private bool _showNoFolders;
 
@@ -104,12 +118,13 @@ public sealed partial class FoldersViewModel : ObservableObject
     [ObservableProperty]
     private bool _showBusy;
 
-    public FoldersViewModel(IMediaLibrary library, IUiSettingsStore uiSettings, IFolderSettingsStore folderSettings, ILocalizer localizer)
+    public FoldersViewModel(IMediaLibrary library, IUiSettingsStore uiSettings, IFolderSettingsStore folderSettings, ILocalizer localizer, IPlaybackStateStore playbackStates)
     {
         _library = library;
         _uiSettings = uiSettings;
         _folderSettings = folderSettings;
         _localizer = localizer;
+        _playbackStates = playbackStates;
     }
 
     public ObservableCollection<FolderRow> Folders { get; } = new();
@@ -187,47 +202,41 @@ public sealed partial class FoldersViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task ChooseView()
+    private Task SelectFolders() => SelectViewModeAsync(ExplorerViewMode.Folders);
+
+    [RelayCommand]
+    private Task SelectBrowser() => SelectViewModeAsync(ExplorerViewMode.Tree);
+
+    [RelayCommand]
+    private Task SelectFavorites() => SelectViewModeAsync(ExplorerViewMode.Favorites);
+
+    [RelayCommand]
+    private Task SelectAllFiles() => SelectViewModeAsync(ExplorerViewMode.Flat);
+
+    // A tap on a mode button saves that mode, as the view sheet did. A tap on the mode in effect does nothing.
+    private async Task SelectViewModeAsync(ExplorerViewMode mode)
     {
-        if (_choosingView)
+        if (_changingView)
         {
             return;
         }
 
-        _choosingView = true;
+        _changingView = true;
         try
         {
-            var shell = Shell.Current;
-            if (shell is null)
+            if (Shell.Current is null)
             {
                 return;
             }
 
             var ct = SessionToken;
             var current = (await _uiSettings.GetAsync(ct)).ViewMode;
-            var choices = new (string Text, ExplorerViewMode Mode)[]
+            if (current == mode)
             {
-                (_localizer["Explorer.ViewFolders"], ExplorerViewMode.Folders),
-                (_localizer["Explorer.ViewTree"], ExplorerViewMode.Tree),
-                (_localizer["Explorer.ViewFavorites"], ExplorerViewMode.Favorites),
-                (_localizer["Explorer.ViewFlat"], ExplorerViewMode.Flat),
-            };
-            var labels = choices
-                .Select(c => c.Mode == current ? "✓ " + c.Text : c.Text)
-                .ToArray();
-
-            var choice = await shell.DisplayActionSheetAsync(
-                _localizer["Explorer.View"],
-                _localizer["Common.Cancel"],
-                null,
-                labels);
-
-            // A cancelled or dismissed sheet gives no matching text, so the mode stays.
-            var index = Array.IndexOf(labels, choice);
-            if (index >= 0)
-            {
-                await SetViewModeAsync(choices[index].Mode, ct);
+                return;
             }
+
+            await SetViewModeAsync(mode, ct);
         }
         catch (OperationCanceledException)
         {
@@ -238,7 +247,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         }
         finally
         {
-            _choosingView = false;
+            _changingView = false;
         }
     }
 
@@ -300,6 +309,14 @@ public sealed partial class FoldersViewModel : ObservableObject
     }
 
     partial void OnIsGridChanged(bool value) => OnPropertyChanged(nameof(LayoutText));
+
+    partial void OnViewModeChanged(ExplorerViewMode value)
+    {
+        OnPropertyChanged(nameof(IsFoldersMode));
+        OnPropertyChanged(nameof(IsBrowserMode));
+        OnPropertyChanged(nameof(IsFavoritesMode));
+        OnPropertyChanged(nameof(IsAllFilesMode));
+    }
 
     [RelayCommand]
     private async Task OpenOptions(FolderRow row)
@@ -374,16 +391,27 @@ public sealed partial class FoldersViewModel : ObservableObject
 
         // The first choice is the general default: no speed for this folder.
         float? speed = index == 0 ? null : FolderSpeeds[index - 1];
-        await SaveFolderSettingsAsync(folder.BucketId, s => s with { Speed = speed }, ct);
+        if (await SaveFolderSettingsAsync(folder.BucketId, s => s with { Speed = speed }, ct))
+        {
+            await ClearFileSpeedsAsync(folder.BucketId, ct);
+        }
     }
 
-    private async Task SaveFolderSettingsAsync(long bucketId, Func<FolderSettings, FolderSettings> change, CancellationToken ct)
+    // The newest choice wins: a folder speed replaces the own speed of each file of the folder.
+    private async Task ClearFileSpeedsAsync(long bucketId, CancellationToken ct)
     {
         try
         {
-            // Read the latest stored entry: only the changed member moves.
-            var current = await _folderSettings.GetAsync(bucketId, ct) ?? new FolderSettings(bucketId);
-            await _folderSettings.SaveAsync(change(current), ct);
+            var items = await _library.GetItemsAsync(new MediaQuery(bucketId, null), ct);
+            var ids = items.Select(item => item.Id).ToList();
+            var states = await _playbackStates.GetManyAsync(ids, ct);
+            foreach (var state in states.Values)
+            {
+                if (state.Speed is not null)
+                {
+                    await _playbackStates.SaveAsync(state with { Speed = null }, ct);
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -392,6 +420,28 @@ public sealed partial class FoldersViewModel : ObservableObject
         {
             System.Diagnostics.Debug.WriteLine(ex);
             ErrorMessage = _localizer["Explorer.SaveFailed"];
+        }
+    }
+
+    // Returns true when the folder setting was saved.
+    private async Task<bool> SaveFolderSettingsAsync(long bucketId, Func<FolderSettings, FolderSettings> change, CancellationToken ct)
+    {
+        try
+        {
+            // Read the latest stored entry: only the changed member moves.
+            var current = await _folderSettings.GetAsync(bucketId, ct) ?? new FolderSettings(bucketId);
+            await _folderSettings.SaveAsync(change(current), ct);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(ex);
+            ErrorMessage = _localizer["Explorer.SaveFailed"];
+            return false;
         }
     }
 
@@ -672,6 +722,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         }
 
         _settings = settings;
+        ViewMode = settings.ViewMode;
         NameFontSize = BaseNameFontSize * settings.ExplorerFontScale;
         IsGrid = settings.Layout == ExplorerLayout.Grid;
         RebuildRows();
