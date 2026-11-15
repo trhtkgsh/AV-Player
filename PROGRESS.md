@@ -4,10 +4,12 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 
 ## Current phase
 
-Phase 1, waiting for the owner's device test. The roster was approved on 2026-11-14 and the HARD GATE was passed then.
-Phase 2 does not start before the owner has run `docs/qa/phase-1-checklist.md` on a phone (MASTER.md section 7).
+Phase 2 (started 2026-11-15). The Phase 1 gate is passed: on 2026-11-15 the owner reported that
+`ArielPlayer-phase1-r2.apk` installs and works on the phone and that every item of `docs/qa/phase-1-checklist.md`
+was run and passed. The owner did not name the phone model or the Android version.
+The roster was approved on 2026-11-14 and the HARD GATE was passed then.
 
-APK for the owner: `artifacts/ArielPlayer-phase1-r2.apk` (Release, built from main at acf3f1c on 2026-11-15, 105 MB,
+Phase 1 APK: `artifacts/ArielPlayer-phase1-r2.apk` (Release, built from main at acf3f1c on 2026-11-15, 105 MB,
 arm64-v8a, armeabi-v7a and x86_64, SHA-256 DEDAD755AB8A3AF9C178BFFF4BA01B7C34DA12AA612594600CE7E4242789B838). It replaces
 `ArielPlayer-phase1.apk` (2826f17), which the owner could not install. The same file was run on two emulators: API 36 as
 x86_64 and as arm64 (through the image's ARM translation), API 34 as x86_64. Checked: install, launcher icon, splash,
@@ -18,7 +20,7 @@ status bar color, explorer, thumbnails, playback, HUD symbols, pause and play, p
 
 | # | Feedback | What was found | What was done | State |
 |---|---|---|---|---|
-| 1 | The app cannot be installed on the phone. | The owner gave no error text and no phone model. The first APK is valid: v2 and v3 signatures verify, minSdk 26, zip aligned, installs on API 34 and API 36. It contained only arm64-v8a and x86_64, so a phone that runs a 32-bit Android refuses it as not compatible. | P1-30 adds armeabi-v7a. The arm64 part was run for the first time (on the emulators' ARM translation) and works. | Not confirmed. The cause on the owner's phone is still unknown; other causes are outside the APK (Play Protect, Samsung Auto Blocker, the permission to install unknown apps, Android older than 8.0). The owner must report the exact message if r2 also fails. |
+| 1 | The app cannot be installed on the phone. | The owner gave no error text and no phone model. The first APK is valid: v2 and v3 signatures verify, minSdk 26, zip aligned, installs on API 34 and API 36. It contained only arm64-v8a and x86_64, so a phone that runs a 32-bit Android refuses it as not compatible. | P1-30 adds armeabi-v7a. The arm64 part was run for the first time (on the emulators' ARM translation) and works. | Closed: r2 installs on the owner's phone (reported 2026-11-15). The cause was not established: the added 32-bit ABI fits the result, but the owner sent no error text and no phone model, so it is not proven. |
 | 2 | The player buttons look like ordinary buttons. They must be white symbols with no background. | The HUD used text buttons with the accent fill. | P1-29: vector symbols for back, previous, play or pause, next; the decoder is an outlined HW/SW label. | Done, checked on API 34 and API 36 in the Release build. |
 | 3 | The app needs its own icon, on the launcher and on the splash screen. | Both were the purple ".NET" template images. | P1-30: a white play triangle on a blue gradient (launcher), the same symbol in a blue circle on black (splash). | Done, checked on API 34 and API 36. |
 | 4 | The Android status bar must have the color of the app design. | It was purple: the template colors in `colors.xml`. | P1-30: `colorPrimary` and `colorPrimaryDark` are the Dark OLED surface color, `colorAccent` the accent blue. | Done for the one theme of Phase 1, checked on API 34 and API 36. Following a theme change at runtime stays a Phase 3 task (ARCHITECTURE.md section 5). |
@@ -28,8 +30,8 @@ status bar color, explorer, thumbnails, playback, HUD symbols, pause and play, p
 | Phase | Build | Tests | Reviewer | Owner device test | Status |
 |---|---|---|---|---|---|
 | 0 Spike | green (spike) | n/a | n/a | pending | go on emulator, waiting for owner device test (docs/SPIKE.md) |
-| 1 | green (Debug and Release) | 349 pass (307 Core, 42 Data) | every merged task approved, except P1-27 (tests only, Sonnet, checked by the orchestrator) | pending | built and verified on the emulator, waiting for the owner |
-| 2 | - | - | - | - | not started |
+| 1 | green (Debug and Release) | 349 pass (307 Core, 42 Data) | every merged task approved, except P1-27 (tests only, Sonnet, checked by the orchestrator) | passed on 2026-11-15 (owner report: all checklist items pass) | PASSED |
+| 2 | - | - | - | - | in progress |
 | 3 | - | - | - | - | not started |
 | 4 | - | - | - | - | not started |
 | 5 | - | - | - | - | not started |
