@@ -18,9 +18,11 @@ public sealed partial class PlayerViewModel : ObservableObject
     private readonly IPlayerEngine _engine;
     private readonly IPlaybackCoordinator _coordinator;
     private readonly IUiSettingsStore _uiSettings;
+    private readonly IPlaybackStateRecorder _recorder;
 
     private UiSettings _settings = new();
     private bool _active;
+    private bool _sheetOpening;
     private int _activation;
     private bool _dragging;
     private bool _closing;
@@ -38,17 +40,23 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _isOpening;
     [ObservableProperty] private bool _isHudVisible = true;
     [ObservableProperty] private string _decoderText = "...";
+    [ObservableProperty] private string _speedText = "1.0x";
     [ObservableProperty] private bool _showClock;
     [ObservableProperty] private string _clockText = "";
 
     /// <summary>True while the play icon is shown; the pause icon is shown while playing.</summary>
     public bool ShowPlayIcon => !IsPlaying;
 
-    public PlayerViewModel(IPlayerEngine engine, IPlaybackCoordinator coordinator, IUiSettingsStore uiSettings)
+    public PlayerViewModel(
+        IPlayerEngine engine,
+        IPlaybackCoordinator coordinator,
+        IUiSettingsStore uiSettings,
+        IPlaybackStateRecorder recorder)
     {
         _engine = engine;
         _coordinator = coordinator;
         _uiSettings = uiSettings;
+        _recorder = recorder;
     }
 
     /// <summary>Called when the page appears. Reads the settings once, then subscribes and starts the timers.</summary>
@@ -109,9 +117,24 @@ public sealed partial class PlayerViewModel : ObservableObject
     private Task PreviousAsync() => RunAsync(() => _coordinator.PreviousAsync(CancellationToken.None));
 
     [RelayCommand]
-    private Task ToggleDecoderAsync() => RunAsync(() => _engine.SetDecoderAsync(
-        _engine.Snapshot.RequestedDecoder == DecoderMode.Hardware ? DecoderMode.Software : DecoderMode.Hardware,
-        CancellationToken.None));
+    private Task ToggleDecoderAsync() => RunAsync(async () =>
+    {
+        var mode = _engine.Snapshot.RequestedDecoder == DecoderMode.Hardware ? DecoderMode.Software : DecoderMode.Hardware;
+        await _engine.SetDecoderAsync(mode, CancellationToken.None);
+        _recorder.Update(s => s with { Decoder = mode }); // remembered for this file only
+    });
+
+    [RelayCommand]
+    private Task OpenSpeedAsync() => OpenSheetAsync("player-speed");
+
+    [RelayCommand]
+    private Task OpenRepeatAsync() => OpenSheetAsync("player-repeat");
+
+    [RelayCommand]
+    private Task OpenAudioAsync() => OpenSheetAsync("player-audio");
+
+    [RelayCommand]
+    private Task OpenSubtitlesAsync() => OpenSheetAsync("player-subtitles");
 
     [RelayCommand]
     private void ToggleHud()
@@ -180,6 +203,27 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
     }
 
+    /// <summary>Opens a settings sheet route. A second tap while the navigation runs is ignored. Never throws.</summary>
+    private async Task OpenSheetAsync(string route)
+    {
+        if (_sheetOpening) return;
+        _sheetOpening = true;
+        try
+        {
+            RestartHideTimer();
+            if (Shell.Current is { } shell) await shell.GoToAsync(route);
+        }
+        catch (Exception ex)
+        {
+            // The route may not exist yet; the sheet is then simply not opened.
+            System.Diagnostics.Debug.WriteLine($"Open {route} failed: {ex}");
+        }
+        finally
+        {
+            _sheetOpening = false;
+        }
+    }
+
     // Engine and store events arrive on background threads: marshal before touching properties.
     private void OnSnapshotChanged(object? sender, PlayerSnapshot snapshot) =>
         MainThread.BeginInvokeOnMainThread(() => { if (_active) ApplySnapshot(snapshot); });
@@ -209,6 +253,8 @@ public sealed partial class PlayerViewModel : ObservableObject
             DecoderMode.Software => "SW",
             _ => "...",
         };
+
+        SpeedText = snapshot.Speed.ToString("0.0#", CultureInfo.InvariantCulture) + "x";
 
         RefreshTitle();
 

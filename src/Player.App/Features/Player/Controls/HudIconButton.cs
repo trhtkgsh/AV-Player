@@ -39,7 +39,7 @@ public sealed class HudIconButton : ContentView
         typeof(HudIconButton),
         Colors.White,
         propertyChanged: (bindable, _, newValue) =>
-            ((HudIconButton)bindable)._icon.Fill = new SolidColorBrush((Color)newValue));
+            ((HudIconButton)bindable)._icon.Fill = new SolidColorBrush(newValue as Color ?? Colors.White));
 
     public static readonly BindableProperty CommandProperty = BindableProperty.Create(
         nameof(Command),
@@ -108,11 +108,11 @@ public sealed class HudIconButton : ContentView
             if (Command is { } command && command.CanExecute(null))
             {
                 command.Execute(null);
-            }
 
-            Opacity = 0.5;
-            await Task.Delay(90);
-            Opacity = 1;
+                Opacity = 0.5;
+                await Task.Delay(90);
+                Opacity = 1;
+            }
         }
         catch (Exception ex)
         {
