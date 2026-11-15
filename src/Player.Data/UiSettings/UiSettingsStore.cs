@@ -102,13 +102,16 @@ public sealed class UiSettingsStore : IUiSettingsStore
 		SkipSeconds = value.SkipSeconds,
 		ShowClock = value.ShowClock,
 		ShowBattery = value.ShowBattery,
-		ExplorerFields = value.ExplorerFields.ToString(),
-		ViewMode = value.ViewMode.ToString(),
-		SortField = value.SortField.ToString(),
-		SortDirection = value.SortDirection.ToString(),
+		ExplorerFields = Name(value.ExplorerFields),
+		ViewMode = Name(value.ViewMode),
+		SortField = Name(value.SortField),
+		SortDirection = Name(value.SortDirection),
 		NewTagDays = value.NewTagDays,
-		Language = value.Language.ToString(),
+		Language = Name(value.Language),
 	};
+
+	private static JsonElement Name<T>(T value) where T : struct, Enum =>
+		JsonSerializer.SerializeToElement(value.ToString(), UiSettingsJsonContext.Default.String);
 
 	// Each field falls back on its own: a missing or unreadable field takes the record default
 	// and never discards the others.
@@ -135,8 +138,27 @@ public sealed class UiSettingsStore : IUiSettingsStore
 		};
 	}
 
-	private static T ParseEnum<T>(string? text, T fallback) where T : struct, Enum =>
-		text is not null && Enum.TryParse(text, ignoreCase: true, out T parsed) ? parsed : fallback;
+	// Each enum field is read on its own: a name (any case), a number, or anything else. A name or number
+	// that is not defined is rejected by Normalize; anything else takes the default.
+	private static T ParseEnum<T>(JsonElement? element, T fallback) where T : struct, Enum
+	{
+		if (element is not { } value)
+		{
+			return fallback;
+		}
+
+		switch (value.ValueKind)
+		{
+			case JsonValueKind.String:
+				return value.GetString() is { } text && Enum.TryParse(text, ignoreCase: true, out T parsed)
+					? parsed
+					: fallback;
+			case JsonValueKind.Number:
+				return value.TryGetInt32(out var number) ? (T)Enum.ToObject(typeof(T), number) : fallback;
+			default:
+				return fallback;
+		}
+	}
 
 	private void RaiseChanged(UiSettings value)
 	{
