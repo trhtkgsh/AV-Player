@@ -38,7 +38,7 @@ public sealed partial class PictureInPictureController : IPictureInPictureContro
     private (bool Playing, VideoFormat? Format, bool OnLeave)? _lastKey;
     private volatile bool _leaveSetting;
     private volatile bool _paramsApplied;
-    private volatile bool _isActive = false;
+    private volatile bool _isActive;
     private volatile bool _disposed;
     private bool? _supported;
 
