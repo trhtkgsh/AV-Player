@@ -35,3 +35,7 @@
 **Escalation.** Stop and report when a wiring request needs logic rather than registration, a package version does not restore, or the same step failed twice. Never change a contract.
 
 **Report format.** `STATUS: done | blocked`, `BRANCH`, `FILES`, `BUILD`, `TESTS`, `DEVICE CHECKLIST` (items for the owner), `DEVIATIONS`, `QUESTIONS`.
+
+## Log
+
+- 2026-11-15 (P5-50): `MauiProgram` calls `AddFileOps()` after `AddMediaService()`. Checked the composition root: `MediaStoreFileOperations` needs `IPlaybackStateStore` (registered by `AddPlaybackStateStore()`) and `ConsentLauncher` (registered by `AddFileOps()` itself). No placeholder `IFileOperations` registration existed. Only the wiring line and its `using` changed.
