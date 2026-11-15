@@ -73,7 +73,7 @@ public sealed class HudIconButton : ContentView
         var grid = new Grid
         {
             BackgroundColor = Colors.Transparent,
-            MinimumWidthRequest = 48,
+            MinimumWidthRequest = 40,
             MinimumHeightRequest = 48,
         };
         grid.Children.Add(_icon);

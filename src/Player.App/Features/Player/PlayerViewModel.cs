@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.Devices;
 using Player.Core.Contracts;
 using Player.Core.Models;
 
@@ -13,12 +14,17 @@ namespace Player.App.Features.PlayerHud;
 /// </summary>
 public sealed partial class PlayerViewModel : ObservableObject
 {
-    private const int ClockRefreshSeconds = 15;
+    private const int StatusRefreshSeconds = 15;
+    private const int UnlockVisibleSeconds = 3;
 
     private readonly IPlayerEngine _engine;
     private readonly IPlaybackCoordinator _coordinator;
     private readonly IUiSettingsStore _uiSettings;
     private readonly IPlaybackStateRecorder _recorder;
+    private readonly ILocalizer _localizer;
+    private readonly IVideoSurface _surface;
+    private readonly IGestureSource _gestures;
+    private readonly PlayerGestureHandler _gestureHandler;
 
     private UiSettings _settings = new();
     private bool _active;
@@ -30,7 +36,8 @@ public sealed partial class PlayerViewModel : ObservableObject
     private bool _errorHandled;
     private double _enginePositionMs;
     private CancellationTokenSource? _hideCts;
-    private CancellationTokenSource? _clockCts;
+    private CancellationTokenSource? _statusCts;
+    private CancellationTokenSource? _unlockCts;
 
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private double _positionMs;
@@ -42,8 +49,13 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _isHudVisible = true;
     [ObservableProperty] private string _decoderText = "...";
     [ObservableProperty] private string _speedText = "1.0x";
-    [ObservableProperty] private bool _showClock;
-    [ObservableProperty] private string _clockText = "";
+    [ObservableProperty] private bool _showStatus;
+    [ObservableProperty] private string _statusText = "";
+    [ObservableProperty] private bool _isLocked;
+    [ObservableProperty] private bool _isUnlockVisible;
+
+    /// <summary>The on-screen indicator of gesture values.</summary>
+    public OsdViewModel Osd { get; }
 
     /// <summary>True while the play icon is shown; the pause icon is shown while playing.</summary>
     public bool ShowPlayIcon => !IsPlaying;
@@ -52,12 +64,21 @@ public sealed partial class PlayerViewModel : ObservableObject
         IPlayerEngine engine,
         IPlaybackCoordinator coordinator,
         IUiSettingsStore uiSettings,
-        IPlaybackStateRecorder recorder)
+        IPlaybackStateRecorder recorder,
+        ILocalizer localizer,
+        IGestureSource gestures,
+        IVideoSurface surface)
     {
         _engine = engine;
         _coordinator = coordinator;
         _uiSettings = uiSettings;
         _recorder = recorder;
+        _localizer = localizer;
+        _surface = surface;
+        _gestures = gestures;
+        Osd = new OsdViewModel();
+        _gestureHandler = new PlayerGestureHandler(
+            gestures, engine, coordinator, surface, localizer, Osd, () => _settings, ToggleHud);
     }
 
     /// <summary>Called when the page appears. Reads the settings once, then subscribes and starts the timers.</summary>
@@ -70,10 +91,14 @@ public sealed partial class PlayerViewModel : ObservableObject
         if (activation != _activation || _active) return; // deactivated, or another activation took over
 
         _active = true;
+        _gestures.Locked = IsLocked; // a locked page stays locked when it is activated again
+        if (IsLocked) IsHudVisible = false;
         ApplySettings(settings);
         _engine.SnapshotChanged += OnSnapshotChanged;
         _coordinator.Changed += OnCoordinatorChanged;
         _uiSettings.Changed += OnUiSettingsChanged;
+        _gestureHandler.Attach();
+        _surface.SetImmersive(true);
 
         ApplySnapshot(_engine.Snapshot);
         if (_returnFromSheet)
@@ -94,8 +119,11 @@ public sealed partial class PlayerViewModel : ObservableObject
         _engine.SnapshotChanged -= OnSnapshotChanged;
         _coordinator.Changed -= OnCoordinatorChanged;
         _uiSettings.Changed -= OnUiSettingsChanged;
+        _gestureHandler.Detach(); // the window stays immersive: a settings sheet may open on top
+        CancelUnlockTimer(); // the lock itself stays: a locked screen stays locked in the background
+        IsUnlockVisible = false;
         CancelHideTimer();
-        StopClock();
+        StopStatus();
     }
 
     partial void OnPositionMsChanged(double value)
@@ -147,7 +175,74 @@ public sealed partial class PlayerViewModel : ObservableObject
     [RelayCommand]
     private void ToggleHud()
     {
+        if (IsLocked)
+        {
+            ShowUnlockButton(); // while locked the HUD never shows; a tap only reveals the unlock button
+            return;
+        }
+
         IsHudVisible = !IsHudVisible;
+        RestartHideTimer();
+    }
+
+    /// <summary>While locked: shows the unlock button for 3 seconds. A new call restarts the 3 seconds.</summary>
+    public void ShowUnlockButton()
+    {
+        IsUnlockVisible = true;
+        CancelUnlockTimer();
+        var cts = new CancellationTokenSource();
+        _unlockCts = cts;
+        _ = HideUnlockAfterDelayAsync(cts.Token);
+    }
+
+    [RelayCommand]
+    private void Lock()
+    {
+        _gestures.Locked = true;
+        IsLocked = true;
+        CancelHideTimer();
+        IsHudVisible = false;
+        Osd.Show(_localizer["Player.Locked"]);
+    }
+
+    [RelayCommand]
+    private void Unlock()
+    {
+        ReleaseLock();
+        IsHudVisible = true;
+        RestartHideTimer();
+    }
+
+    /// <summary>Clears the lock in the gesture source and on the page. Safe to call when not locked.</summary>
+    private void ReleaseLock()
+    {
+        _gestures.Locked = false;
+        IsLocked = false;
+        CancelUnlockTimer();
+        IsUnlockVisible = false;
+    }
+
+    [RelayCommand]
+    private void CycleAspect()
+    {
+        var next = _surface.Aspect switch
+        {
+            AspectMode.Fit => AspectMode.Stretch,
+            AspectMode.Stretch => AspectMode.Crop,
+            AspectMode.Crop => AspectMode.Original,
+            _ => AspectMode.Fit,
+        };
+        _surface.SetAspect(next);
+        _recorder.Update(s => s with { Aspect = next }); // remembered for this file only
+
+        string key = next switch
+        {
+            AspectMode.Stretch => "Player.Aspect.Stretch",
+            AspectMode.Crop => "Player.Aspect.Crop",
+            AspectMode.Original => "Player.Aspect.Original",
+            _ => "Player.Aspect.Fit",
+        };
+        Osd.Show(_localizer[key]);
         RestartHideTimer();
     }
 
@@ -176,11 +271,19 @@ public sealed partial class PlayerViewModel : ObservableObject
     private async Task CloseAsync()
     {
         if (_closing) return;
+        if (IsLocked)
+        {
+            ShowUnlockButton(); // Back while locked: do not close, show the unlock button like a tap
+            return;
+        }
         _closing = true;
 
         try
         {
             await _coordinator.CloseAsync(CancellationToken.None);
+            ReleaseLock();
+            _surface.SetImmersive(false);
+            _surface.SetWindowBrightness(null);
             if (Shell.Current is { } shell) await shell.GoToAsync("..");
         }
         catch (OperationCanceledException)
@@ -207,7 +310,8 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            await ShowAlertAsync("Error", ex.Message);
+            System.Diagnostics.Debug.WriteLine($"Command failed: {ex}");
+            await ShowAlertAsync(_localizer["Common.Error"], _localizer["Player.ActionFailed"]);
         }
     }
 
@@ -274,15 +378,15 @@ public sealed partial class PlayerViewModel : ObservableObject
 
         if (snapshot.Status == PlayerStatus.Error)
         {
-            _ = HandleErrorAsync(snapshot.Error ?? "Unknown error.");
+            _ = HandleErrorAsync(snapshot.Error ?? "no message");
         }
     }
 
     private void ApplySettings(UiSettings settings)
     {
         _settings = settings;
-        ShowClock = settings.ShowClock;
-        UpdateClockState();
+        ShowStatus = settings.ShowClock || settings.ShowBattery;
+        UpdateStatusState();
     }
 
     private void RefreshTitle() => Title = _coordinator.Current?.DisplayName ?? "";
@@ -294,7 +398,9 @@ public sealed partial class PlayerViewModel : ObservableObject
         _errorHandled = true;
         try
         {
-            await ShowAlertAsync("Cannot play", message);
+            System.Diagnostics.Debug.WriteLine($"Playback error: {message}");
+            await ShowAlertAsync(_localizer["Player.CannotPlay"], _localizer["Player.CannotPlayMessage"]);
+            ReleaseLock(); // an error close must not be blocked by the lock
             await CloseAsync();
         }
         catch (Exception ex)
@@ -306,7 +412,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private void RestartHideTimer()
     {
         CancelHideTimer();
-        if (!_active) return;
+        if (!_active || IsLocked) return;
 
         var cts = new CancellationTokenSource();
         _hideCts = cts;
@@ -335,38 +441,63 @@ public sealed partial class PlayerViewModel : ObservableObject
         if (!ct.IsCancellationRequested && IsPlaying && !_dragging) IsHudVisible = false;
     }
 
-    /// <summary>The clock runs only while active and ShowClock is on.</summary>
-    private void UpdateClockState()
+    private void CancelUnlockTimer()
     {
-        if (!_active || !ShowClock)
+        _unlockCts?.Cancel();
+        _unlockCts?.Dispose();
+        _unlockCts = null;
+    }
+
+    private async Task HideUnlockAfterDelayAsync(CancellationToken ct)
+    {
+        try
         {
-            StopClock();
+            await Task.Delay(TimeSpan.FromSeconds(UnlockVisibleSeconds), ct);
+        }
+        catch (OperationCanceledException)
+        {
             return;
         }
 
-        if (_clockCts is not null) return; // already running
+        if (!ct.IsCancellationRequested) IsUnlockVisible = false;
+    }
 
-        UpdateClock();
+    /// <summary>The status line runs only while active and ShowStatus is on.</summary>
+    private void UpdateStatusState()
+    {
+        if (!_active || !ShowStatus)
+        {
+            StopStatus();
+            return;
+        }
+
+        if (_statusCts is not null)
+        {
+            UpdateStatus(); // already running: show the new settings at once
+            return;
+        }
+
+        UpdateStatus();
         var cts = new CancellationTokenSource();
-        _clockCts = cts;
-        _ = RunClockAsync(cts.Token);
+        _statusCts = cts;
+        _ = RunStatusAsync(cts.Token);
     }
 
-    private void StopClock()
+    private void StopStatus()
     {
-        _clockCts?.Cancel();
-        _clockCts?.Dispose();
-        _clockCts = null;
+        _statusCts?.Cancel();
+        _statusCts?.Dispose();
+        _statusCts = null;
     }
 
-    private async Task RunClockAsync(CancellationToken ct)
+    private async Task RunStatusAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(ClockRefreshSeconds));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(StatusRefreshSeconds));
         try
         {
             while (await timer.WaitForNextTickAsync(ct))
             {
-                UpdateClock();
+                UpdateStatus();
             }
         }
         catch (OperationCanceledException)
@@ -375,19 +506,43 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
     }
 
-    private void UpdateClock()
+    /// <summary>Builds the status line: the clock and the battery percentage, joined by two spaces.</summary>
+    private void UpdateStatus()
     {
-        if (ShowClock) ClockText = DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture);
+        var parts = new List<string>(2);
+        if (_settings.ShowClock) parts.Add(DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture));
+        if (_settings.ShowBattery && ReadBatteryPercent() is { } percent)
+        {
+            parts.Add(percent.ToString(CultureInfo.InvariantCulture) + "%");
+        }
+
+        StatusText = "\u200E" + string.Join("  ", parts); // LTR mark: the clock and the percentage keep their order in RTL
     }
 
-    /// <summary>Shows an alert. Never throws, so it is safe to await inside a catch block.</summary>
-    private static async Task ShowAlertAsync(string title, string message)
+    /// <summary>The battery level in percent, or null when it is unknown. Never throws.</summary>
+    private static int? ReadBatteryPercent()
+    {
+        try
+        {
+            double level = Battery.Default.ChargeLevel;
+            if (double.IsNaN(level) || level < 0) return null;
+            return (int)Math.Round(Math.Clamp(level, 0d, 1d) * 100d);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Battery level unavailable: {ex}");
+            return null;
+        }
+    }
+
+    /// <summary>Shows an alert with the localized OK button. Never throws, so it is safe to await inside a catch block.</summary>
+    private async Task ShowAlertAsync(string title, string message)
     {
         try
         {
             if (Shell.Current is { } shell)
             {
-                await shell.DisplayAlertAsync(title, message, "OK");
+                await shell.DisplayAlertAsync(title, message, _localizer["Common.Ok"]);
             }
         }
         catch (Exception ex)
