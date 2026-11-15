@@ -10,8 +10,8 @@ public sealed record UiSettings
     public bool ShowClock { get; init; } = true;
     public bool ShowBattery { get; init; } = true;
 
-    public ExplorerInfoFields ExplorerFields { get; init; } =
-        ExplorerInfoFields.Duration | ExplorerInfoFields.Resolution | ExplorerInfoFields.Size;
+    /// <summary>The details shown under a file name in the explorer. None by default: the name only.</summary>
+    public ExplorerInfoFields ExplorerFields { get; init; } = ExplorerInfoFields.None;
 
     public ExplorerViewMode ViewMode { get; init; } = ExplorerViewMode.Folders;
     public SortField SortField { get; init; } = SortField.Name;
@@ -23,6 +23,9 @@ public sealed record UiSettings
 
     /// <summary>Rows or tiles in the explorer.</summary>
     public ExplorerLayout Layout { get; init; } = ExplorerLayout.List;
+
+    /// <summary>Size of the thumbnails in rows and of the tiles in the grid.</summary>
+    public ExplorerItemSize ItemSize { get; init; } = ExplorerItemSize.Large;
 
     /// <summary>Scale of folder and file names in the explorer: 0.8 .. 1.6.</summary>
     public double ExplorerFontScale { get; init; } = 1.0;
@@ -46,13 +49,22 @@ public sealed record PlaybackOverlaySettings
     /// <summary>The thin progress line. It uses the theme's progress color.</summary>
     public bool ProgressLine { get; init; } = true;
 
+    /// <summary>Height of the progress line, in device-independent units: 1 .. 12.</summary>
+    public int ProgressLineThickness { get; init; } = 2;
+
     public OverlayEdge ProgressLineEdge { get; init; } = OverlayEdge.Bottom;
     public bool Clock { get; init; } = true;
     public bool Battery { get; init; } = true;
     public OverlayTimeMode Time { get; init; } = OverlayTimeMode.ElapsedTotal;
 
-    /// <summary>The corner of the screen (not of the picture) that holds the text.</summary>
+    /// <summary>The corner of the screen (not of the picture) that holds the playback times.</summary>
     public OverlayCorner Corner { get; init; } = OverlayCorner.TopRight;
+
+    /// <summary>The corner of the clock. Texts that share a corner are joined into one line.</summary>
+    public OverlayCorner ClockCorner { get; init; } = OverlayCorner.TopLeft;
+
+    /// <summary>The corner of the battery level.</summary>
+    public OverlayCorner BatteryCorner { get; init; } = OverlayCorner.TopLeft;
 
     /// <summary>Distance of the text from the screen edges, in device-independent units: 0 .. 48.</summary>
     public int MarginDp { get; init; }
@@ -67,6 +79,8 @@ public sealed record PlaybackOverlaySettings
     public const int MaxMarginDp = 48;
     public const int MinFontSize = 10;
     public const int MaxFontSize = 24;
+    public const int MinProgressLineThickness = 1;
+    public const int MaxProgressLineThickness = 12;
 }
 
 /// <summary>One text of the user interface in every supported language.</summary>

@@ -24,6 +24,12 @@ public enum ExplorerViewMode { Folders, Flat, Tree, Favorites }
 /// <summary>Rows, or tiles with a large thumbnail.</summary>
 public enum ExplorerLayout { List, Grid }
 
+/// <summary>
+/// Large: rows with a wide thumbnail, two tiles in a portrait row. Small: rows with a small thumbnail,
+/// three tiles in a portrait row.
+/// </summary>
+public enum ExplorerItemSize { Large, Small }
+
 public enum ThemeId { DarkOled, DarkSlate, Light, HighContrast }
 
 /// <summary>The language of the user interface. System follows the language of the device.</summary>
