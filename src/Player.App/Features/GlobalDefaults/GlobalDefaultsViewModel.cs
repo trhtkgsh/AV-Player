@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 using Player.Core.Contracts;
 using Player.Core.Models;
@@ -64,6 +66,12 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
     private bool _resumeFromLastPosition;
 
     [ObservableProperty]
+    private bool _backgroundAudio;
+
+    [ObservableProperty]
+    private bool _pictureInPictureOnLeave;
+
+    [ObservableProperty]
     private string _preferredAudioLanguage = string.Empty;
 
     [ObservableProperty]
@@ -116,6 +124,8 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
             IsRepeatFile = stored.Repeat == RepeatMode.File;
             IsRepeatFolder = stored.Repeat == RepeatMode.Folder;
             ResumeFromLastPosition = stored.ResumeFromLastPosition;
+            BackgroundAudio = stored.BackgroundAudio;
+            PictureInPictureOnLeave = stored.PictureInPictureOnLeave;
             PreferredAudioLanguage = stored.PreferredAudioLanguage ?? string.Empty;
             AudioDelayMs = stored.AudioDelayMs;
             SubtitlesEnabled = stored.SubtitlesEnabled;
@@ -146,6 +156,26 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
         }
 
         _ = SaveAsync(d => d with { ResumeFromLastPosition = value });
+    }
+
+    partial void OnBackgroundAudioChanged(bool value)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        _ = SetBackgroundAudioAsync(value);
+    }
+
+    partial void OnPictureInPictureOnLeaveChanged(bool value)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        _ = SaveAsync(d => d with { PictureInPictureOnLeave = value });
     }
 
     partial void OnSubtitlesEnabledChanged(bool value)
@@ -334,12 +364,8 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
                 return;
             }
 
-            // Reset restores the record defaults. The two fields this page does not show keep their stored values.
-            if (await SaveAsync(stored => new GlobalDefaults
-            {
-                BackgroundAudio = stored.BackgroundAudio,
-                PictureInPictureOnLeave = stored.PictureInPictureOnLeave,
-            }))
+            // Reset restores the record defaults for every field, the two background rows included.
+            if (await SaveAsync(_ => new GlobalDefaults()))
             {
                 await LoadAsync();
             }
@@ -347,6 +373,27 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+        }
+    }
+
+    // The notification permission is asked once, after the switch is turned on and the save succeeded.
+    // Playback works without it: the result is ignored, and a failure (for example the manifest declaration
+    // is not there yet) is only logged, never shown.
+    private async Task SetBackgroundAudioAsync(bool value)
+    {
+        if (!await SaveAsync(d => d with { BackgroundAudio = value }) || !value)
+        {
+            return;
+        }
+
+        try
+        {
+            // The save resumes on the UI thread (the awaits in SaveAsync capture it), where the request must run.
+            await Permissions.RequestAsync<Permissions.PostNotifications>();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine("Notification permission request failed: " + ex.Message);
         }
     }
 

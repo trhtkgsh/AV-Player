@@ -49,6 +49,20 @@
                 <Switch Grid.Column="1" IsToggled="{Binding ResumeFromLastPosition, Mode=TwoWay}" />
             </Grid>
 
+            <Label Text="{loc:T Defaults.Background}" Style="{StaticResource LabelSection}" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="{loc:T Defaults.BackgroundAudio}" VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding BackgroundAudio, Mode=TwoWay}" />
+            </Grid>
+            <Label Text="{loc:T Defaults.BackgroundAudio.Detail}" Style="{StaticResource LabelMuted}" />
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="{loc:T Defaults.PictureInPicture}" VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding PictureInPictureOnLeave, Mode=TwoWay}" />
+            </Grid>
+            <Label Text="{loc:T Defaults.PictureInPicture.Detail}" Style="{StaticResource LabelMuted}" />
+
             <Label Text="{loc:T Defaults.Audio}" Style="{StaticResource LabelSection}" />
 
             <Label Text="{loc:T Defaults.PreferredAudioLanguage}" />
