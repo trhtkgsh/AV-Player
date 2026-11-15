@@ -42,7 +42,7 @@ public sealed partial class MediaStoreFileOperations : IFileOperations
 
 		if (FileOperationRules.IsSameName(item.DisplayName, newDisplayName))
 		{
-			return new FileOperationResult(FileOperationStatus.Success, item, null);
+			return new FileOperationResult(FileOperationStatus.Success, item, null) { CompletedCount = 1 };
 		}
 
 		var committed = false;
@@ -98,7 +98,7 @@ public sealed partial class MediaStoreFileOperations : IFileOperations
 			Log.Warn(Tag, $"Reading back the renamed file failed: {ex}");
 		}
 
-		return new FileOperationResult(FileOperationStatus.Success, updated, null);
+		return new FileOperationResult(FileOperationStatus.Success, updated, null) { CompletedCount = 1 };
 	}
 
 	public async Task<FileOperationResult> TrashAsync(IReadOnlyList<MediaItem> items, CancellationToken ct)
@@ -117,7 +117,7 @@ public sealed partial class MediaStoreFileOperations : IFileOperations
 			FileOperationResult? failure;
 			if (OperatingSystem.IsAndroidVersionAtLeast(30))
 			{
-				var withSubtitles = uris.Concat(subtitles.Values.SelectMany(s => s).Select(s => AndroidUri.Parse(s.ContentUri)!)).ToList();
+				var withSubtitles = uris.Concat(subtitles.Values.SelectMany(s => s).Select(s => s.ContentUri).Distinct().Select(s => AndroidUri.Parse(s)!)).ToList();
 				IntentSender sender;
 				try
 				{
@@ -161,7 +161,7 @@ public sealed partial class MediaStoreFileOperations : IFileOperations
 				await DeleteSidecarsAsync(removed, subtitles).ConfigureAwait(false);
 			}
 
-			return failure ?? new FileOperationResult(FileOperationStatus.Success, null, null);
+			return FileOperationRules.WithCount(failure ?? new FileOperationResult(FileOperationStatus.Success, null, null), removed.Count);
 		}
 		catch (Exception ex)
 		{
@@ -169,11 +169,11 @@ public sealed partial class MediaStoreFileOperations : IFileOperations
 			await DeleteStatesAsync(removed).ConfigureAwait(false);
 			if (ex is OperationCanceledException)
 			{
-				return FileOperationRules.Cancelled();
+				return FileOperationRules.WithCount(FileOperationRules.Cancelled(), removed.Count);
 			}
 
 			Log.Warn(Tag, $"Trash failed: {ex}");
-			return FileOperationRules.Failed(ex.Message);
+			return FileOperationRules.WithCount(FileOperationRules.Failed(ex.Message), removed.Count);
 		}
 	}
 

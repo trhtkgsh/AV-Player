@@ -46,6 +46,9 @@ public sealed partial class MediaStoreFileOperations
 
 		public List<(MediaItem Item, AndroidUri Uri)> Moved { get; } = [];
 
+		/// <summary>Subtitles already moved or copied, by URI: one shared by several files is handled once.</summary>
+		public HashSet<string> HandledSubtitles { get; } = new(StringComparer.Ordinal);
+
 		public void Fail(string error) => FirstError ??= error;
 	}
 
@@ -80,8 +83,9 @@ public sealed partial class MediaStoreFileOperations
 	{
 		if (target.Directory is not null)
 		{
-			var siblings = new JavaFile(target.Directory).List();
-			return siblings is not null && siblings.Any(s => string.Equals(s, name, StringComparison.OrdinalIgnoreCase));
+			var siblings = new JavaFile(target.Directory).List()
+				?? throw new InvalidOperationException("The target folder cannot be read.");
+			return siblings.Any(s => string.Equals(s, name, StringComparison.OrdinalIgnoreCase));
 		}
 
 		using var cursor = Resolver.Query(
@@ -89,11 +93,11 @@ public sealed partial class MediaStoreFileOperations
 			["_id"],
 			"relative_path = ? AND _display_name = ? COLLATE NOCASE AND _id != ?",
 			[target.RelativePath!, name, excludeId.ToString(CultureInfo.InvariantCulture)],
-			null);
-		return cursor is not null && cursor.MoveToFirst();
+			null) ?? throw new InvalidOperationException("The target folder cannot be read.");
+		return cursor.MoveToFirst();
 	}
 
-	/// <summary>Subtitles per item (by id), best effort, each file once, never one of the selected files. Never throws.</summary>
+	/// <summary>Subtitles per item (by id), best effort, never one of the selected files. A subtitle may belong to several items; callers handle it once. Never throws.</summary>
 	private async Task<Dictionary<MediaFileId, IReadOnlyList<SubtitleFile>>> CollectSubtitlesAsync(IReadOnlyList<MediaItem> items, CancellationToken ct)
 	{
 		var result = new Dictionary<MediaFileId, IReadOnlyList<SubtitleFile>>();
@@ -108,7 +112,7 @@ public sealed partial class MediaStoreFileOperations
 			try
 			{
 				var found = await _subtitles.FindSidecarsAsync(item, ct).ConfigureAwait(false);
-				result[item.Id] = found.Where(s => seen.Add(s.ContentUri)).ToList();
+				result[item.Id] = found.Where(s => !seen.Contains(s.ContentUri)).ToList();
 			}
 			catch (Exception ex)
 			{
@@ -123,7 +127,7 @@ public sealed partial class MediaStoreFileOperations
 	{
 		try
 		{
-			var uris = removed.Where(i => subtitles.ContainsKey(i.Id)).SelectMany(i => subtitles[i.Id]).Select(s => s.ContentUri).ToList();
+			var uris = removed.Where(i => subtitles.ContainsKey(i.Id)).SelectMany(i => subtitles[i.Id]).Select(s => s.ContentUri).Distinct().ToList();
 			await Task.Run(() =>
 			{
 				foreach (var text in uris)
@@ -229,7 +233,7 @@ public sealed partial class MediaStoreFileOperations
 				{
 					case Step.Done:
 						Record(unit, run);
-						MoveSubtitles(unit, folder, pendingSubtitles);
+						MoveSubtitles(unit, folder, pendingSubtitles, run);
 						break;
 					case Step.NeedsConsent:
 						pending.Add(unit);
@@ -241,65 +245,97 @@ public sealed partial class MediaStoreFileOperations
 			}
 		}, ct).ConfigureAwait(false);
 
-		var retry = pending.Concat(pendingSubtitles).ToList();
-		if (retry.Count == 0)
+		var pendingUris = pending.Select(u => u.Uri).ToList();
+		var queuedSubtitles = pendingSubtitles.DistinctBy(u => u.Uri.ToString()).ToList();
+		if (pending.Count == 0 && queuedSubtitles.Count == 0)
 		{
 			return null;
 		}
 
 		if (OperatingSystem.IsAndroidVersionAtLeast(30))
 		{
-			var uris = retry.Concat(pending.SelectMany(p => p.Subtitles)).Select(u => u.Uri).DistinctBy(u => u.ToString()).ToList();
-			IntentSender sender;
+			var uris = pendingUris.Concat(pending.SelectMany(p => p.Subtitles).Concat(queuedSubtitles).Select(u => u.Uri)).DistinctBy(u => u.ToString()).ToList();
+			IntentSender? sender = null;
 			try
 			{
 				sender = await Task.Run(() => OperatingSystem.IsAndroidVersionAtLeast(30) ? WriteRequest(uris) : null!, ct).ConfigureAwait(false);
 			}
-			catch (Exception ex) when (ex is not OperationCanceledException)
+			catch (Exception ex) when (ex is not OperationCanceledException || pending.Count == 0)
 			{
-				Log.Warn(Tag, $"The write request with subtitles was refused, trying without them: {ex.Message}");
-				var onlyItems = pending.Select(u => u.Uri).ToList();
-				sender = await Task.Run(() => OperatingSystem.IsAndroidVersionAtLeast(30) ? WriteRequest(onlyItems) : null!, ct).ConfigureAwait(false);
+				Log.Warn(Tag, $"The write request with subtitles was refused: {ex.Message}");
+				if (pending.Count > 0)
+				{
+					sender = await Task.Run(() => OperatingSystem.IsAndroidVersionAtLeast(30) ? WriteRequest(pendingUris) : null!, ct).ConfigureAwait(false);
+				}
+			}
+
+			if (sender is null)
+			{
+				// Only subtitles were waiting: nothing to ask, the main result stays.
+				return null;
 			}
 
 			var refused = await AskAsync(sender, ct).ConfigureAwait(false);
 			if (refused is not null)
 			{
-				return refused;
+				// Files in the list decide the result; a declined subtitle-only dialog changes nothing.
+				return pending.Count > 0 ? refused : null;
 			}
 		}
 
-		foreach (var unit in retry)
+		foreach (var unit in pending.Concat(queuedSubtitles))
 		{
-			if (!OperatingSystem.IsAndroidVersionAtLeast(30))
+			var isSubtitle = unit.Item is null;
+			try
 			{
-				if (unit.Sender is null)
+				if (!OperatingSystem.IsAndroidVersionAtLeast(30))
 				{
-					FailOrLog(unit, run, FileOperationRules.AccessDeniedError);
-					continue;
+					if (unit.Sender is null)
+					{
+						FailOrLog(unit, run, FileOperationRules.AccessDeniedError);
+						continue;
+					}
+
+					var refused = await AskAsync(unit.Sender, ct).ConfigureAwait(false);
+					if (refused is not null)
+					{
+						if (isSubtitle)
+						{
+							continue;
+						}
+
+						return refused;
+					}
 				}
 
-				var refused = await AskAsync(unit.Sender, ct).ConfigureAwait(false);
-				if (refused is not null)
+				await Task.Run(() =>
 				{
-					return refused;
-				}
+					if (!isSubtitle)
+					{
+						ct.ThrowIfCancellationRequested();
+					}
+
+					if (isSubtitle && run.HandledSubtitles.Contains(unit.Uri.ToString()!))
+					{
+						return;
+					}
+
+					var step = TryMove(unit, folder);
+					if (step == Step.Done)
+					{
+						Record(unit, run);
+						MoveSubtitles(unit, folder, null, run);
+					}
+					else
+					{
+						FailOrLog(unit, run, step == Step.NeedsConsent ? FileOperationRules.AccessDeniedError : unit.Error!);
+					}
+				}, CancellationToken.None).ConfigureAwait(false);
 			}
-
-			await Task.Run(() =>
+			catch (Exception ex) when (isSubtitle)
 			{
-				ct.ThrowIfCancellationRequested();
-				var step = TryMove(unit, folder);
-				if (step == Step.Done)
-				{
-					Record(unit, run);
-					MoveSubtitles(unit, folder, null);
-				}
-				else
-				{
-					FailOrLog(unit, run, step == Step.NeedsConsent ? FileOperationRules.AccessDeniedError : unit.Error!);
-				}
-			}, ct).ConfigureAwait(false);
+				Log.Warn(Tag, $"Subtitle {unit.Name} was not moved: {ex.Message}");
+			}
 		}
 
 		return null;
@@ -324,19 +360,33 @@ public sealed partial class MediaStoreFileOperations
 			run.Done++;
 			run.Moved.Add((unit.Item, unit.Uri));
 		}
+		else
+		{
+			run.HandledSubtitles.Add(unit.Uri.ToString()!);
+		}
 	}
 
 	// Subtitles never fail the move: a refusal that needs consent is queued when a queue is given.
-	private void MoveSubtitles(MoveUnit unit, TargetFolder folder, List<MoveUnit>? queue)
+	// A subtitle shared by several files is moved once, after the first of them was moved.
+	private void MoveSubtitles(MoveUnit unit, TargetFolder folder, List<MoveUnit>? queue, BatchRun run)
 	{
 		foreach (var sub in unit.Subtitles)
 		{
+			if (run.HandledSubtitles.Contains(sub.Uri.ToString()!))
+			{
+				continue;
+			}
+
 			var step = TryMove(sub, folder);
-			if (step == Step.NeedsConsent && queue is not null)
+			if (step == Step.Done)
+			{
+				Record(sub, run);
+			}
+			else if (step == Step.NeedsConsent && queue is not null)
 			{
 				queue.Add(sub);
 			}
-			else if (step != Step.Done)
+			else
 			{
 				Log.Warn(Tag, $"Subtitle {sub.Name} was not moved: {sub.Error ?? "no permission"}");
 			}
@@ -395,9 +445,25 @@ public sealed partial class MediaStoreFileOperations
 				Record(unit, run);
 				foreach (var sub in unit.Subtitles)
 				{
-					if (!TryMoveLegacy(sub, folder))
+					if (run.HandledSubtitles.Contains(sub.Uri.ToString()!))
 					{
-						Log.Warn(Tag, $"Subtitle {sub.Name} was not moved: {sub.Error}");
+						continue;
+					}
+
+					try
+					{
+						if (TryMoveLegacy(sub, folder))
+						{
+							Record(sub, run);
+						}
+						else
+						{
+							Log.Warn(Tag, $"Subtitle {sub.Name} was not moved: {sub.Error}");
+						}
+					}
+					catch (Exception ex)
+					{
+						Log.Warn(Tag, $"Subtitle {sub.Name} was not moved: {ex.Message}");
 					}
 				}
 			}
@@ -426,9 +492,18 @@ public sealed partial class MediaStoreFileOperations
 				return false;
 			}
 
-			using var values = new ContentValues();
-			values.Put("_data", destination.AbsolutePath);
-			Resolver.Update(unit.Uri, values, null, null);
+			// The file is moved: a row update that fails now is only logged.
+			try
+			{
+				using var values = new ContentValues();
+				values.Put("_data", destination.AbsolutePath);
+				Resolver.Update(unit.Uri, values, null, null);
+			}
+			catch (Exception ex)
+			{
+				Log.Warn(Tag, $"The row of {unit.Name} was not updated after the move: {ex.Message}");
+			}
+
 			return true;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException && ex is not JavaSecurityException)
@@ -513,7 +588,17 @@ public sealed partial class MediaStoreFileOperations
 		foreach (var item in items)
 		{
 			ct.ThrowIfCancellationRequested();
-			var name = FileOperationRules.FreeName(item.DisplayName, n => NameExistsAt(folder, n, -1));
+			string name;
+			try
+			{
+				name = FileOperationRules.FreeName(item.DisplayName, n => NameExistsAt(folder, n, -1));
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				run.Fail($"{item.DisplayName}: {ex.Message}");
+				continue;
+			}
+
 			var error = CopyRow(item.Kind == MediaKind.Video ? VideoCollection(folder) : AudioCollection(folder), AndroidUri.Parse(item.ContentUri)!, name, item.MimeType, folder, ct);
 			if (error is not null)
 			{
@@ -529,15 +614,31 @@ public sealed partial class MediaStoreFileOperations
 
 			foreach (var sub in found)
 			{
-				ct.ThrowIfCancellationRequested();
-				var subName = FileOperationRules.SidecarName(item.DisplayName, name, sub.DisplayName);
-				subName = FileOperationRules.FreeName(subName, n => NameExistsAt(folder, n, -1));
-				var uri = AndroidUri.Parse(sub.ContentUri)!;
-				var mime = ReadString(uri, "mime_type") ?? "application/octet-stream";
-				var problem = CopyRow(MediaStore.Files.GetContentUri(folder.Volume!)!, uri, subName, mime, folder, ct);
-				if (problem is not null)
+				if (run.HandledSubtitles.Contains(sub.ContentUri))
 				{
-					Log.Warn(Tag, $"Subtitle {sub.DisplayName} was not copied: {problem}");
+					continue;
+				}
+
+				ct.ThrowIfCancellationRequested();
+				try
+				{
+					var subName = FileOperationRules.SidecarName(item.DisplayName, name, sub.DisplayName);
+					subName = FileOperationRules.FreeName(subName, n => NameExistsAt(folder, n, -1));
+					var uri = AndroidUri.Parse(sub.ContentUri)!;
+					var mime = ReadString(uri, "mime_type") ?? "application/octet-stream";
+					var problem = CopyRow(MediaStore.Files.GetContentUri(folder.Volume!)!, uri, subName, mime, folder, ct);
+					if (problem is null)
+					{
+						run.HandledSubtitles.Add(sub.ContentUri);
+					}
+					else
+					{
+						Log.Warn(Tag, $"Subtitle {sub.DisplayName} was not copied: {problem}");
+					}
+				}
+				catch (Exception ex) when (ex is not OperationCanceledException)
+				{
+					Log.Warn(Tag, $"Subtitle {sub.DisplayName} was not copied: {ex.Message}");
 				}
 			}
 		}
@@ -620,7 +721,17 @@ public sealed partial class MediaStoreFileOperations
 		foreach (var item in items)
 		{
 			ct.ThrowIfCancellationRequested();
-			var name = FileOperationRules.FreeName(item.DisplayName, n => NameExistsAt(folder, n, -1));
+			string name;
+			try
+			{
+				name = FileOperationRules.FreeName(item.DisplayName, n => NameExistsAt(folder, n, -1));
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				run.Fail($"{item.DisplayName}: {ex.Message}");
+				continue;
+			}
+
 			var error = CopyFileLegacy(AndroidUri.Parse(item.ContentUri)!, name, item.MimeType, folder, ct);
 			if (error is not null)
 			{
@@ -631,13 +742,29 @@ public sealed partial class MediaStoreFileOperations
 			run.Done++;
 			foreach (var sub in subtitles.TryGetValue(item.Id, out var found) ? found : [])
 			{
-				ct.ThrowIfCancellationRequested();
-				var subName = FileOperationRules.SidecarName(item.DisplayName, name, sub.DisplayName);
-				subName = FileOperationRules.FreeName(subName, n => NameExistsAt(folder, n, -1));
-				var problem = CopyFileLegacy(AndroidUri.Parse(sub.ContentUri)!, subName, null, folder, ct);
-				if (problem is not null)
+				if (run.HandledSubtitles.Contains(sub.ContentUri))
 				{
-					Log.Warn(Tag, $"Subtitle {sub.DisplayName} was not copied: {problem}");
+					continue;
+				}
+
+				ct.ThrowIfCancellationRequested();
+				try
+				{
+					var subName = FileOperationRules.SidecarName(item.DisplayName, name, sub.DisplayName);
+					subName = FileOperationRules.FreeName(subName, n => NameExistsAt(folder, n, -1));
+					var problem = CopyFileLegacy(AndroidUri.Parse(sub.ContentUri)!, subName, null, folder, ct);
+					if (problem is null)
+					{
+						run.HandledSubtitles.Add(sub.ContentUri);
+					}
+					else
+					{
+						Log.Warn(Tag, $"Subtitle {sub.DisplayName} was not copied: {problem}");
+					}
+				}
+				catch (Exception ex) when (ex is not OperationCanceledException)
+				{
+					Log.Warn(Tag, $"Subtitle {sub.DisplayName} was not copied: {ex.Message}");
 				}
 			}
 		}
@@ -646,18 +773,18 @@ public sealed partial class MediaStoreFileOperations
 	private string? CopyFileLegacy(AndroidUri source, string name, string? mime, TargetFolder folder, CancellationToken ct)
 	{
 		var path = Path.Combine(folder.Directory!, name);
+		var created = false;
 		var complete = false;
 		try
 		{
 			using (var input = Resolver.OpenInputStream(source) ?? throw new InvalidOperationException("The source file cannot be read."))
 			using (var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, CopyBufferSize))
 			{
+				created = true; // only a file this call created may be deleted again
 				CopyStream(input, output, ct);
 			}
 
 			complete = true;
-			global::Android.Media.MediaScannerConnection.ScanFile(_context, [path], mime is null ? null : [mime], null);
-			return null;
 		}
 		catch (Exception ex) when (ex is not OperationCanceledException)
 		{
@@ -666,7 +793,7 @@ public sealed partial class MediaStoreFileOperations
 		}
 		finally
 		{
-			if (!complete)
+			if (created && !complete)
 			{
 				try
 				{
@@ -678,5 +805,17 @@ public sealed partial class MediaStoreFileOperations
 				}
 			}
 		}
+
+		// The copy is complete: a scan failure is only logged.
+		try
+		{
+			global::Android.Media.MediaScannerConnection.ScanFile(_context, [path], mime is null ? null : [mime], null);
+		}
+		catch (Exception ex)
+		{
+			Log.Warn(Tag, $"Scanning the copy failed: {ex.Message}");
+		}
+
+		return null;
 	}
 }
