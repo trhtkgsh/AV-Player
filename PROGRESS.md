@@ -16,7 +16,7 @@ smoke-tested on the emulator: explorer, playback, HUD, decoder switch, 4 backgro
 | Phase | Build | Tests | Reviewer | Owner device test | Status |
 |---|---|---|---|---|---|
 | 0 Spike | green (spike) | n/a | n/a | pending | go on emulator, waiting for owner device test (docs/SPIKE.md) |
-| 1 | green (Debug and Release) | 307 pass (Core). Data layer: none yet | every merged task approved | pending | built and verified on the emulator, waiting for the owner |
+| 1 | green (Debug and Release) | 349 pass (307 Core, 42 Data) | every merged task approved, except P1-27 (tests only, Sonnet, checked by the orchestrator) | pending | built and verified on the emulator, waiting for the owner |
 | 2 | - | - | - | - | not started |
 | 3 | - | - | - | - | not started |
 | 4 | - | - | - | - | not started |
@@ -72,7 +72,7 @@ the orchestrator.
 | P1-25 | playback-coordinator | Sonnet 5.5 | task/p1-25-coordinator-fixes | 1 | merged. 11 fixes for the gate reviewer's findings. Reviewer: approve. Next, Prev (restart and previous item) checked on the emulator. |
 | P1-16a/b | test-writer | Sonnet 5.5 (escalated) | task/p1-16-tests-core-b | 1 each | merged. Surface geometry, theming, info formatter, sorter and resolver gaps. No product bug found. |
 | P1-26 | test-writer | Sonnet 5.5 | task/p1-26-tests-coordinator | 1 | merged. 77 coordinator test cases with fakes, 5 runs in a row green. No product bug found. Core total: 307. |
-| P1-27 | test-writer | Sonnet 5.5 | task/p1-27-tests-data | 1 launch died on the same model stream error after about 7 hours with only a `Support` folder written, and no completion notice reached the orchestrator. | OPEN: the data layer (`DbConnectionProvider`, `SettingsRepository`, `MediaMetadataRepository`) has no tests. |
+| P1-27 | test-writer | Sonnet 5.5 | task/p1-27-tests-data | 6 launches, 3 died on the model stream error (the first one silently, overnight) | merged. Split into three launches of one test file each, with a commit after each. 42 tests against a real SQLite file: `DbConnectionProvider` 12, `SettingsRepository` 13, `MediaMetadataMigration` and `MediaMetadataRepository` 17 plus 1. No product bug found. No separate reviewer pass: the orchestrator read the tests and ran the whole suite. |
 | P1-28 | player-engine, video-surface | Fable 5.2 (orchestrator) | task/p1-28-reveal-fixes | 1 | merged. Reviewer of P1-24: changes-required (a seek during a frame reveal), approve after the fix. Emulator: 10 of 10 and 6 of 6 paused background cycles, 10 rapid open/close cycles. |
 | publish | orchestrator | - | main at 2826f17 | 3 | Release APK. Attempt 1 (`-r android-x64`) built an APK without LibVLC. Attempt 2 (`-p:RuntimeIdentifiers`) failed to build. Attempt 3 (no RID) is correct and verified on the emulator. See ARCHITECTURE.md section 5. |
 
@@ -90,11 +90,12 @@ picture restored and hardware decoding kept, vertical video, audio file, 8 rapid
 Defects found and fixed: shell route (P1-18), native library load thread and late picture after backgrounding (P1-19).
 Not verified: anything on a physical device, HEVC, 4K, 500+ files, API levels other than 34, a Release build on a device.
 
-Phase 1 tasks not finished: P1-27 (data layer tests), owner device test.
+Phase 1 tasks not finished: the owner's device test.
 
-The stream error is not tied to the model: it hit test-writer on Haiku three times and on Sonnet once (4 of 8
-launches), and no other agent. Its cause is unknown. A failed launch does not always notify the orchestrator, so a
-background test-writer must be polled.
+The stream error is not tied to the model: it hit test-writer on Haiku three times and on Sonnet four times (7 of
+13 launches), and no other agent. Its cause is unknown. What worked: one test file per launch, launched in sync mode,
+with a commit at the end, so a dead launch loses a few minutes and is simply repeated. A background launch that dies
+does not always notify the orchestrator.
 
 Lessons recorded for later briefs:
 - An agent that builds with a relative path can build in the main checkout and corrupt its `obj` folder (a crash at startup that a clean build removed). Every brief now gives full paths for build commands.
