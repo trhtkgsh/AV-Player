@@ -445,7 +445,7 @@ Not verified at all: sound in the background (only the position was seen to adva
 - The arm64 build cannot be tested on the emulators while paused (SPIKE finding 20). Emulator checks use x86_64.
 - Pause when the app goes to the background: Phase 1 uses a placeholder in app-skeleton; media-service owns it in Phase 4.
 - Contract doc change after the freeze (orchestrator): `IVideoOutputBinding` surface methods must be called on the UI thread; `PlayerSnapshot.Idle`; `IVideoSurface.WindowBrightness` is -1 for the system default.
-- `docs/MASTER.md` has an uncommitted change in the main checkout that the orchestrator did not make (the Hebrew preface and the code fence around the plan were removed; the plan text is the same). It was first seen on 2026-11-15 during Phase 3. It is left as it is, not committed and not reverted: the file belongs to the owner.
+- `docs/MASTER.md` has an uncommitted change in the main checkout that the orchestrator did not make (the Hebrew preface and the code fence around the plan were removed; the plan text is the same). It was first seen on 2026-11-15 during Phase 3. It is left as it is, not committed and not reverted: the file belongs to the owner. One slip on 2026-11-15: the docs commit 5f4744c staged it by mistake (`git add docs`); commit d9f3d9f put the earlier committed version back without touching the working file, so the owner's change is again local and uncommitted, but it can be seen in the history of 5f4744c.
 
 ## Agents
 
