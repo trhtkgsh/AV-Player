@@ -43,6 +43,11 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
         _lifecycle.Stopping += OnLifecycle;
     }
 
+    /// <summary>
+    /// Applies a per-file override and saves immediately. <paramref name="change"/> must be pure:
+    /// it runs under the recorder's lock and runs a second time when the file's saved state is
+    /// still loading (or its load failed), to replay it on top of the loaded state.
+    /// </summary>
     public void Update(Func<PlaybackState, PlaybackState> change)
     {
         lock (_gate)
@@ -52,9 +57,9 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
                 return;
             }
 
-            // Mutate runs the change first, so a throwing change leaves everything untouched.
+            // ApplyChange runs the change first, so a throwing change leaves everything untouched.
             // The caller owns only the override fields.
-            Mutate(track, current => change(current) with
+            ApplyChange(track, current => change(current) with
             {
                 Id = current.Id,
                 PositionMs = current.PositionMs,
@@ -134,34 +139,32 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
 
             var statusChanged = track.LastStatus != snapshot.Status;
             track.LastStatus = snapshot.Status;
-            Mutate(track, state => ApplySnapshot(state, snapshot));
+            if (snapshot.Status is not (PlayerStatus.Idle or PlayerStatus.Error))
+            {
+                ApplyPosition(track, snapshot.PositionMs, snapshot.DurationMs);
+            }
 
             if (statusChanged && snapshot.Status is
                 PlayerStatus.Paused or PlayerStatus.Ended or PlayerStatus.Idle or PlayerStatus.Error)
             {
                 SaveNow();
             }
-            else if (!track.Loading && track.IsDirty)
+            else if (track.Loading ? !track.LoadQueued : track.IsDirty)
             {
-                StartTimerIfNone();
+                StartTimerIfNone(); // also the retry clock for a failed load
             }
         }
     }
 
-    private static PlaybackState ApplySnapshot(PlaybackState state, PlayerSnapshot snapshot)
+    private static PlaybackState WithPosition(PlaybackState state, long positionMs, long durationMs)
     {
-        if (snapshot.Status is PlayerStatus.Idle or PlayerStatus.Error)
-        {
-            return state;
-        }
-
         // The engine reports 0 until the length is known: never overwrite a known duration.
-        var duration = snapshot.DurationMs > 0 ? snapshot.DurationMs : state.DurationMs;
+        var duration = durationMs > 0 ? durationMs : state.DurationMs;
         return state with
         {
-            PositionMs = snapshot.PositionMs,
+            PositionMs = positionMs,
             DurationMs = duration,
-            Finished = duration > 0 && snapshot.PositionMs > 0.95 * duration,
+            Finished = duration > 0 && positionMs > 0.95 * duration,
         };
     }
 
@@ -173,27 +176,34 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
 
         if (_track is { } old)
         {
-            EnqueueSave(old);
+            if (old.Loading && !old.LoadQueued)
+            {
+                // Its load failed and was never retried: drop the queued changes, write nothing.
+                old.PendingChanges.Clear();
+            }
+            else
+            {
+                EnqueueSave(old); // an in-flight load finishes first, then this save
+            }
         }
 
         _track = null;
         if (id is { } newId)
         {
-            var track = new Track(newId);
-            _track = track;
-            Enqueue(() => LoadAsync(track));
+            _track = new Track(newId);
+            EnqueueLoad(_track);
         }
     }
 
-    // Callers hold _gate. Applies a change; while the saved state is still loading the change is
-    // also remembered and replayed on top of the loaded state.
-    private static void Mutate(Track track, Func<PlaybackState, PlaybackState> change)
+    // Callers hold _gate. While the saved state is not loaded, the change is applied to a
+    // provisional state (to surface exceptions) and remembered for replay on the loaded state.
+    private static void ApplyChange(Track track, Func<PlaybackState, PlaybackState> change)
     {
         var next = change(track.State);
         if (track.Loading)
         {
             track.State = next;
-            track.Pending.Add(change);
+            track.PendingChanges.Add(change);
         }
         else if (next != track.State)
         {
@@ -202,14 +212,47 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
         }
     }
 
-    // Callers hold _gate. Cancels the debounce and queues a save of every unsaved state.
+    // Callers hold _gate. Position and duration are kept as latest values, not one entry per snapshot.
+    private static void ApplyPosition(Track track, long positionMs, long durationMs)
+    {
+        var next = WithPosition(track.State, positionMs, durationMs);
+        if (track.Loading)
+        {
+            track.State = next;
+            track.HasPosition = true;
+            track.PendingPosition = positionMs;
+            track.PendingDuration = durationMs > 0 ? durationMs : track.PendingDuration;
+        }
+        else if (next != track.State)
+        {
+            track.State = next;
+            track.Version++;
+        }
+    }
+
+    // Callers hold _gate. Cancels the debounce, retries a failed load and queues a save of
+    // every unsaved state.
     private void SaveNow()
     {
         CancelTimer();
         RetryUnsaved();
         if (_track is { } track)
         {
+            if (track.Loading)
+            {
+                EnqueueLoad(track);
+            }
+
             EnqueueSave(track);
+        }
+    }
+
+    private void EnqueueLoad(Track track)
+    {
+        if (!track.LoadQueued)
+        {
+            track.LoadQueued = true;
+            Enqueue(() => LoadAsync(track));
         }
     }
 
@@ -277,20 +320,38 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
     private async Task LoadAsync(Track track)
     {
         PlaybackState? loaded = null;
+        var succeeded = false;
         try
         {
             loaded = await _store.GetAsync(track.Id, CancellationToken.None).ConfigureAwait(false);
+            succeeded = true;
         }
         catch (Exception)
         {
-            // An unreadable record is treated as "no saved state".
+            // Not loaded: nothing may be written for this file until a load succeeds.
         }
 
         lock (_gate)
         {
+            track.LoadQueued = false;
+            var current = !_disposed && ReferenceEquals(track, _track);
+            if (!succeeded)
+            {
+                if (current)
+                {
+                    StartTimerIfNone(); // retry in one debounce interval
+                }
+                else
+                {
+                    track.PendingChanges.Clear(); // abandoned before a load succeeded
+                }
+
+                return;
+            }
+
             var baseline = loaded ?? new PlaybackState(track.Id);
             var state = baseline;
-            foreach (var change in track.Pending)
+            foreach (var change in track.PendingChanges)
             {
                 try
                 {
@@ -302,7 +363,12 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
                 }
             }
 
-            track.Pending.Clear();
+            if (track.HasPosition)
+            {
+                state = WithPosition(state, track.PendingPosition, track.PendingDuration);
+            }
+
+            track.PendingChanges.Clear();
             track.Loading = false;
             track.State = state;
             if (state != baseline)
@@ -310,7 +376,7 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
                 track.Version++;
             }
 
-            if (!_disposed && ReferenceEquals(track, _track) && track.IsDirty)
+            if (current && track.IsDirty)
             {
                 StartTimerIfNone();
             }
@@ -368,8 +434,14 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
         public MediaFileId Id { get; } = id;
         public PlaybackState State { get; set; } = new(id);
         public PlayerStatus? LastStatus { get; set; }
+
+        // True until a load succeeded: State is provisional and nothing is written.
         public bool Loading { get; set; } = true;
-        public List<Func<PlaybackState, PlaybackState>> Pending { get; } = [];
+        public bool LoadQueued { get; set; }
+        public List<Func<PlaybackState, PlaybackState>> PendingChanges { get; } = [];
+        public bool HasPosition { get; set; }
+        public long PendingPosition { get; set; }
+        public long PendingDuration { get; set; }
         public long Version { get; set; }
         public long SavedVersion { get; set; }
         public bool IsDirty => Version != SavedVersion;
