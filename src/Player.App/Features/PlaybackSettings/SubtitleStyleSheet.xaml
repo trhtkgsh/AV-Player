@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:Player.App.Features.PlaybackSettings"
+    xmlns:loc="clr-namespace:Player.App.Localization"
     x:DataType="local:SubtitleStyleSheetViewModel"
     Shell.PresentationMode="ModalNotAnimated"
     Shell.NavBarIsVisible="False"
@@ -32,9 +33,9 @@
                 Padding="16,12,16,24"
                 Spacing="12">
 
-                <Label Text="Subtitle style" Style="{StaticResource LabelHud}" />
+                <Label Text="{loc:T Sheets.Style.Title}" Style="{StaticResource LabelHud}" />
                 <Label
-                    Text="For text subtitles. The picture restarts briefly after a change."
+                    Text="{loc:T Sheets.Style.Note}"
                     FontSize="12"
                     Style="{StaticResource LabelHud}" />
 
@@ -42,7 +43,7 @@
                 <Grid ColumnDefinitions="*,Auto">
                     <Label
                         Grid.Column="0"
-                        Text="Size"
+                        Text="{loc:T Sheets.Style.Size}"
                         VerticalOptions="Center"
                         Style="{StaticResource LabelHud}" />
                     <Label
@@ -54,18 +55,18 @@
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                     <Button
                         Grid.Column="0"
-                        Text="Smaller"
+                        Text="{loc:T Sheets.Style.Smaller}"
                         Command="{Binding SmallerCommand}"
                         Style="{StaticResource ButtonHud}" />
                     <Button
                         Grid.Column="1"
-                        Text="Larger"
+                        Text="{loc:T Sheets.Style.Larger}"
                         Command="{Binding LargerCommand}"
                         Style="{StaticResource ButtonHud}" />
                 </Grid>
 
                 <!-- Text color -->
-                <Label Text="Text color" Style="{StaticResource LabelHud}" />
+                <Label Text="{loc:T Sheets.Style.TextColor}" Style="{StaticResource LabelHud}" />
                 <HorizontalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding TextColors}">
                     <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="local:StyleSwatch">
@@ -94,7 +95,7 @@
                 </HorizontalStackLayout>
 
                 <!-- Outline color -->
-                <Label Text="Outline color" Style="{StaticResource LabelHud}" />
+                <Label Text="{loc:T Sheets.Style.OutlineColor}" Style="{StaticResource LabelHud}" />
                 <HorizontalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding OutlineColors}">
                     <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="local:StyleSwatch">
@@ -126,7 +127,7 @@
                 <Grid ColumnDefinitions="*,Auto">
                     <Label
                         Grid.Column="0"
-                        Text="Outline"
+                        Text="{loc:T Sheets.Style.Outline}"
                         VerticalOptions="Center"
                         Style="{StaticResource LabelHud}" />
                     <Label
@@ -138,12 +139,12 @@
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                     <Button
                         Grid.Column="0"
-                        Text="Thinner"
+                        Text="{loc:T Sheets.Style.Thinner}"
                         Command="{Binding ThinnerCommand}"
                         Style="{StaticResource ButtonHud}" />
                     <Button
                         Grid.Column="1"
-                        Text="Thicker"
+                        Text="{loc:T Sheets.Style.Thicker}"
                         Command="{Binding ThickerCommand}"
                         Style="{StaticResource ButtonHud}" />
                 </Grid>
@@ -152,7 +153,7 @@
                 <Grid ColumnDefinitions="*,Auto">
                     <Label
                         Grid.Column="0"
-                        Text="Background"
+                        Text="{loc:T Sheets.Style.Background}"
                         VerticalOptions="Center"
                         Style="{StaticResource LabelHud}" />
                     <Label
@@ -164,12 +165,12 @@
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                     <Button
                         Grid.Column="0"
-                        Text="Lighter"
+                        Text="{loc:T Sheets.Style.Lighter}"
                         Command="{Binding LighterCommand}"
                         Style="{StaticResource ButtonHud}" />
                     <Button
                         Grid.Column="1"
-                        Text="Darker"
+                        Text="{loc:T Sheets.Style.Darker}"
                         Command="{Binding DarkerCommand}"
                         Style="{StaticResource ButtonHud}" />
                 </Grid>
@@ -177,14 +178,14 @@
                 <!-- Bold -->
                 <HorizontalStackLayout Spacing="10">
                     <Switch IsToggled="{Binding Bold, Mode=TwoWay}" VerticalOptions="Center" />
-                    <Label Text="Bold" VerticalOptions="Center" Style="{StaticResource LabelHud}" />
+                    <Label Text="{loc:T Sheets.Style.Bold}" VerticalOptions="Center" Style="{StaticResource LabelHud}" />
                 </HorizontalStackLayout>
 
                 <!-- Bottom margin -->
                 <Grid ColumnDefinitions="*,Auto">
                     <Label
                         Grid.Column="0"
-                        Text="Distance from the bottom"
+                        Text="{loc:T Sheets.Style.Margin}"
                         VerticalOptions="Center"
                         Style="{StaticResource LabelHud}" />
                     <Label
@@ -196,12 +197,12 @@
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                     <Button
                         Grid.Column="0"
-                        Text="Lower"
+                        Text="{loc:T Sheets.Style.Lower}"
                         Command="{Binding LowerCommand}"
                         Style="{StaticResource ButtonHud}" />
                     <Button
                         Grid.Column="1"
-                        Text="Higher"
+                        Text="{loc:T Sheets.Style.Higher}"
                         Command="{Binding HigherCommand}"
                         Style="{StaticResource ButtonHud}" />
                 </Grid>
@@ -210,12 +211,12 @@
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                     <Button
                         Grid.Column="0"
-                        Text="Save as default"
+                        Text="{loc:T Sheets.Style.SaveDefault}"
                         Command="{Binding SaveAsDefaultCommand}"
                         Style="{StaticResource ButtonHud}" />
                     <Button
                         Grid.Column="1"
-                        Text="Back to default"
+                        Text="{loc:T Sheets.Style.RestoreDefault}"
                         Command="{Binding RestoreDefaultCommand}"
                         Style="{StaticResource ButtonHud}" />
                 </Grid>

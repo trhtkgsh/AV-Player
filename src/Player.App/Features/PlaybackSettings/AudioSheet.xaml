@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:Player.App.Features.PlaybackSettings"
+    xmlns:loc="clr-namespace:Player.App.Localization"
     x:DataType="local:AudioSheetViewModel"
     Shell.PresentationMode="ModalNotAnimated"
     Shell.NavBarIsVisible="False"
@@ -30,7 +31,7 @@
             Spacing="12"
             BackgroundColor="{DynamicResource ColorHudBackground}">
 
-            <Label Text="Audio track" Style="{StaticResource LabelHud}" />
+            <Label Text="{loc:T Sheets.Audio.Title}" Style="{StaticResource LabelHud}" />
 
             <CollectionView
                 ItemsSource="{Binding Tracks}"
@@ -62,14 +63,14 @@
             </CollectionView>
 
             <Label
-                Text="No audio tracks"
+                Text="{loc:T Sheets.Audio.NoTracks}"
                 IsVisible="{Binding HasNoTracks}"
                 Style="{StaticResource LabelHud}" />
 
             <Grid ColumnDefinitions="*,Auto">
                 <Label
                     Grid.Column="0"
-                    Text="Audio delay"
+                    Text="{loc:T Sheets.Audio.Delay}"
                     VerticalOptions="Center"
                     Style="{StaticResource LabelHud}" />
                 <Label
@@ -92,7 +93,7 @@
                     Style="{StaticResource ButtonHud}" />
                 <Button
                     Grid.Column="2"
-                    Text="Reset"
+                    Text="{loc:T Common.Reset}"
                     Command="{Binding DelayResetCommand}"
                     Style="{StaticResource ButtonHud}" />
             </Grid>
