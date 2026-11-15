@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 using Player.Core.Contracts;
+using Player.Core.Logic.Explorer;
 using Player.Core.Models;
 
 namespace Player.App.Features.Explorer;
@@ -21,15 +22,29 @@ public sealed partial class FoldersViewModel : ObservableObject
 
     private readonly IMediaLibrary _library;
     private readonly IUiSettingsStore _uiSettings;
+    private readonly IFolderSettingsStore _folderSettings;
     private readonly ILocalizer _localizer;
 
-    // The folders of the last successful load. The rows are rebuilt from it when the language changes.
+    // The folders of the last successful load, and the per-folder settings read with them.
+    // The rows are rebuilt from them when the language or a setting changes.
     private IReadOnlyList<MediaFolder> _folders = [];
+    private IReadOnlyDictionary<long, FolderSettings> _folderSettingsByBucket = new Dictionary<long, FolderSettings>();
+
+    // The UI settings of the last load or change. Null before the first one.
+    private UiSettings? _settings;
+
+    // The file-browser path: segments joined with '/', empty at the storage root.
+    private string _treePath = "";
+
+    // True once a load has finished, with the folders or with a denied permission.
+    private bool _loaded;
 
     private CancellationTokenSource? _session;
     private int _loadVersion;
     private bool _flatSeen;
     private bool _openingSettings;
+    private bool _choosingView;
+    private bool _opening;
 
     // The NewTagDays the current or last load read from the settings. Null when no load has read them yet, or the last load failed.
     private int? _loadedNewTagDays;
@@ -44,7 +59,18 @@ public sealed partial class FoldersViewModel : ObservableObject
     private bool _permissionDenied;
 
     [ObservableProperty]
-    private bool _isEmpty;
+    private bool _showNoFolders;
+
+    [ObservableProperty]
+    private bool _showNoFavorites;
+
+    // The file-browser folder name below the root. Null shows the app name.
+    [ObservableProperty]
+    private string? _title;
+
+    // True in the file browser below the storage root: the back button goes one level up.
+    [ObservableProperty]
+    private bool _canGoUp;
 
     [ObservableProperty]
     private string? _errorMessage;
@@ -55,10 +81,11 @@ public sealed partial class FoldersViewModel : ObservableObject
     [ObservableProperty]
     private bool _showBusy;
 
-    public FoldersViewModel(IMediaLibrary library, IUiSettingsStore uiSettings, ILocalizer localizer)
+    public FoldersViewModel(IMediaLibrary library, IUiSettingsStore uiSettings, IFolderSettingsStore folderSettings, ILocalizer localizer)
     {
         _library = library;
         _uiSettings = uiSettings;
+        _folderSettings = folderSettings;
         _localizer = localizer;
     }
 
@@ -72,6 +99,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         _session = new CancellationTokenSource();
         _library.Changed += OnLibraryChanged;
         _uiSettings.Changed += OnSettingsChanged;
+        _folderSettings.Changed += OnFolderSettingsChanged;
         _localizer.Changed += OnLanguageChanged;
         await LoadAsync(LoadReason.Activate);
     }
@@ -90,8 +118,22 @@ public sealed partial class FoldersViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task OpenFolder(FolderRow row)
+    private async Task OpenRow(FolderRow row)
     {
+        // A file-browser node that holds more goes one level down in this page.
+        if (row.Kind == FolderRowKind.Container && row.TreePath is { } path)
+        {
+            SetTreePath(path);
+            RebuildRows();
+            return;
+        }
+
+        if (row.Folder is null || _opening)
+        {
+            return;
+        }
+
+        _opening = true;
         try
         {
             var shell = Shell.Current;
@@ -115,18 +157,54 @@ public sealed partial class FoldersViewModel : ObservableObject
         {
             ReportError(ex);
         }
+        finally
+        {
+            _opening = false;
+        }
     }
 
     [RelayCommand]
-    private async Task ShowAll()
+    private async Task ChooseView()
     {
+        if (_choosingView)
+        {
+            return;
+        }
+
+        _choosingView = true;
         try
         {
+            var shell = Shell.Current;
+            if (shell is null)
+            {
+                return;
+            }
+
             var ct = SessionToken;
-            var settings = await _uiSettings.GetAsync(ct);
-            _flatSeen = true;
-            await _uiSettings.SaveAsync(settings with { ViewMode = ExplorerViewMode.Flat }, ct);
-            await NavigateToAllAsync();
+            var current = (await _uiSettings.GetAsync(ct)).ViewMode;
+            var choices = new (string Text, ExplorerViewMode Mode)[]
+            {
+                (_localizer["Explorer.ViewFolders"], ExplorerViewMode.Folders),
+                (_localizer["Explorer.ViewTree"], ExplorerViewMode.Tree),
+                (_localizer["Explorer.ViewFavorites"], ExplorerViewMode.Favorites),
+                (_localizer["Explorer.ViewFlat"], ExplorerViewMode.Flat),
+            };
+            var labels = choices
+                .Select(c => c.Mode == current ? "✓ " + c.Text : c.Text)
+                .ToArray();
+
+            var choice = await shell.DisplayActionSheetAsync(
+                _localizer["Explorer.View"],
+                _localizer["Common.Cancel"],
+                null,
+                labels);
+
+            // A cancelled or dismissed sheet gives no matching text, so the mode stays.
+            var index = Array.IndexOf(labels, choice);
+            if (index >= 0)
+            {
+                await SetViewModeAsync(choices[index].Mode, ct);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -135,6 +213,37 @@ public sealed partial class FoldersViewModel : ObservableObject
         {
             ReportError(ex);
         }
+        finally
+        {
+            _choosingView = false;
+        }
+    }
+
+    private async Task SetViewModeAsync(ExplorerViewMode mode, CancellationToken ct)
+    {
+        // Read the latest stored settings: only the view mode changes.
+        var settings = await _uiSettings.GetAsync(ct);
+        var saved = settings with { ViewMode = mode };
+        await _uiSettings.SaveAsync(saved, ct);
+        ApplySettings(saved);
+
+        if (mode == ExplorerViewMode.Flat)
+        {
+            await NavigateToAllAsync();
+        }
+    }
+
+    [RelayCommand]
+    private void GoUp()
+    {
+        if (_treePath.Length == 0)
+        {
+            return;
+        }
+
+        var slash = _treePath.LastIndexOf('/');
+        SetTreePath(slash < 0 ? "" : _treePath[..slash]);
+        RebuildRows();
     }
 
     [RelayCommand]
@@ -227,8 +336,8 @@ public sealed partial class FoldersViewModel : ObservableObject
             {
                 PermissionDenied = true;
                 _folders = [];
-                RebuildRows();
-                IsEmpty = false;
+                _loaded = true;
+                ApplySettings(settings);
                 return;
             }
 
@@ -239,9 +348,16 @@ public sealed partial class FoldersViewModel : ObservableObject
                 return;
             }
 
+            var folderSettings = await _folderSettings.GetAllAsync(ct);
+            if (!IsCurrentLoad(version))
+            {
+                return;
+            }
+
             _folders = folders;
-            RebuildRows();
-            IsEmpty = Folders.Count == 0;
+            _folderSettingsByBucket = folderSettings;
+            _loaded = true;
+            ApplySettings(settings);
         }
         catch (OperationCanceledException)
         {
@@ -286,6 +402,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     {
         _library.Changed -= OnLibraryChanged;
         _uiSettings.Changed -= OnSettingsChanged;
+        _folderSettings.Changed -= OnFolderSettingsChanged;
         _localizer.Changed -= OnLanguageChanged;
 
         _session?.Cancel();
@@ -306,25 +423,137 @@ public sealed partial class FoldersViewModel : ObservableObject
     private void OnSettingsChanged(object? sender, UiSettings settings) =>
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            // Only a changed new-tag window reloads. Null: no load has read the settings, the next load reads them.
             // A callback queued before Deactivate does nothing.
-            if (_session is not null && _loadedNewTagDays is int loaded && settings.NewTagDays != loaded)
+            if (_session is null)
+            {
+                return;
+            }
+
+            // Only a changed new-tag window reloads. Null: no load has read the settings, the next load reads them.
+            if (_loadedNewTagDays is int loaded && settings.NewTagDays != loaded)
             {
                 _ = LoadAsync(LoadReason.Library);
+                return;
+            }
+
+            // A view mode or audio-only change shows at once.
+            if (_loaded)
+            {
+                ApplySettings(settings);
             }
         });
 
+    private void OnFolderSettingsChanged(object? sender, EventArgs e) =>
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            // A callback queued before Deactivate does nothing.
+            if (_session is not null)
+            {
+                _ = ReloadFolderSettingsAsync();
+            }
+        });
+
+    private async Task ReloadFolderSettingsAsync()
+    {
+        try
+        {
+            _folderSettingsByBucket = await _folderSettings.GetAllAsync(SessionToken);
+            RebuildRows();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
+    }
+
     private void OnLanguageChanged(object? sender, EventArgs e) => RebuildRows();
+
+    private void ApplySettings(UiSettings settings)
+    {
+        // The file browser starts again at the root when the view mode changes.
+        if (settings.ViewMode != _settings?.ViewMode)
+        {
+            SetTreePath("");
+        }
+
+        _settings = settings;
+        RebuildRows();
+    }
+
+    private void SetTreePath(string path)
+    {
+        _treePath = path;
+        CanGoUp = path.Length > 0;
+        Title = path.Length > 0 ? path[(path.LastIndexOf('/') + 1)..] : null;
+    }
 
     // The rows keep the texts of the language they were made in: they are made again from the folders held now.
     private void RebuildRows()
     {
+        var mode = _settings?.ViewMode ?? ExplorerViewMode.Folders;
+        var includeAudioOnly = _settings?.IncludeAudioOnlyFolders ?? true;
+
+        // Audio-only folders are left out before any view is built, so an empty container disappears with them.
+        var visible = _folders.Where(f => includeAudioOnly || !f.AudioOnly).ToList();
+
         Folders.Clear();
-        foreach (var folder in _folders)
+        switch (mode)
         {
-            Folders.Add(new FolderRow(folder, _localizer));
+            case ExplorerViewMode.Favorites:
+                foreach (var folder in visible.Where(IsFavorite))
+                {
+                    Folders.Add(new FolderRow(FolderRowKind.Folder, folder.Name, folder, folder.ItemCount, folder.NewCount, _localizer));
+                }
+
+                break;
+
+            case ExplorerViewMode.Tree:
+                AddTreeRows(visible);
+                break;
+
+            default:
+                foreach (var folder in visible)
+                {
+                    Folders.Add(new FolderRow(FolderRowKind.Folder, folder.Name, folder, folder.ItemCount, folder.NewCount, _localizer));
+                }
+
+                break;
+        }
+
+        var empty = _loaded && !PermissionDenied && Folders.Count == 0;
+        ShowNoFavorites = empty && mode == ExplorerViewMode.Favorites;
+        ShowNoFolders = empty && mode != ExplorerViewMode.Favorites;
+    }
+
+    private void AddTreeRows(IReadOnlyList<MediaFolder> visible)
+    {
+        if (_treePath.Length > 0 && CurrentTreeFolder(visible) is { } current)
+        {
+            Folders.Add(new FolderRow(FolderRowKind.FilesHere, current.Name, current, current.ItemCount, current.NewCount, _localizer));
+        }
+
+        foreach (var node in FolderTree.GetChildren(visible, _treePath))
+        {
+            var folder = node.Folder;
+            Folders.Add(node.FolderCount == 1 && folder is not null
+                ? new FolderRow(FolderRowKind.Folder, folder.Name, folder, node.ItemCount, node.NewCount, _localizer)
+                : new FolderRow(FolderRowKind.Container, folder?.Name ?? node.Name, folder, node.ItemCount, node.NewCount, _localizer, node.Path));
         }
     }
+
+    // The media folder at the current file-browser path, or null when the path is only a container.
+    private MediaFolder? CurrentTreeFolder(IReadOnlyList<MediaFolder> visible)
+    {
+        var slash = _treePath.LastIndexOf('/');
+        var parent = slash < 0 ? "" : _treePath[..slash];
+        return FolderTree.GetChildren(visible, parent).FirstOrDefault(n => n.Path == _treePath)?.Folder;
+    }
+
+    private bool IsFavorite(MediaFolder folder) =>
+        _folderSettingsByBucket.TryGetValue(folder.BucketId, out var settings) && settings.Favorite;
 
     partial void OnErrorMessageChanged(string? value)
     {

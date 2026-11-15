@@ -11,6 +11,23 @@ public partial class FoldersPage : ContentPage
         InitializeComponent();
         _viewModel = viewModel;
         BindingContext = viewModel;
+
+        // The back arrow shows only in the file browser below the root; at the root the page behaves as before.
+        var back = new BackButtonBehavior();
+        back.SetBinding(BackButtonBehavior.IsVisibleProperty, new Binding(nameof(FoldersViewModel.CanGoUp), source: viewModel));
+        back.SetBinding(BackButtonBehavior.CommandProperty, new Binding(nameof(FoldersViewModel.GoUpCommand), source: viewModel));
+        Shell.SetBackButtonBehavior(this, back);
+    }
+
+    protected override bool OnBackButtonPressed()
+    {
+        if (_viewModel.CanGoUp)
+        {
+            _viewModel.GoUpCommand.Execute(null);
+            return true;
+        }
+
+        return base.OnBackButtonPressed();
     }
 
     protected override async void OnAppearing()

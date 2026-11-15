@@ -9,13 +9,14 @@ internal sealed class ExplorerStrings : IStringSource
     /// <inheritdoc />
     public IReadOnlyDictionary<string, LocalizedText> Texts { get; } = new Dictionary<string, LocalizedText>
     {
-        ["Explorer.AllFiles"] = new("All files", "כל הקבצים"),
         ["Explorer.AllMedia"] = new("All media", "כל המדיה"),
+        ["Explorer.FilesHere"] = new("Files in this folder ({0})", "קבצים בתיקייה הזו ({0})"),
         ["Explorer.Items.Many"] = new("{0} items", "{0} פריטים"),
         ["Explorer.Items.One"] = new("1 item", "פריט אחד"),
         ["Explorer.NewCount.Many"] = new("{0} new", "{0} חדשים"),
         ["Explorer.NewCount.One"] = new("1 new", "חדש אחד"),
         ["Explorer.NewTag"] = new("NEW", "חדש"),
+        ["Explorer.NoFavorites"] = new("No favorite folders yet. Use the menu of a folder to add it.", "אין עדיין תיקיות מועדפות. אפשר להוסיף תיקייה דרך התפריט שלה."),
         ["Explorer.NoFiles"] = new("No media files", "לא נמצאו קבצי מדיה"),
         ["Explorer.NoFolders"] = new("No media folders found", "לא נמצאו תיקיות מדיה"),
         ["Explorer.OpenAppSettings"] = new("Open app settings", "פתח את הגדרות האפליקציה"),
@@ -28,6 +29,11 @@ internal sealed class ExplorerStrings : IStringSource
         ["Explorer.SortDuration"] = new("Duration", "משך"),
         ["Explorer.SortName"] = new("Name", "שם"),
         ["Explorer.SortSize"] = new("Size", "גודל"),
+        ["Explorer.View"] = new("View", "תצוגה"),
+        ["Explorer.ViewFavorites"] = new("Favorites", "מועדפים"),
+        ["Explorer.ViewFlat"] = new("All files", "כל הקבצים"),
+        ["Explorer.ViewFolders"] = new("Media folders", "תיקיות מדיה"),
+        ["Explorer.ViewTree"] = new("File browser", "סייר קבצים"),
         ["Explorer.Watched"] = new("Watched", "נצפה"),
     };
 }
