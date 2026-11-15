@@ -2,10 +2,10 @@
 <svg width="456" height="456" viewBox="0 0 456 456" version="1.1" xmlns="http://www.w3.org/2000/svg">
     <defs>
         <linearGradient id="bg" x1="88" y1="88" x2="368" y2="368" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#5BA8FF" />
-            <stop offset="1" stop-color="#1D56C4" />
+            <stop offset="0" stop-color="#2E7D32" />
+            <stop offset="1" stop-color="#2E7D32" />
         </linearGradient>
     </defs>
     <circle cx="228" cy="228" r="140" fill="url(#bg)" />
-    <path d="M194 168 L194 288 L300 228 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="20" stroke-linejoin="round" />
+    <path d="M207.6 192 L207.6 264 L271.2 228 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="12" stroke-linejoin="round" />
 </svg>

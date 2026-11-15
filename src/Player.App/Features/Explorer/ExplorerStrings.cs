@@ -37,7 +37,7 @@ internal sealed class ExplorerStrings : IStringSource
         ["Explorer.OpenAppSettings"] = new("Open app settings", "פתח את הגדרות האפליקציה"),
         ["Explorer.OperationDenied"] = new("Permission to change this file was denied.", "ההרשאה לשינוי הקובץ נדחתה."),
         ["Explorer.OperationDetails"] = new("{0} Details: {1}", "{0} פרטים: {1}"),
-        ["Explorer.PermissionNeeded"] = new("Ariel Player needs permission to read your video and audio files.", "Ariel Player צריך הרשאה לקרוא את קבצי הווידאו והשמע שלך."),
+        ["Explorer.PermissionNeeded"] = new("AV Player needs permission to read your video and audio files.", "AV Player צריך הרשאה לקרוא את קבצי הווידאו והשמע שלך."),
         ["Explorer.RemoveFavorite"] = new("Remove from favorites", "הסר מהמועדפים"),
         ["Explorer.Rename"] = new("Rename", "שנה שם"),
         ["Explorer.RenameFailed"] = new("The file could not be renamed.", "לא ניתן לשנות את שם הקובץ."),
