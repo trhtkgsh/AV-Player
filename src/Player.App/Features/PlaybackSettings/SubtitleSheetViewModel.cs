@@ -25,6 +25,7 @@ public sealed partial class SubtitleSheetViewModel : ObservableObject
     private readonly IPlaybackCoordinator _coordinator;
     private readonly ISubtitleService _subtitles;
     private readonly IPlaybackStateRecorder _recorder;
+    private readonly ILocalizer _localizer;
     private bool _active;
     private bool _navigating;
     private int _runningDelays;
@@ -46,12 +47,14 @@ public sealed partial class SubtitleSheetViewModel : ObservableObject
         IPlayerEngine engine,
         IPlaybackCoordinator coordinator,
         ISubtitleService subtitles,
-        IPlaybackStateRecorder recorder)
+        IPlaybackStateRecorder recorder,
+        ILocalizer localizer)
     {
         _engine = engine;
         _coordinator = coordinator;
         _subtitles = subtitles;
         _recorder = recorder;
+        _localizer = localizer;
     }
 
     /// <summary>Called when the sheet appears. Shows the state in effect, starts the file list, and subscribes.</summary>
@@ -100,7 +103,7 @@ public sealed partial class SubtitleSheetViewModel : ObservableObject
         try
         {
             bool ok = await _subtitles.LoadExternalAsync(row.ContentUri, CancellationToken.None);
-            ErrorMessage = ok ? "" : "The subtitle file could not be loaded.";
+            ErrorMessage = ok ? "" : _localizer["Sheets.Subtitles.LoadFailed"];
         }
         catch (Exception ex)
         {
@@ -231,7 +234,7 @@ public sealed partial class SubtitleSheetViewModel : ObservableObject
         if (!SameTracks(tracks))
         {
             Tracks.Clear();
-            Tracks.Add(new TrackRow(OffTrackId, "Off", isSelected: false));
+            Tracks.Add(new TrackRow(OffTrackId, _localizer["Common.Off"], isSelected: false));
             foreach (TrackInfo track in tracks)
             {
                 Tracks.Add(new TrackRow(track.Id, TrackRow.TitleOf(track), isSelected: false));

@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:Player.App.Features.PlaybackSettings"
+    xmlns:loc="clr-namespace:Player.App.Localization"
     x:DataType="local:SubtitleSheetViewModel"
     Shell.PresentationMode="ModalNotAnimated"
     Shell.NavBarIsVisible="False"
@@ -32,7 +33,7 @@
                 Padding="16,12,16,24"
                 Spacing="12">
 
-                <Label Text="Subtitles" Style="{StaticResource LabelHud}" />
+                <Label Text="{loc:T Sheets.Subtitles.Title}" Style="{StaticResource LabelHud}" />
 
                 <CollectionView
                     ItemsSource="{Binding Tracks}"
@@ -64,7 +65,7 @@
                 </CollectionView>
 
                 <Label
-                    Text="Files next to the video"
+                    Text="{loc:T Sheets.Subtitles.FilesNearby}"
                     IsVisible="{Binding HasFiles}"
                     Style="{StaticResource LabelHud}" />
 
@@ -90,14 +91,14 @@
                 </CollectionView>
 
                 <Button
-                    Text="Open a subtitle file..."
+                    Text="{loc:T Sheets.Subtitles.OpenFile}"
                     Command="{Binding PickFileCommand}"
                     Style="{StaticResource ButtonHud}" />
 
                 <Grid ColumnDefinitions="*,Auto">
                     <Label
                         Grid.Column="0"
-                        Text="Subtitle delay"
+                        Text="{loc:T Sheets.Subtitles.Delay}"
                         VerticalOptions="Center"
                         Style="{StaticResource LabelHud}" />
                     <Label
@@ -120,13 +121,13 @@
                         Style="{StaticResource ButtonHud}" />
                     <Button
                         Grid.Column="2"
-                        Text="Reset"
+                        Text="{loc:T Common.Reset}"
                         Command="{Binding DelayResetCommand}"
                         Style="{StaticResource ButtonHud}" />
                 </Grid>
 
                 <Button
-                    Text="Style..."
+                    Text="{loc:T Sheets.Subtitles.Style}"
                     Command="{Binding OpenStyleCommand}"
                     Style="{StaticResource ButtonHud}" />
 
