@@ -516,7 +516,7 @@ public sealed partial class PlayerViewModel : ObservableObject
             parts.Add(percent.ToString(CultureInfo.InvariantCulture) + "%");
         }
 
-        StatusText = string.Join("  ", parts);
+        StatusText = "\u200E" + string.Join("  ", parts); // LTR mark: the clock and the percentage keep their order in RTL
     }
 
     /// <summary>The battery level in percent, or null when it is unknown. Never throws.</summary>

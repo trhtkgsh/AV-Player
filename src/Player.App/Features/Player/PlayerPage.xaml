@@ -69,7 +69,11 @@
         </Border>
 
         <!-- (d) HUD. Only the top and bottom bars have a background and catch input; the middle lets taps through. -->
-        <Grid IsVisible="{Binding IsHudVisible}" RowDefinitions="Auto,*,Auto">
+        <Grid
+            IsVisible="{Binding IsHudVisible}"
+            InputTransparent="True"
+            CascadeInputTransparent="False"
+            RowDefinitions="Auto,*,Auto">
 
             <Grid
                 Grid.Row="0"
@@ -98,7 +102,6 @@
                         IsVisible="{Binding ShowStatus}"
                         Text="{Binding StatusText}"
                         FontSize="11"
-                        FlowDirection="LeftToRight"
                         Opacity="0.8"
                         TextColor="{DynamicResource ColorHudOnBackground}" />
                 </VerticalStackLayout>
