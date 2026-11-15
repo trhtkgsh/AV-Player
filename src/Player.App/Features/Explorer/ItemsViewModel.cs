@@ -31,6 +31,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private readonly IPlaybackStateStore _stateStore;
     private readonly IUiSettingsStore _uiSettings;
     private readonly IPlaybackCoordinator _coordinator;
+    private readonly IFileOperations _fileOperations;
     private readonly TimeProvider _timeProvider;
     private readonly ILocalizer _localizer;
 
@@ -101,6 +102,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         IPlaybackStateStore stateStore,
         IUiSettingsStore uiSettings,
         IPlaybackCoordinator coordinator,
+        IFileOperations fileOperations,
         TimeProvider timeProvider,
         ILocalizer localizer)
     {
@@ -109,6 +111,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         _stateStore = stateStore;
         _uiSettings = uiSettings;
         _coordinator = coordinator;
+        _fileOperations = fileOperations;
         _timeProvider = timeProvider;
         _localizer = localizer;
     }
@@ -189,6 +192,11 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     [RelayCommand]
     private async Task Open(MediaRowViewModel row)
     {
+        if (_fileOperationRunning)
+        {
+            return;
+        }
+
         try
         {
             await _coordinator.OpenAsync(row.Item, Rows.Select(r => r.Item).ToList(), SessionToken);
@@ -628,7 +636,9 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         try
         {
             var metadata = await _metadataService.GetOrCreateAsync(item, request.Token);
-            if (metadata is null || request.Token.IsCancellationRequested || _session is null)
+            // A file renamed or deleted meanwhile is no longer in the list: its result is dropped.
+            if (metadata is null || request.Token.IsCancellationRequested || _session is null
+                || !_items.Any(i => i.Id == id))
             {
                 return;
             }
