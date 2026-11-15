@@ -110,7 +110,7 @@ public sealed partial class SubtitleStyleSheetViewModel : ObservableObject
         if (!_dirty) return;
 
         CancelPending();
-        _ = ApplyAsync();
+        _ = ApplyIfDirtyAsync(CancellationToken.None);
     }
 
     [RelayCommand]
@@ -167,7 +167,8 @@ public sealed partial class SubtitleStyleSheetViewModel : ObservableObject
     {
         try
         {
-            await FlushAsync();
+            if (!await FlushAsync()) return; // the failed apply already shows its error: nothing is saved
+
             GlobalDefaults current = await _defaults.GetAsync(CancellationToken.None);
             await _defaults.SaveAsync(current with { SubtitleStyle = CurrentStyle() }, CancellationToken.None);
             ErrorMessage = "";
@@ -240,38 +241,54 @@ public sealed partial class SubtitleStyleSheetViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            return; // a newer change replaced this one
+            return; // a newer change replaced this one, or the sheet closed
         }
 
-        await ApplyAsync();
+        // The delay can finish just before a newer change or Deactivate cancels this one.
+        if (token.IsCancellationRequested) return;
+
+        await ApplyIfDirtyAsync(token);
     }
 
-    /// <summary>Applies a pending change now, if there is one.</summary>
-    private async Task FlushAsync()
+    /// <summary>Applies a pending change now, if there is one. Returns false when the apply failed.</summary>
+    private async Task<bool> FlushAsync()
     {
-        if (!_dirty) return;
+        if (!_dirty) return true;
 
         CancelPending();
-        await ApplyAsync();
+        return await ApplyIfDirtyAsync(CancellationToken.None);
     }
+
+    /// <summary>
+    /// Applies the style when a change is still pending. A cancelled change is skipped: its newer change or the
+    /// close applies the newest style. Used by the debounce timer and by Deactivate.
+    /// </summary>
+    private Task<bool> ApplyIfDirtyAsync(CancellationToken token) => ApplyUnderGateAsync(onlyIfDirty: true, token);
+
+    /// <summary>Applies the style unconditionally. Used by "Back to default".</summary>
+    private Task<bool> ApplyAsync() => ApplyUnderGateAsync(onlyIfDirty: false, CancellationToken.None);
 
     /// <summary>
     /// Sends the style to the engine. The gate keeps two applies from overlapping. The style is read after the gate,
     /// so the newest values are sent. On failure the controls go back to the engine's style.
     /// </summary>
-    private async Task ApplyAsync()
+    private async Task<bool> ApplyUnderGateAsync(bool onlyIfDirty, CancellationToken token)
     {
         await _applyGate.WaitAsync();
         try
         {
+            if (onlyIfDirty && (!_dirty || token.IsCancellationRequested)) return true;
+
             _dirty = false;
             await _engine.SetSubtitleStyleAsync(CurrentStyle(), CancellationToken.None);
             ErrorMessage = "";
+            return true;
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
             ReadFromStyle(_engine.SubtitleStyle);
+            return false;
         }
         finally
         {

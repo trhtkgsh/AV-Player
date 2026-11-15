@@ -14,7 +14,6 @@ public static class PlaybackSettingsServiceCollectionExtensions
         services.AddTransient<RepeatSheetViewModel>();
         services.AddTransient<RepeatSheet>();
         services.AddTransient<AudioSheetViewModel>();
-        services.AddTransient<AudioSheetViewModel>();
         services.AddTransient<AudioSheet>();
         services.AddTransient<SubtitleSheetViewModel>();
         services.AddTransient<SubtitleSheet>();

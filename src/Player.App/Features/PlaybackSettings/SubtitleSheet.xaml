@@ -18,10 +18,15 @@
             </ContentView.GestureRecognizers>
         </ContentView>
 
-        <!-- (b) The translucent panel. -->
-        <ScrollView
-            Grid.Row="1"
-            MaximumHeightRequest="520"
+        <!-- (b) The translucent panel, on a dimmed backing so that bright video does not show through its text. -->
+        <Grid Grid.Row="1">
+            <BoxView
+                Color="{DynamicResource ColorBackground}"
+                Opacity="0.72"
+                HorizontalOptions="Fill"
+                VerticalOptions="Fill" />
+            <ScrollView
+                MaximumHeightRequest="520"
             BackgroundColor="{DynamicResource ColorHudBackground}">
             <VerticalStackLayout
                 Padding="16,12,16,24"
@@ -131,5 +136,6 @@
                     TextColor="{DynamicResource ColorDanger}" />
             </VerticalStackLayout>
         </ScrollView>
+        </Grid>
     </Grid>
 </ContentPage>

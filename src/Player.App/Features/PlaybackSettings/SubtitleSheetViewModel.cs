@@ -26,8 +26,8 @@ public sealed partial class SubtitleSheetViewModel : ObservableObject
     private readonly ISubtitleService _subtitles;
     private readonly IPlaybackStateRecorder _recorder;
     private bool _active;
-    private bool _closing;
     private bool _navigating;
+    private int _runningDelays;
 
     [ObservableProperty] private long _delayMs;
     [ObservableProperty] private string _delayText = "0 ms";
@@ -133,43 +133,28 @@ public sealed partial class SubtitleSheetViewModel : ObservableObject
     [RelayCommand(AllowConcurrentExecutions = true)]
     private Task DelayResetAsync() => ApplyDelayAsync(0);
 
-    /// <summary>Opens the subtitle style sheet: this sheet closes first. A second tap while navigating is ignored.</summary>
+    /// <summary>Opens the subtitle style sheet in one navigation: this sheet is replaced, so the player is not shown in between.</summary>
     [RelayCommand]
-    private async Task OpenStyleAsync()
+    private Task OpenStyleAsync() => NavigateAsync("../player-subtitle-style");
+
+    /// <summary>Closes the sheet and returns to the player.</summary>
+    [RelayCommand]
+    private Task CloseAsync() => NavigateAsync("..");
+
+    /// <summary>Runs one navigation. A tap while a navigation is running, or after it, is ignored.</summary>
+    private async Task NavigateAsync(string route)
     {
         if (_navigating) return;
         _navigating = true;
 
         try
         {
-            if (Shell.Current is { } shell)
-            {
-                await shell.GoToAsync("..");
-                await shell.GoToAsync("player-subtitle-style");
-            }
+            if (Shell.Current is { } shell) await shell.GoToAsync(route);
         }
         catch (Exception ex)
         {
-            _navigating = false; // navigation failed: allow a later tap to try again
-            Debug.WriteLine($"Open subtitle style failed: {ex}");
-        }
-    }
-
-    /// <summary>Closes the sheet and returns to the player. Runs once while a close is in progress.</summary>
-    [RelayCommand]
-    private async Task CloseAsync()
-    {
-        if (_closing) return;
-        _closing = true;
-
-        try
-        {
-            if (Shell.Current is { } shell) await shell.GoToAsync("..");
-        }
-        catch (Exception ex)
-        {
-            _closing = false; // close failed: allow a later tap or Back press to try again
-            Debug.WriteLine($"Close failed: {ex}");
+            _navigating = false; // navigation failed: allow a later tap or Back press to try again
+            Debug.WriteLine($"Navigation to {route} failed: {ex}");
         }
     }
 
@@ -177,6 +162,7 @@ public sealed partial class SubtitleSheetViewModel : ObservableObject
     {
         long value = Math.Clamp(requested, MinDelayMs, MaxDelayMs);
         DelayMs = value; // synchronous: the next tap steps from this value
+        _runningDelays++;
 
         try
         {
@@ -187,7 +173,12 @@ public sealed partial class SubtitleSheetViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
-            DelayMs = _engine.SubtitleDelayMs;
+            // Reset only when no other delay step is in flight: it would overwrite the value of that step.
+            if (_runningDelays == 1) DelayMs = _engine.SubtitleDelayMs;
+        }
+        finally
+        {
+            _runningDelays--;
         }
     }
 
@@ -214,6 +205,8 @@ public sealed partial class SubtitleSheetViewModel : ObservableObject
             rows.Clear();
             Debug.WriteLine($"Finding subtitle files failed: {ex}");
         }
+
+        if (!_active) return; // the sheet closed while the files were being found
 
         Files.Clear();
         foreach (SubtitleFileRow row in rows)
