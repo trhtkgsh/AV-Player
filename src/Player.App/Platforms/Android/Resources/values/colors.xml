@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Colors of the window before ThemeService applies the theme. They mirror the Dark OLED palette (ColorSurface, ColorAccent). -->
 <resources>
     <color name="colorPrimary">#111419</color>
     <color name="colorPrimaryDark">#111419</color>
