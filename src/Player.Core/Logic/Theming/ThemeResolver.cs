@@ -9,13 +9,21 @@ public static class ThemeResolver
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        var colors = new Dictionary<string, uint>(ThemePalettes.Get(settings.Theme).Colors)
+        var palette = ThemePalettes.Get(settings.Theme);
+        var accent = settings.AccentColorArgb | 0xFF000000u;   // any ARGB is accepted, always opaque
+        var colors = new Dictionary<string, uint>(palette.Colors)
         {
-            [ThemeTokens.ColorAccent] = settings.AccentColorArgb,
-            [ThemeTokens.ColorOnAccent] = ContrastCalculator.ReadableOn(settings.AccentColorArgb),
+            [ThemeTokens.ColorAccent] = accent,
+            [ThemeTokens.ColorOnAccent] = ContrastCalculator.ReadableOn(accent),
         };
 
-        var opacity = double.IsNaN(settings.HudOpacity) ? 0 : Math.Clamp(settings.HudOpacity, 0, 1);
+        // A palette whose progress color equals its own accent follows the chosen accent.
+        if (palette[ThemeTokens.ColorProgress] == palette[ThemeTokens.ColorAccent])
+        {
+            colors[ThemeTokens.ColorProgress] = accent;
+        }
+
+        var opacity = ThemeSettingsNormalizer.NormalizeOpacity(settings.HudOpacity);
         var alpha = (uint)Math.Round(opacity * 255);
         colors[ThemeTokens.ColorHudBackground] =
             (alpha << 24) | (colors[ThemeTokens.ColorHudBackground] & 0x00FFFFFF);
