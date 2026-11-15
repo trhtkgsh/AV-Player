@@ -103,6 +103,7 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
             SubtitlesEnabled = stored.SubtitlesEnabled;
             PreferredSubtitleLanguage = stored.PreferredSubtitleLanguage ?? string.Empty;
             SubtitleDelayMs = stored.SubtitleDelayMs;
+            ErrorMessage = null;
         }
         catch (Exception ex)
         {
@@ -190,48 +191,53 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
         _ = SaveAsync(d => d with { Repeat = RepeatMode.Folder });
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task SaveSpeed()
     {
         var speed = RoundSpeed(Speed);
         Speed = speed;
-        await SaveAsync(d => d with { Speed = (float)speed });
-
-        // The thumb shows the value that was stored. Speed has no change-triggered save, so this does not save again.
-        Speed = (float)speed;
+        if (await SaveAsync(d => d with { Speed = (float)speed }))
+        {
+            // The thumb shows the value that was stored. Speed has no change-triggered save, so this does not save again.
+            Speed = (float)speed;
+        }
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private Task ResetSpeed()
     {
         Speed = 1.0;
         return SaveAsync(d => d with { Speed = 1.0f });
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private Task SaveLanguages()
     {
         var audio = NormalizeLanguage(PreferredAudioLanguage);
         var subtitle = NormalizeLanguage(PreferredSubtitleLanguage);
+
+        // Written back before the save starts, so text typed while the save runs is not overwritten.
+        PreferredAudioLanguage = audio ?? string.Empty;
+        PreferredSubtitleLanguage = subtitle ?? string.Empty;
         return SaveAsync(d => d with { PreferredAudioLanguage = audio, PreferredSubtitleLanguage = subtitle });
     }
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private Task AudioDelayDown() => SetAudioDelayAsync(AudioDelayMs - DelayStepMs);
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private Task AudioDelayUp() => SetAudioDelayAsync(AudioDelayMs + DelayStepMs);
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private Task AudioDelayReset() => SetAudioDelayAsync(0);
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private Task SubtitleDelayDown() => SetSubtitleDelayAsync(SubtitleDelayMs - DelayStepMs);
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private Task SubtitleDelayUp() => SetSubtitleDelayAsync(SubtitleDelayMs + DelayStepMs);
 
-    [RelayCommand]
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private Task SubtitleDelayReset() => SetSubtitleDelayAsync(0);
 
     [RelayCommand]
@@ -297,18 +303,26 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
     }
 
     // Every save starts from the stored record, so fields this page does not show are preserved.
-    private async Task SaveAsync(Func<GlobalDefaults, GlobalDefaults> change)
+    // A change that leaves the record equal to the stored one writes nothing. Returns false when the save failed.
+    private async Task<bool> SaveAsync(Func<GlobalDefaults, GlobalDefaults> change)
     {
         await _saveGate.WaitAsync(CancellationToken.None);
         try
         {
             var current = await _store.GetAsync(CancellationToken.None);
-            await _store.SaveAsync(change(current), CancellationToken.None);
+            var updated = change(current);
+            if (updated != current)
+            {
+                await _store.SaveAsync(updated, CancellationToken.None);
+            }
+
             ErrorMessage = null;
+            return true;
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            return false;
         }
         finally
         {
