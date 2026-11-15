@@ -206,7 +206,7 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             {
                 // A frame reveal in progress must now wait for the clock to pass the new position.
                 _revealFromMs = target;
-                if (_pauseRequested && !_revealingFrame && _hasVideo && _videoEnabled && _surfaceAttached)
+                if (_pauseRequested && !_revealingFrame && _hasVideo && _videoEnabled && _hasSurface)
                 {
                     picture = PreviewSeek(target);
                 }
@@ -389,7 +389,7 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
 
         // The player page creates the surface right after the open command. Starting without it would
         // fail the video output and lose hardware decoding (docs/SPIKE.md findings 6 and 7).
-        if (_item!.Kind == MediaKind.Video && _videoEnabled && !_surfaceAttached)
+        if (_item!.Kind == MediaKind.Video && _videoEnabled && !_hasSurface)
         {
             _waitingForSurface = true;
             var generation = _generation;
@@ -423,7 +423,7 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
                 ?? throw new IOException("The media file could not be opened.");
 
             var player = EnsurePlayer(SubtitleMarginPx());
-            var withVideo = _videoEnabled && _surfaceAttached;
+            var withVideo = _videoEnabled && _hasSurface;
             _media = new VlcMedia(_libVlc!, _descriptor.Fd);
             _media.AddOption(_requestedDecoder == DecoderMode.Hardware ? ":codec=mediacodec_ndk,all" : ":codec=all");
             if (_startMs > 0)
