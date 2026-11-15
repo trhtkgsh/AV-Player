@@ -9,16 +9,20 @@ using PowerManager = Android.OS.PowerManager;
 namespace Player.App.Pip;
 
 // The activity callbacks, the action receiver and the close rule. MainActivity forwards four events, all on the
-// main thread. The close decision never reads Platform.CurrentActivity and does not depend on the order of
-// onStop and onPictureInPictureModeChanged(false), which differs between Android versions.
+// main thread. The close decision never reads Platform.CurrentActivity. The order of onStop and
+// onPictureInPictureModeChanged(false) differs between Android versions, so both orders are handled: a mode
+// change that finds the activity still started ends the session without a close and notes the time, and a stop
+// right after it turns that into a close (see TryCloseAfterEarlyEnd).
 public sealed partial class PictureInPictureController
 {
     private static readonly TimeSpan StopCheckDelay = TimeSpan.FromMilliseconds(600);
+    private const long EarlyEndWindowMs = 1000;
 
     private WeakReference<Activity>? _activity;
     private PipActionReceiver? _receiver;
     private Context? _receiverHost;
     private int _session;
+    private long? _endedWithoutCloseAt;   // Environment.TickCount64 of a session end that did not close playback
 
     /// <summary>Called by MainActivity (main thread) from OnPictureInPictureModeChanged.</summary>
     internal void OnPictureInPictureModeChanged(Activity activity, bool isInPictureInPictureMode)
@@ -36,9 +40,16 @@ public sealed partial class PictureInPictureController
             // Out of PiP. Expanded to full screen: the activity is started or resumed and playback goes on.
             // Dismissed: the activity is finishing, destroyed or below started.
             var closing = activity.IsFinishing || activity.IsDestroyed || !IsAtLeastStarted(activity);
+            var wasActive = _isActive;
             EndPictureInPicture(closePlayback: closing);
             if (!closing)
             {
+                // Either an expand to full screen, or a dismiss whose onStop has not arrived yet.
+                if (wasActive)
+                {
+                    _endedWithoutCloseAt = Environment.TickCount64;
+                }
+
                 ApplyParamsAgain();
             }
         }
@@ -57,6 +68,7 @@ public sealed partial class PictureInPictureController
             Remember(activity);
             if (!_isActive)
             {
+                TryCloseAfterEarlyEnd();
                 return;
             }
 
@@ -96,7 +108,14 @@ public sealed partial class PictureInPictureController
                 _activity = null;
             }
 
-            EndPictureInPicture(closePlayback: activity.IsFinishing);
+            if (_isActive)
+            {
+                EndPictureInPicture(closePlayback: activity.IsFinishing);
+            }
+            else if (activity.IsFinishing)
+            {
+                TryCloseAfterEarlyEnd();
+            }
         }
         catch (Exception ex)
         {
@@ -139,6 +158,7 @@ public sealed partial class PictureInPictureController
 
         _isActive = true;
         _session++;
+        _endedWithoutCloseAt = null;
         RegisterReceiver();
         RaiseChanged();
         ApplyParamsAgain();
@@ -162,6 +182,23 @@ public sealed partial class PictureInPictureController
         {
             _ = Task.Run(CloseAsync);
         }
+    }
+
+    /// <summary>
+    /// A session ended on the mode change with the activity still started, and now the activity stops (or is
+    /// destroyed while finishing) right after: the window was dismissed and the mode callback came first.
+    /// A screen that is off or a locked device is not a close.
+    /// </summary>
+    private void TryCloseAfterEarlyEnd()
+    {
+        var endedAt = _endedWithoutCloseAt;
+        _endedWithoutCloseAt = null;
+        if (endedAt is null || Environment.TickCount64 - endedAt.Value >= EarlyEndWindowMs || !IsScreenOnAndUnlocked())
+        {
+            return;
+        }
+
+        _ = Task.Run(CloseAsync);
     }
 
     private void CheckDismissed(Activity activity, int session)
