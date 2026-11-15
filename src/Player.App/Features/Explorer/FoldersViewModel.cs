@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.ApplicationModel;
@@ -44,7 +45,11 @@ public sealed partial class FoldersViewModel : ObservableObject
     private bool _flatSeen;
     private bool _openingSettings;
     private bool _choosingView;
+    private bool _choosingOptions;
     private bool _opening;
+
+    // The speeds of the folder speed sheet, after the general default.
+    private static readonly float[] FolderSpeeds = [0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f];
 
     // The NewTagDays the current or last load read from the settings. Null when no load has read them yet, or the last load failed.
     private int? _loadedNewTagDays;
@@ -232,6 +237,102 @@ public sealed partial class FoldersViewModel : ObservableObject
             await NavigateToAllAsync();
         }
     }
+
+    [RelayCommand]
+    private async Task OpenOptions(FolderRow row)
+    {
+        if (row.Folder is not { } folder || _choosingOptions)
+        {
+            return;
+        }
+
+        _choosingOptions = true;
+        try
+        {
+            var shell = Shell.Current;
+            if (shell is null)
+            {
+                return;
+            }
+
+            // The state shown in the sheet is read now, not taken from the rows.
+            var ct = SessionToken;
+            var current = await _folderSettings.GetAsync(folder.BucketId, ct);
+            var favoriteText = _localizer[current?.Favorite == true ? "Explorer.RemoveFavorite" : "Explorer.AddFavorite"];
+            var speedName = current?.Speed is { } speed ? FormatSpeed(speed) : _localizer["Explorer.FolderSpeedGeneral"];
+            var speedText = _localizer.Format("Explorer.FolderSpeed", speedName);
+
+            var choice = await shell.DisplayActionSheetAsync(
+                folder.Name,
+                _localizer["Common.Cancel"],
+                null,
+                favoriteText,
+                speedText);
+
+            if (choice == favoriteText)
+            {
+                await SaveFolderSettingsAsync(folder.BucketId, s => s with { Favorite = !s.Favorite }, ct);
+            }
+            else if (choice == speedText)
+            {
+                await ChooseFolderSpeedAsync(shell, folder, ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
+        finally
+        {
+            _choosingOptions = false;
+        }
+    }
+
+    private async Task ChooseFolderSpeedAsync(Shell shell, MediaFolder folder, CancellationToken ct)
+    {
+        var labels = new[] { _localizer["Explorer.FolderSpeedGeneral"] }
+            .Concat(FolderSpeeds.Select(FormatSpeed))
+            .ToArray();
+
+        var choice = await shell.DisplayActionSheetAsync(
+            folder.Name,
+            _localizer["Common.Cancel"],
+            null,
+            labels);
+
+        var index = Array.IndexOf(labels, choice);
+        if (index < 0)
+        {
+            return;
+        }
+
+        // The first choice is the general default: no speed for this folder.
+        float? speed = index == 0 ? null : FolderSpeeds[index - 1];
+        await SaveFolderSettingsAsync(folder.BucketId, s => s with { Speed = speed }, ct);
+    }
+
+    private async Task SaveFolderSettingsAsync(long bucketId, Func<FolderSettings, FolderSettings> change, CancellationToken ct)
+    {
+        try
+        {
+            // Read the latest stored entry: only the changed member moves.
+            var current = await _folderSettings.GetAsync(bucketId, ct) ?? new FolderSettings(bucketId);
+            await _folderSettings.SaveAsync(change(current), ct);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(ex);
+            ErrorMessage = _localizer["Explorer.SaveFailed"];
+        }
+    }
+
+    private static string FormatSpeed(float speed) => speed.ToString("0.0#", CultureInfo.InvariantCulture) + "x";
 
     [RelayCommand]
     private void GoUp()
@@ -505,7 +606,7 @@ public sealed partial class FoldersViewModel : ObservableObject
             case ExplorerViewMode.Favorites:
                 foreach (var folder in visible.Where(IsFavorite))
                 {
-                    Folders.Add(new FolderRow(FolderRowKind.Folder, folder.Name, folder, folder.ItemCount, folder.NewCount, _localizer));
+                    Folders.Add(FolderRowFor(folder));
                 }
 
                 break;
@@ -517,7 +618,7 @@ public sealed partial class FoldersViewModel : ObservableObject
             default:
                 foreach (var folder in visible)
                 {
-                    Folders.Add(new FolderRow(FolderRowKind.Folder, folder.Name, folder, folder.ItemCount, folder.NewCount, _localizer));
+                    Folders.Add(FolderRowFor(folder));
                 }
 
                 break;
@@ -532,17 +633,20 @@ public sealed partial class FoldersViewModel : ObservableObject
     {
         if (_treePath.Length > 0 && CurrentTreeFolder(visible) is { } current)
         {
-            Folders.Add(new FolderRow(FolderRowKind.FilesHere, current.Name, current, current.ItemCount, current.NewCount, _localizer));
+            Folders.Add(new FolderRow(FolderRowKind.FilesHere, current.Name, current, current.ItemCount, current.NewCount, _localizer, null, IsFavorite(current)));
         }
 
         foreach (var node in FolderTree.GetChildren(visible, _treePath))
         {
             var folder = node.Folder;
             Folders.Add(node.FolderCount == 1 && folder is not null
-                ? new FolderRow(FolderRowKind.Folder, folder.Name, folder, node.ItemCount, node.NewCount, _localizer)
-                : new FolderRow(FolderRowKind.Container, folder?.Name ?? node.Name, folder, node.ItemCount, node.NewCount, _localizer, node.Path));
+                ? new FolderRow(FolderRowKind.Folder, folder.Name, folder, node.ItemCount, node.NewCount, _localizer, null, IsFavorite(folder))
+                : new FolderRow(FolderRowKind.Container, folder?.Name ?? node.Name, folder, node.ItemCount, node.NewCount, _localizer, node.Path, IsFavorite(folder)));
         }
     }
+
+    private FolderRow FolderRowFor(MediaFolder folder) =>
+        new(FolderRowKind.Folder, folder.Name, folder, folder.ItemCount, folder.NewCount, _localizer, null, IsFavorite(folder));
 
     // The media folder at the current file-browser path, or null when the path is only a container.
     private MediaFolder? CurrentTreeFolder(IReadOnlyList<MediaFolder> visible)
@@ -552,8 +656,8 @@ public sealed partial class FoldersViewModel : ObservableObject
         return FolderTree.GetChildren(visible, parent).FirstOrDefault(n => n.Path == _treePath)?.Folder;
     }
 
-    private bool IsFavorite(MediaFolder folder) =>
-        _folderSettingsByBucket.TryGetValue(folder.BucketId, out var settings) && settings.Favorite;
+    private bool IsFavorite(MediaFolder? folder) =>
+        folder is not null && _folderSettingsByBucket.TryGetValue(folder.BucketId, out var settings) && settings.Favorite;
 
     partial void OnErrorMessageChanged(string? value)
     {
