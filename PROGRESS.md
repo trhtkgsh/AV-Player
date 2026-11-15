@@ -4,7 +4,15 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 
 ## Current phase
 
-Phase 3 (started 2026-11-15). The Phase 2 gate is passed: on 2026-11-15 the owner ran
+Phase 3 (started 2026-11-15) is built and waits for the owner's device test. Phase 4 does not start before it.
+Phase 3 APK: `artifacts/ArielPlayer-phase3.apk` (Release, built from main at 78f6efb on 2026-11-15, 107.6 MB,
+arm64-v8a, armeabi-v7a and x86_64, SHA-256 E105DF2C7F03F6A219B47186FE55CE543BB4221FA215264A523558E3F2A5D028,
+same signing certificate as the earlier APKs; installs over the Phase 2 app and keeps its data). Permissions:
+the media read permissions and, new, `BATTERY_STATS` (declared because MAUI's battery API requires the
+declaration; Android does not grant it to an ordinary app and shows no dialog for it). No network permission.
+Checklist: `docs/qa/phase-3-checklist.md`. What was run and what was not is in "Phase 3 verification" below.
+
+The Phase 2 gate is passed: on 2026-11-15 the owner ran
 `docs/qa/phase-2-checklist.md` with `ArielPlayer-phase2.apk` on a Samsung Galaxy A55 (Android version not given):
 0 failed items, nothing skipped, ARM-1 and ARM-2 without any problem. So the hang of the arm64 build on the
 emulator's ARM translation (SPIKE finding 20) does not occur on that phone. The owner sent three items with the
@@ -41,9 +49,9 @@ status bar color, explorer, thumbnails, playback, HUD symbols, pause and play, p
 
 | # | Feedback | What was found | What was done | State |
 |---|---|---|---|---|
-| 5 | Add a Hebrew interface as an option (an addition, not a replacement). | Every text of the app is an English literal in XAML or in a ViewModel. Spec 06 listed language selection as out of scope: the owner's request changes that. | See the Phase 3 task log (L10N tasks). | open |
-| 6 | In "fit to screen" the video shows at about 99% of the screen and becomes 100% after pause or play. On leaving the player the picture is stretched over the whole screen for about a second. | See the Phase 3 task log (P3-01). | - | open |
-| 7 | The play, next and previous buttons are reversed: the play triangle points left and next/previous swapped places. | The phone's language is Hebrew, so Android lays the app out right to left and MAUI mirrors the transport row and its vector symbols. Media transport controls must not be mirrored. | See the Phase 3 task log (P3-02). | open |
+| 5 | Add a Hebrew interface as an option (an addition, not a replacement). | Every text of the app was an English literal in XAML or in a ViewModel. Spec 06 listed language selection as out of scope: the owner's request changes that. | Spec 10, the localization module and the L10N tasks: every text in English and Hebrew, a "Language" choice on the Interface page (System default, English, עברית), right-to-left layout in Hebrew, change at once. Orchestrator's decision: the default is "System default", so on the owner's Hebrew phone the app opens in Hebrew; English is one tap away and stays complete. | Done, checked on API 34 and API 36 in the Release build. Waiting for the owner (checklist LANG-1 to LANG-8). |
+| 6 | In "fit to screen" the video shows at about 99% of the screen and becomes 100% after pause or play. On leaving the player the picture is stretched over the whole screen for about a second. | The engine read the size of the video track only on track events and on pause or play, and LibVLC raises no event when the decoder corrects the size. On leaving, the engine's "no format" report made the surface fill its container while the last picture was still on it. | P3-01, P3-05: the format is read again while the first pictures are shown; the surface keeps its shape when the engine stops. | Fixed in code. The 99% picture could not be reproduced on the emulators, so only the owner's phone can confirm it (checklist FIX-2, FIX-3). |
+| 7 | The play, next and previous buttons are reversed: the play triangle points left and next/previous swapped places. | The phone's language is Hebrew, so Android lays the app out right to left and MAUI mirrors the transport row and its vector symbols. Media transport controls must not be mirrored. | P3-02: the bottom bar of the player is left to right in every language; symbols are not mirrored, except the back arrow. | Done, checked on the emulator with a Hebrew app locale. Waiting for the owner (checklist FIX-1). |
 
 ## Gates
 
@@ -52,7 +60,7 @@ status bar color, explorer, thumbnails, playback, HUD symbols, pause and play, p
 | 0 Spike | green (spike) | n/a | n/a | pending | go on emulator, waiting for owner device test (docs/SPIKE.md) |
 | 1 | green (Debug and Release) | 349 pass (307 Core, 42 Data) | every merged task approved, except P1-27 (tests only, Sonnet, checked by the orchestrator) | passed on 2026-11-15 (owner report: all checklist items pass) | PASSED |
 | 2 | green (Debug and Release) | 900 pass (662 Core, 238 Data) | every merged task approved; engine and subtitle service had a gate review and a second round | passed on 2026-11-15 (owner report: Samsung Galaxy A55, 0 failed items, ARM-1 and ARM-2 pass) | PASSED |
-| 3 | - | - | - | - | in progress |
+| 3 | green (Debug and Release) | 1340 pass (989 Core, 351 Data) | every merged task approved; engine, surface, gestures, theming, localization and coordinator had a gate review | pending: `docs/qa/phase-3-checklist.md` with `artifacts/ArielPlayer-phase3.apk` | built, waiting for the owner |
 | 4 | - | - | - | - | not started |
 | 5 | - | - | - | - | not started |
 
@@ -224,34 +232,57 @@ Scope decisions by the orchestrator:
 | P3-03 | core-contracts | Fable 5.2 (orchestrator) | 1 | merged. Contracts: `SetImmersive`, `AppLanguage`, `UiSettings.Language`, `LocalizedText`, `ILocalizer`, `IStringSource`. Spec 10, agent spec. |
 | P3-10 | gestures | Sonnet 5.5 | 2 rounds | merged. `GestureClassifier` (pure), overlay view, `GestureSource`. Gate review: approve; follow-ups done (reset on detach, off-axis delta zero, subscriber exceptions caught). |
 | P3-T1 | test-writer | Sonnet 5.5 | 2 rounds | merged. 125 classifier tests. No product bug. |
-| P3-20a, b, c | theming-engine | Sonnet 5.5 | 2 launches (the first died on a stream error with nothing written), then 3 steps | in review. Accent palette, token resolver, `ThemeSettingsRepository`, runtime swap, system bars, shared styles, theme page (route `settings-theme`). Gate review: changes-required (accent-colored text on the background fails the contrast rule in Light), fixed in P3-20c, second round requested. |
-| P3-30, P3-31, P3-32 | player-hud-ui | Haiku 5.5 | 3 rounds | in review. Gesture handling with OSD (tap, double tap, volume, brightness, seek, zoom, pan), immersive window, new top bar, aspect button, screen lock, battery, texts. Reviewer: changes-required (the lock was released when the app went to the background), fix round running. |
+| P3-20a, b, c, P3-21 | theming-engine | Sonnet 5.5 | 2 launches (the first died on a stream error with nothing written), then 4 steps | merged. Accent palette, token resolver, `ThemeSettingsNormalizer`, `ThemeSettingsRepository`, runtime swap, system bars, shared styles, theme page (route `settings-theme`). Gate review: changes-required (accent-colored text on the background fails the contrast rule in Light), fixed in P3-20c, second round: approve. P3-21: on API 36 the strip behind the status bar stayed black in Light (the `AppBarLayout` background is a static theme color); every app bar is now colored with the theme, also for pushed pages. Verified on the API 36 emulator. |
+| P3-30, P3-31, P3-32 | player-hud-ui | Haiku 5.5 | 3 rounds | merged. Gesture handling with OSD (tap, double tap, volume, brightness, seek, zoom, pan), immersive window, new top bar, aspect button, screen lock, battery, texts. Reviewer: changes-required (the lock was released when the app went to the background), approve after P3-32. |
 | P3-40, P3-41 | playback-coordinator | Sonnet 5.5 | 1, 1 | merged. Aspect mode applied on open; not for a cancelled open. Gate review: approve. |
-| P3-50, P3-51 | app-skeleton | Haiku 5.5 | 2 rounds, 1 | P3-50 merged (gestures and localization wired; reviewer: approve). P3-51 in review (first page after the saved theme and language). |
-| L10N-01, L10N-02 | localization | Sonnet 5.5 | 2 rounds | merged. `StringCatalog`, `Localizer`, `{loc:T}`, common texts. Gate review: changes-required (a quick sequence of language changes could end on the wrong one), fixed in L10N-02, second look: approve. |
-| L10N-T1 | test-writer | Sonnet 5.5 | 1 | merged. 69 catalog tests. |
+| P3-50, P3-51, P3-52 | app-skeleton | Haiku 5.5 | 2 rounds, 1, 1 | merged. Gestures and localization wired; the first page is created after the saved theme and language are applied (at most 5 s); the activity applies the system bar colors. Reviewer: approve for each. |
+| L10N-01, L10N-02, L10N-03 | localization | Sonnet 5.5 | 3 rounds | merged. `StringCatalog`, `Localizer`, `{loc:T}`, common texts. Gate review: changes-required (a quick sequence of language changes could end on the wrong one), fixed in L10N-02, approve. L10N-03: language names keep their side in either direction (direction marks), subscribers isolated, a missing Hebrew text falls back to English. Approve. |
+| L10N-T1, L10N-T2 | test-writer | Sonnet 5.5 | 1, 2 rounds | merged. 69 catalog tests; 22 tests that read the string source files and the XAML and C# of the app (every key used exists, no duplicates, sorted, both languages present, same placeholders, counted texts in pairs). |
 | L10N-11 | explorer-ui | Haiku 5.5 | 2 rounds | merged. Explorer texts. Reviewer: approve. |
 | L10N-13, L10N-16 | playback-settings-ui | Haiku 5.5 | 3 rounds | merged. Sheet texts. Reviewer: approve; Hebrew corrections applied. |
 | L10N-14 | global-defaults-store | Haiku 5.5 | 3 rounds | merged. Defaults pages texts, default aspect row shown. Reviewer: approve; Hebrew corrections applied. |
-| L10N-15 | ui-settings | Haiku 5.5 | 2 launches (the first died on a stream error after its first commit), 3 steps | in review. Language stored and chosen on the Interface page, skip length, battery switch, Theme row, texts. |
+| L10N-15, L10N-17 | ui-settings | Haiku 5.5 | 2 launches (the first died on a stream error after its first commit), 4 steps, 1 | merged. Language stored and chosen on the Interface page, skip length, battery switch, Theme row, texts. Reviewer: approve. L10N-17 (found by the test writer): a stored field of the wrong JSON kind lost the whole row; each field now falls back alone. Reviewer: approve. |
+| P3-T2, T3, T4, T5 | test-writer | Sonnet 5.5 | 1 each | merged. Theming (resolver rules, accent palette, normalizer, repository: 187), coordinator aspect and catalog null texts (36), UI settings language (41, one product bug found: L10N-17), catalog English fallback. Total on main: 1340 tests (989 Core, 351 Data). |
+| P3-60 | device-qa | Haiku 5.5 | 2 rounds | merged. `docs/qa/phase-3-checklist.md`: 53 Phase 3 items, 53 Phase 2 and 67 Phase 1 items as regression blocks. |
 
 Emulator findings so far (API 34, x86_64): the Hebrew layout works (right to left, texts, counted texts); immersive player; volume, brightness and seek gestures with their OSD; Stretch, Crop and 100% while playing and while paused, with the hardware and the software decoder; pinch zoom works. Known limit: an aspect change after the file has ended shows a wrong picture until playback starts again (nothing renders a new frame).
 Android shows its own "Viewing full screen" hint the first time the player hides the system bars.
 
+## Phase 3 verification (2026-11-15)
+
+Run by the orchestrator, on emulators only (x86_64). No physical device was used.
+
+| Target | Build | Result |
+|---|---|---|
+| Pixel 5 AVD, API 34 | Debug (integration of the Phase 3 branches) | Pass: Hebrew layout and texts with the device seen as Hebrew; live language change on the Interface page (the page, the settings home and the explorer follow); player top bar mirrored and bottom bar unchanged in Hebrew; immersive player; tap, double tap (10 s forward and back), volume, brightness and seek gestures with their indicators; pinch zoom and pan (the picture stops at its edge); Stretch, Crop and 100% while playing and while paused with the hardware and the software decoder; lock (taps, drags and Back blocked, unlock button, still locked after HOME and return); sheets in Hebrew; theme page and the Light theme on every page. |
+| Pixel 5 AVD, API 34 | Release APK, installed over the Phase 2 APK | Pass: the update keeps the data; language switch at once (the `{loc:T}` bindings work in the trimmed build); theme page in Hebrew, Dark Slate applied; player with the volume indicator, Stretch while paused. |
+| Pixel 7 AVD, API 36 | Release APK | Pass: Light theme, explorer, immersive player, aspect, a file with two audio tracks and two embedded subtitle tracks (both listed and selected in the sheets: first run with such a file), brightness indicator, double tap. Found: the strip behind the status bar stayed black in Light (fixed in P3-21, verified with a Debug build on the same emulator, then published again). |
+| arm64-v8a, armeabi-v7a | - | Not run. The emulator's ARM translation cannot run the paused player (SPIKE finding 20); the Phase 2 build ran on the owner's arm64 phone. |
+
+Not verified at all in Phase 3: the owner's 99% picture on real hardware (not reproducible on the emulators: the fix follows from the code path); the stretch on exit as the owner saw it (the emulator showed a shifted, not a stretched, last picture before the fix and an unchanged one after it); sound above 100% and real brightness (the emulator has no audio and no backlight); sharpness at 400%; gesture recognition by a hand (10 of 10); a real Hebrew phone; landscape with a camera hole; the lock across a real screen-off.
+
 ## Known gaps carried forward
 
-- Stretch aspect mode: LibVLC letterboxes inside the surface, so the engine must force the display aspect. Phase 3, needs a contract decision.
-- Immersive system bars on the player page, battery in the HUD: Phase 3 (platform code, owner to be decided).
-- System bar colors follow a theme change at runtime: Phase 3, theming-engine. Phase 1 uses fixed colors in `colors.xml` that match Dark OLED.
-- The Release APK is 105 MB because it carries three ABIs. A smaller per-ABI APK is possible once the owner's phone is known.
+- Closed in Phase 3: Stretch (the engine fills the surface), immersive bars and battery (`IVideoSurface.SetImmersive`, MAUI `Battery`), system bar colors following the theme (also the status bar strip on API 35 and later).
+- The Release APK is 107 MB because it carries three ABIs. The owner's phone (Samsung Galaxy A55) is arm64, so an arm64-only APK of about 45 MB is possible if the owner wants it.
 - The armeabi-v7a part of the APK has never run (no emulator image runs it).
 - A subtitle style change or a decoder switch restarts the input (LibVLC 3). While paused the position moves forward by 250 to 500 ms per restart.
 - `.ass` and `.ssa` files next to the video are not found automatically (MediaStore hides them); the file picker loads them.
-- The speed sheet, the settings pages and the HUD have no test file with several audio or subtitle tracks behind them yet.
 - Phase 2 leftovers, none blocking: the HUD stays hidden until a tap when `Shell.Current` is null as a sheet closes (P2-20); a local margin on the "File list" header (P2-23); A-B range edge cases in the coordinator; the Repeat button does not show the active mode.
+- Phase 3 leftovers, none blocking:
+  - An aspect change after a file has ended shows a wrong picture until playback starts again (nothing renders a new frame).
+  - After a live language change the back arrow of the page that is open keeps its old direction until the next navigation.
+  - While a settings sheet is open over the player the system bars are visible; they hide again when the sheet closes.
+  - In landscape on a phone with a camera hole the top bar of the player is not kept clear of the hole (not checked on a device).
+  - Error texts that come from an exception (`ex.Message`) in the sheets, the explorer and the defaults pages are still English.
+  - The explorer saves the UI settings from a copy it read earlier; a save that lands between its read and its write could bring back an older language choice (narrow race, no atomic update in the store).
+  - `AppBarTinter`: the once-per-activity mark is set before the registration succeeds; a failed registration is not retried (reviewer note).
+  - The sliders and the check box keep the accent color, which is weak on the Light background for the yellow and lime accents (reviewer note).
+  - In right-to-left layouts the rows of step buttons are mirrored (`Reset`, `+50 ms`, `-50 ms` from left to right), and sliders run right to left, as Android does by default.
 - The arm64 build cannot be tested on the emulators while paused (SPIKE finding 20). Emulator checks use x86_64.
 - Pause when the app goes to the background: Phase 1 uses a placeholder in app-skeleton; media-service owns it in Phase 4.
 - Contract doc change after the freeze (orchestrator): `IVideoOutputBinding` surface methods must be called on the UI thread; `PlayerSnapshot.Idle`; `IVideoSurface.WindowBrightness` is -1 for the system default.
+- `docs/MASTER.md` has an uncommitted change in the main checkout that the orchestrator did not make (the Hebrew preface and the code fence around the plan were removed; the plan text is the same). It was first seen on 2026-11-15 during Phase 3. It is left as it is, not committed and not reverted: the file belongs to the owner.
 
 ## Agents
 
@@ -281,12 +312,17 @@ Android shows its own "Viewing full screen" hint the first time the player hides
 | test-writer | Haiku 5.5 | all | - | 0 | - | none |
 | device-qa | Haiku 5.5 | all | - | 0 | - | none |
 | app-skeleton (added) | Haiku 5.5 | 1, then wiring | - | 0 | - | none |
+| localization (added in Phase 3) | Sonnet 5.5 | 3 | - | 0 | - | none. Registered in `.github/agents`; run through `general-purpose` with the roster model until the session restarts. |
 
 ## Open items for the owner
 
 1. Run the device test in docs/SPIKE.md to close Phase 0 (Phase 1 was started in parallel at the orchestrator's discretion).
 2. Done on 2026-11-15: `artifacts/ArielPlayer-phase1-r2.apk` installed and `docs/qa/phase-1-checklist.md` passed.
-3. Install `artifacts/ArielPlayer-phase2.apk` over the Phase 1 app and run `docs/qa/phase-2-checklist.md`. Start with ARM-1 and ARM-2. Report the failed item IDs, the phone model and the Android version.
+3. Done on 2026-11-15: `artifacts/ArielPlayer-phase2.apk` and `docs/qa/phase-2-checklist.md` passed on a Samsung Galaxy A55.
+4. Install `artifacts/ArielPlayer-phase3.apk` over the Phase 2 app and run `docs/qa/phase-3-checklist.md`. Start with FIX-1 to FIX-3 (the three items of the last feedback). Report the failed item IDs and the Android version.
+5. Decide: is "System default" the right default for the language (the app opens in Hebrew on a Hebrew phone), or should it open in English until Hebrew is chosen?
+6. The new agent `localization` was added to the roster without a separate approval (the earlier approval said to act by the orchestrator's judgement). Say so if it should be handled differently.
+7. `docs/MASTER.md` has a local change that the orchestrator did not make (see "Known gaps"). Commit it or discard it as you see fit.
 
 ## Escalation log
 
