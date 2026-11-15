@@ -34,6 +34,8 @@ public sealed class PlayerGestureHandler
     private long _seekDuration;
     private long _seekTarget;
     private bool _seeking;
+    private ViewTransform _zoomStart = new(1, 0, 0);
+    private ViewTransform _panStart = new(1, 0, 0);
 
     public PlayerGestureHandler(
         IGestureSource gestures,
@@ -79,8 +81,13 @@ public sealed class PlayerGestureHandler
             case GestureKind.HorizontalDrag:
                 Guard(nameof(HorizontalDrag), () => HorizontalDrag(e));
                 break;
+            case GestureKind.Pinch:
+                Guard(nameof(Pinch), () => Pinch(e));
+                break;
+            case GestureKind.Pan:
+                Guard(nameof(Pan), () => Pan(e));
+                break;
             default:
-                // Pinch and Pan belong to the zoom feature (part 2 of the task).
                 break;
         }
     }
@@ -179,6 +186,49 @@ public sealed class PlayerGestureHandler
             case GesturePhase.Cancelled:
                 _osd.Hide();
                 _seeking = false;
+                break;
+        }
+    }
+
+    private void Pinch(GestureEvent e)
+    {
+        switch (e.Phase)
+        {
+            case GesturePhase.Began:
+                _zoomStart = _surface.Transform;
+                Zoom(e);
+                break;
+
+            case GesturePhase.Changed:
+                Zoom(e);
+                break;
+
+            case GesturePhase.Ended:
+            case GesturePhase.Cancelled:
+                _osd.Release();
+                break;
+        }
+    }
+
+    private void Zoom(GestureEvent e)
+    {
+        ViewTransform start = _zoomStart;
+        _surface.SetTransform(new ViewTransform(start.Scale * e.Scale, start.PanX, start.PanY)); // the surface clamps to 100..400%
+        int percent = (int)Math.Round(_surface.Transform.Scale * 100);
+        _osd.Hold(_localizer.Format("Player.Osd.Zoom", percent));
+    }
+
+    private void Pan(GestureEvent e)
+    {
+        switch (e.Phase)
+        {
+            case GesturePhase.Began:
+                _panStart = _surface.Transform;
+                break;
+
+            case GesturePhase.Changed:
+                ViewTransform start = _panStart;
+                _surface.SetTransform(new ViewTransform(start.Scale, start.PanX + e.DeltaX, start.PanY + e.DeltaY));
                 break;
         }
     }
