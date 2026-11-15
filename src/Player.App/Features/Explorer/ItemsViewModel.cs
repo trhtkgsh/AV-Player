@@ -39,6 +39,9 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private Dictionary<MediaFileId, MediaMetadata> _metadata = new();
     private Dictionary<MediaFileId, PlaybackState> _states = new();
     private Dictionary<MediaFileId, MediaRowViewModel> _rows = new();
+
+    // The buckets of the audio-only folders. Read for the All files list only.
+    private HashSet<long> _audioOnlyBuckets = new();
     private int _loadVersion;
     private bool _settingsLoaded;
 
@@ -396,7 +399,21 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
                 return;
             }
 
+            // The All files list leaves out the files of audio-only folders while the setting is off.
+            var audioOnly = new HashSet<long>();
+            if (_bucketId is null)
+            {
+                var folders = await _library.GetFoldersAsync(settings.NewTagDays, ct);
+                if (!IsCurrentLoad(version))
+                {
+                    return;
+                }
+
+                audioOnly.UnionWith(folders.Where(f => f.AudioOnly).Select(f => f.BucketId));
+            }
+
             _items = items;
+            _audioOnlyBuckets = audioOnly;
             _states = new Dictionary<MediaFileId, PlaybackState>(states);
             _metadata = new Dictionary<MediaFileId, MediaMetadata>(cached);
             RebuildRows();
@@ -434,8 +451,12 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
                 : new MediaRowViewModel(item);
         }
 
+        var shown = _settings.IncludeAudioOnlyFolders || _bucketId is not null
+            ? _items
+            : _items.Where(item => !_audioOnlyBuckets.Contains(item.BucketId)).ToList();
+
         var ordered = SearchFilter.Apply(
-            MediaSorter.Sort(_items, SortField, SortDirection, _metadata),
+            MediaSorter.Sort(shown, SortField, SortDirection, _metadata),
             SearchText);
 
         Rows.Clear();

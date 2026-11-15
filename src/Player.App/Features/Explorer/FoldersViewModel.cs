@@ -293,7 +293,7 @@ public sealed partial class FoldersViewModel : ObservableObject
 
     private async Task ChooseFolderSpeedAsync(Shell shell, MediaFolder folder, CancellationToken ct)
     {
-        var labels = new[] { _localizer["Explorer.FolderSpeedGeneral"] }
+        var labels = new[] { _localizer["Explorer.FolderSpeedUseGeneral"] }
             .Concat(FolderSpeeds.Select(FormatSpeed))
             .ToArray();
 

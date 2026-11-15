@@ -15,6 +15,7 @@ internal sealed class ExplorerStrings : IStringSource
         ["Explorer.FolderOptions"] = new("Folder options", "אפשרויות תיקייה"),
         ["Explorer.FolderSpeed"] = new("Default speed for this folder: {0}", "מהירות ברירת מחדל לתיקייה: {0}"),
         ["Explorer.FolderSpeedGeneral"] = new("general default", "ברירת המחדל הכללית"),
+        ["Explorer.FolderSpeedUseGeneral"] = new("Use the general default", "השתמש בברירת המחדל הכללית"),
         ["Explorer.Items.Many"] = new("{0} items", "{0} פריטים"),
         ["Explorer.Items.One"] = new("1 item", "פריט אחד"),
         ["Explorer.NewCount.Many"] = new("{0} new", "{0} חדשים"),
