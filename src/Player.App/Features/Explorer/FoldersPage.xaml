@@ -12,6 +12,8 @@
         <ToolbarItem x:Key="LayoutItem" Text="{Binding LayoutText}" Command="{Binding ToggleLayoutCommand}" />
         <ToolbarItem x:Key="SettingsItem" Text="{loc:T Common.Settings}" Order="Secondary" Command="{Binding OpenSettingsCommand}" />
         <ToolbarItem x:Key="SelectAllItem" Text="{loc:T Explorer.SelectAll}" Command="{Binding SelectAllCommand}" />
+        <ToolbarItem x:Key="MoveItem" Text="{loc:T Explorer.Move}" Command="{Binding MoveSelectedCommand}" />
+        <ToolbarItem x:Key="CopyItem" Text="{loc:T Explorer.Copy}" Command="{Binding CopySelectedCommand}" />
         <ToolbarItem x:Key="DeleteItem" Text="{loc:T Explorer.Delete}" Command="{Binding DeleteSelectedCommand}" />
 
         <!-- The ⋮ button: no border, transparent, muted, with a touch area of 44 x 44. -->
@@ -201,6 +203,8 @@
             <VerticalStackLayout Spacing="12" HorizontalOptions="Center" VerticalOptions="Center">
                 <ActivityIndicator IsRunning="{Binding IsOperationRunning}" HorizontalOptions="Center" />
                 <Label Text="{Binding OperationName}" HorizontalTextAlignment="Center" />
+                <Button Text="{loc:T Common.Cancel}" Command="{Binding CancelOperationCommand}"
+                        IsVisible="{Binding CanCancelOperation}" HorizontalOptions="Center" />
             </VerticalStackLayout>
         </Grid>
 

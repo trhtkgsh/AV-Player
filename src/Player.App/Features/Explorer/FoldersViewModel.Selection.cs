@@ -29,6 +29,12 @@ public sealed partial class FoldersViewModel
     [ObservableProperty]
     private string _operationName = string.Empty;
 
+    // Only a copy can be cancelled: a move is not stopped halfway.
+    [ObservableProperty]
+    private bool _canCancelOperation;
+
+    private CancellationTokenSource? _operationCts;
+
     // The ⋮ buttons and the normal toolbar actions show only outside the selection mode.
     public bool IsBrowsing => !IsSelecting;
 
@@ -171,6 +177,72 @@ public sealed partial class FoldersViewModel
                 await LoadAsync(LoadReason.Library);
                 ErrorMessage = _operations.FailureText(result, partialKey);
                 break;
+        }
+    }
+
+    [RelayCommand]
+    private Task MoveSelected() => TransferSelectedAsync(move: true);
+
+    [RelayCommand]
+    private Task CopySelected() => TransferSelectedAsync(move: false);
+
+    [RelayCommand]
+    private void CancelOperation() => _operationCts?.Cancel();
+
+    // The files of the selected folders go to the chosen folder. Move closes an open file first; copy can be cancelled.
+    // The folders always reload: their counts change.
+    private async Task TransferSelectedAsync(bool move)
+    {
+        var shell = Shell.Current;
+        if (_fileOperationRunning || !IsSelecting || shell is null)
+        {
+            return;
+        }
+
+        var buckets = _selection.Keys.ToList();
+        try
+        {
+            var items = await _operations.FilesAsync([], buckets, SessionToken);
+            if (items.Count == 0)
+            {
+                ExitSelection();
+                return;
+            }
+
+            var target = await _operations.ChooseTargetAsync(shell, items, SessionToken);
+            if (target is null)
+            {
+                return;
+            }
+
+            _fileOperationRunning = true;
+            _operationCts = CancellationTokenSource.CreateLinkedTokenSource(SessionToken);
+            var ct = _operationCts.Token;
+            IsOperationRunning = true;
+            CanCancelOperation = !move;
+            OperationName = _localizer[move ? "Explorer.OperationMove" : "Explorer.OperationCopy"];
+            try
+            {
+                var result = move
+                    ? await _operations.MoveAsync(items, target, ct)
+                    : await _operations.CopyAsync(items, target, ct);
+                await ApplyBatchResultAsync(result, move ? "Explorer.SomeNotMoved" : "Explorer.SomeNotCopied");
+            }
+            finally
+            {
+                _operationCts.Dispose();
+                _operationCts = null;
+                _fileOperationRunning = false;
+                IsOperationRunning = false;
+                CanCancelOperation = false;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
         }
     }
 

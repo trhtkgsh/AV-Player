@@ -15,17 +15,20 @@ public sealed class SelectionOperations
     private readonly IMediaLibrary _library;
     private readonly IFileOperations _fileOperations;
     private readonly IPlaybackCoordinator _coordinator;
+    private readonly IUiSettingsStore _uiSettings;
     private readonly ILocalizer _localizer;
 
     public SelectionOperations(
         IMediaLibrary library,
         IFileOperations fileOperations,
         IPlaybackCoordinator coordinator,
+        IUiSettingsStore uiSettings,
         ILocalizer localizer)
     {
         _library = library;
         _fileOperations = fileOperations;
         _coordinator = coordinator;
+        _uiSettings = uiSettings;
         _localizer = localizer;
     }
 
@@ -66,12 +69,48 @@ public sealed class SelectionOperations
     // The file that is open in playback is closed first. Then the batch goes to the trash.
     public async Task<FileOperationResult> TrashAsync(IReadOnlyList<MediaItem> items, CancellationToken ct)
     {
+        await CloseIfPlayingAsync(items, ct);
+        return await _fileOperations.TrashAsync(items, ct);
+    }
+
+    // Move closes an open file first, as delete does. Copy leaves playback alone.
+    public async Task<FileOperationResult> MoveAsync(IReadOnlyList<MediaItem> items, MediaFolder target, CancellationToken ct)
+    {
+        await CloseIfPlayingAsync(items, ct);
+        return await _fileOperations.MoveAsync(items, target, ct);
+    }
+
+    public Task<FileOperationResult> CopyAsync(IReadOnlyList<MediaItem> items, MediaFolder target, CancellationToken ct) =>
+        _fileOperations.CopyAsync(items, target, ct);
+
+    // The folders the files can go to: all media folders in their list order, without the source folder
+    // when the files all share one. Null when the user cancels the picker.
+    public async Task<MediaFolder?> ChooseTargetAsync(Shell shell, IReadOnlyList<MediaItem> items, CancellationToken ct)
+    {
+        var settings = await _uiSettings.GetAsync(ct);
+        var folders = await _library.GetFoldersAsync(settings.NewTagDays, ct);
+        var choices = SelectionRules.TargetChoices(
+            folders,
+            SelectionRules.SingleBucket(items.Select(item => item.BucketId)));
+
+        var page = new FolderPickerPage(choices);
+        var modal = new NavigationPage(page);
+        await shell.Navigation.PushModalAsync(modal);
+        var chosen = await page.Result;
+        if (shell.Navigation.ModalStack.Contains(modal))
+        {
+            await shell.Navigation.PopModalAsync();
+        }
+
+        return chosen;
+    }
+
+    private async Task CloseIfPlayingAsync(IReadOnlyList<MediaItem> items, CancellationToken ct)
+    {
         if (_coordinator.Current is { } current && items.Any(item => item.Id == current.Id))
         {
             await _coordinator.CloseAsync(ct);
         }
-
-        return await _fileOperations.TrashAsync(items, ct);
     }
 
     // The localized line for a batch, then the implementation's English error (or a localized fallback when there is none).

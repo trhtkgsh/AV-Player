@@ -31,6 +31,12 @@ public sealed partial class ItemsViewModel
     [ObservableProperty]
     private string _operationName = string.Empty;
 
+    // Only a copy can be cancelled: a move is not stopped halfway.
+    [ObservableProperty]
+    private bool _canCancelOperation;
+
+    private CancellationTokenSource? _operationCts;
+
     // The ⋮ buttons and the normal toolbar actions show only outside the selection mode.
     public bool IsBrowsing => !IsSelecting;
 
@@ -114,10 +120,7 @@ public sealed partial class ItemsViewModel
             try
             {
                 var result = await _operations.TrashAsync(items, SessionToken);
-                await ApplyBatchResultAsync(
-                    result,
-                    "Explorer.SomeNotDeleted",
-                    items.Count == 1 ? () => RemoveFromList(items[0]) : null);
+                await ApplyBatchResultAsync(result, "Explorer.SomeNotDeleted", () => AfterRemovalAsync(items));
             }
             finally
             {
@@ -134,21 +137,17 @@ public sealed partial class ItemsViewModel
         }
     }
 
-    // The selection mode ends with the operation. One file is edited in place when it succeeds (editInPlace is set),
-    // several files reload once. Cancelled reloads only when some files were done. Denied and Failed show the message.
-    private async Task ApplyBatchResultAsync(FileOperationResult result, string partialKey, Action? editInPlace)
+    // The selection mode ends with the operation. Success runs onSuccess. Cancelled reloads only when some files were done.
+    // Denied and Failed reload and show the message.
+    private async Task ApplyBatchResultAsync(FileOperationResult result, string partialKey, Func<Task> onSuccess)
     {
         _selection.Clear();
         UpdateSelection();
 
         switch (result.Status)
         {
-            case FileOperationStatus.Success when editInPlace is not null:
-                await EditInPlaceAsync(editInPlace);
-                break;
-
             case FileOperationStatus.Success:
-                await LoadAsync();
+                await onSuccess();
                 break;
 
             case FileOperationStatus.Cancelled when result.CompletedCount > 0:
@@ -165,12 +164,100 @@ public sealed partial class ItemsViewModel
         }
     }
 
-    private void RemoveFromList(MediaItem item)
+    // One file leaves the list in place. Several files reload once.
+    private Task AfterRemovalAsync(IReadOnlyList<MediaItem> items)
     {
-        _items = MediaListEdits.Remove(_items, item.Id);
-        _states.Remove(item.Id);
-        _metadata.Remove(item.Id);
-        RebuildRows();
+        if (items.Count != 1)
+        {
+            return LoadAsync();
+        }
+
+        var item = items[0];
+        return EditInPlaceAsync(() =>
+        {
+            _items = MediaListEdits.Remove(_items, item.Id);
+            _states.Remove(item.Id);
+            _metadata.Remove(item.Id);
+            RebuildRows();
+        });
+    }
+
+    // Copied files appear in the list only when the shown folder is the target (or the list is all media).
+    private Task ReloadIfShownAsync(MediaFolder target) =>
+        _bucketId is null || target.BucketId == _bucketId ? LoadAsync() : Task.CompletedTask;
+
+    [RelayCommand]
+    private async Task MoveSelected()
+    {
+        var shell = Shell.Current;
+        if (shell is not null && IsSelecting)
+        {
+            await TransferAsync(shell, SelectedItems(), move: true);
+        }
+    }
+
+    [RelayCommand]
+    private async Task CopySelected()
+    {
+        var shell = Shell.Current;
+        if (shell is not null && IsSelecting)
+        {
+            await TransferAsync(shell, SelectedItems(), move: false);
+        }
+    }
+
+    [RelayCommand]
+    private void CancelOperation() => _operationCts?.Cancel();
+
+    // Move and copy of the selection, or of one file from its ⋮ menu. The target is picked first. Then the list is covered
+    // while the operation runs. Move closes an open file first; copy can be cancelled.
+    private async Task TransferAsync(Shell shell, IReadOnlyList<MediaItem> items, bool move)
+    {
+        if (_fileOperationRunning || items.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var target = await _operations.ChooseTargetAsync(shell, items, SessionToken);
+            if (target is null)
+            {
+                return;
+            }
+
+            _fileOperationRunning = true;
+            _operationCts = CancellationTokenSource.CreateLinkedTokenSource(SessionToken);
+            var ct = _operationCts.Token;
+            IsOperationRunning = true;
+            CanCancelOperation = !move;
+            OperationName = _localizer[move ? "Explorer.OperationMove" : "Explorer.OperationCopy"];
+            try
+            {
+                var result = move
+                    ? await _operations.MoveAsync(items, target, ct)
+                    : await _operations.CopyAsync(items, target, ct);
+                await ApplyBatchResultAsync(
+                    result,
+                    move ? "Explorer.SomeNotMoved" : "Explorer.SomeNotCopied",
+                    () => move ? AfterRemovalAsync(items) : ReloadIfShownAsync(target));
+            }
+            finally
+            {
+                _operationCts.Dispose();
+                _operationCts = null;
+                _fileOperationRunning = false;
+                IsOperationRunning = false;
+                CanCancelOperation = false;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
     }
 
     // Rename is offered for exactly one file. The mode ends first, then the normal rename prompt runs.

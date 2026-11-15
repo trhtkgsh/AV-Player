@@ -15,6 +15,8 @@
         <ToolbarItem x:Key="SelectAllItem" Text="{loc:T Explorer.SelectAll}" Command="{Binding SelectAllCommand}" />
         <ToolbarItem x:Key="RenameItem" Text="{loc:T Explorer.Rename}" Command="{Binding RenameSelectedCommand}"
                      IsEnabled="{Binding CanRename}" />
+        <ToolbarItem x:Key="MoveItem" Text="{loc:T Explorer.Move}" Command="{Binding MoveSelectedCommand}" />
+        <ToolbarItem x:Key="CopyItem" Text="{loc:T Explorer.Copy}" Command="{Binding CopySelectedCommand}" />
         <ToolbarItem x:Key="DeleteItem" Text="{loc:T Explorer.Delete}" Command="{Binding DeleteSelectedCommand}" />
 
         <!-- The ⋮ button: no border, transparent, muted, with a touch area of 44 x 44 (as on the folder rows). -->
@@ -136,6 +138,8 @@
                 <VerticalStackLayout Grid.Row="1" Spacing="12" HorizontalOptions="Center">
                     <ActivityIndicator IsRunning="{Binding IsOperationRunning}" HorizontalOptions="Center" />
                     <Label Text="{Binding OperationName}" HorizontalTextAlignment="Center" />
+                    <Button Text="{loc:T Common.Cancel}" Command="{Binding CancelOperationCommand}"
+                            IsVisible="{Binding CanCancelOperation}" HorizontalOptions="Center" />
                 </VerticalStackLayout>
             </Grid>
 

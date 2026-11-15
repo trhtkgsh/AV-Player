@@ -34,12 +34,16 @@ public sealed partial class ItemsViewModel
 
             var renameText = _localizer["Explorer.Rename"];
             var deleteText = _localizer["Explorer.Delete"];
+            var moveText = _localizer["Explorer.Move"];
+            var copyText = _localizer["Explorer.Copy"];
             var choice = await shell.DisplayActionSheetAsync(
                 row.Name,
                 _localizer["Common.Cancel"],
                 null,
                 renameText,
-                deleteText);
+                deleteText,
+                moveText,
+                copyText);
 
             if (choice == renameText)
             {
@@ -48,6 +52,14 @@ public sealed partial class ItemsViewModel
             else if (choice == deleteText)
             {
                 await DeleteFileAsync(shell, row.Item);
+            }
+            else if (choice == moveText)
+            {
+                await TransferAsync(shell, [row.Item], move: true);
+            }
+            else if (choice == copyText)
+            {
+                await TransferAsync(shell, [row.Item], move: false);
             }
         }
         catch (OperationCanceledException)

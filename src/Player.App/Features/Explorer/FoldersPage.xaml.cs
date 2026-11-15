@@ -32,6 +32,8 @@ public partial class FoldersPage : ContentPage
         if (_viewModel.IsSelecting)
         {
             ToolbarItems.Add((ToolbarItem)Resources["SelectAllItem"]);
+            ToolbarItems.Add((ToolbarItem)Resources["MoveItem"]);
+            ToolbarItems.Add((ToolbarItem)Resources["CopyItem"]);
             ToolbarItems.Add((ToolbarItem)Resources["DeleteItem"]);
             Shell.SetBackButtonBehavior(this, new BackButtonBehavior { Command = _viewModel.ExitSelectionCommand });
         }
