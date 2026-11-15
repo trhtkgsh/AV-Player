@@ -27,6 +27,12 @@ public sealed partial class UiSettingsViewModel : ObservableObject
 
     private bool _loading;
 
+    // Saves that have started and not finished yet (see SaveAsync). Changed only through Interlocked.
+    private int _pendingSaves;
+
+    // Set by a failed save; the page reloads the stored values once the last queued save has finished.
+    private bool _reloadNeeded;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HudAutoHideText))]
     private double _hudAutoHideSeconds = 3;
@@ -245,6 +251,8 @@ public sealed partial class UiSettingsViewModel : ObservableObject
 
     private async Task SaveAsync(Func<UiSettings, UiSettings> change)
     {
+        // Counts the saves that are waiting for the gate or running, so the reload runs once, after the last one.
+        Interlocked.Increment(ref _pendingSaves);
         await _saveGate.WaitAsync();
         try
         {
@@ -254,21 +262,27 @@ public sealed partial class UiSettingsViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ErrorMessage = ex.Message;
-
-            // Show the stored values again, so the page does not keep a value that was not saved.
-            // The save error stays visible if the reload fails too.
-            try
-            {
-                await PopulateAsync();
-            }
-            catch (Exception)
-            {
-                // The save error above stays visible.
-            }
+            System.Diagnostics.Debug.WriteLine(ex);
+            ErrorMessage = _localizer["Interface.SaveFailed"];
+            _reloadNeeded = true;
         }
         finally
         {
+            // Show the stored values again, so the page does not keep a value that was not saved.
+            // The reload waits until no other save is queued, so it cannot show values from before a later save.
+            if (Interlocked.Decrement(ref _pendingSaves) == 0 && _reloadNeeded)
+            {
+                _reloadNeeded = false;
+                try
+                {
+                    await PopulateAsync();
+                }
+                catch (Exception)
+                {
+                    // The save error stays visible if the reload fails too.
+                }
+            }
+
             _saveGate.Release();
         }
     }
