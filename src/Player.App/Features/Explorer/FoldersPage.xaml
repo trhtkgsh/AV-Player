@@ -5,14 +5,17 @@
              xmlns:explorer="clr-namespace:Player.App.Features.Explorer"
              xmlns:loc="clr-namespace:Player.App.Localization"
              x:DataType="explorer:FoldersViewModel"
+             x:Name="Page"
              Title="{Binding Title, TargetNullValue='AV Player'}">
 
-    <ContentPage.ToolbarItems>
-        <ToolbarItem Text="{Binding LayoutText}" Command="{Binding ToggleLayoutCommand}" />
-        <ToolbarItem Text="{loc:T Common.Settings}" Order="Secondary" Command="{Binding OpenSettingsCommand}" />
-    </ContentPage.ToolbarItems>
-
     <ContentPage.Resources>
+        <ToolbarItem x:Key="LayoutItem" Text="{Binding LayoutText}" Command="{Binding ToggleLayoutCommand}" />
+        <ToolbarItem x:Key="SettingsItem" Text="{loc:T Common.Settings}" Order="Secondary" Command="{Binding OpenSettingsCommand}" />
+        <ToolbarItem x:Key="SelectAllItem" Text="{loc:T Explorer.SelectAll}" Command="{Binding SelectAllCommand}" />
+        <ToolbarItem x:Key="MoveItem" Text="{loc:T Explorer.Move}" Command="{Binding MoveSelectedCommand}" />
+        <ToolbarItem x:Key="CopyItem" Text="{loc:T Explorer.Copy}" Command="{Binding CopySelectedCommand}" />
+        <ToolbarItem x:Key="DeleteItem" Text="{loc:T Explorer.Delete}" Command="{Binding DeleteSelectedCommand}" />
+
         <!-- The ⋮ button: no border, transparent, muted, with a touch area of 44 x 44. -->
         <Style x:Key="OptionsButton" TargetType="Button">
             <Setter Property="BackgroundColor" Value="Transparent" />
@@ -45,6 +48,14 @@
                         CommandParameter="{Binding .}" />
                 </Grid.GestureRecognizers>
 
+            <Grid.Behaviors>
+                    <explorer:LongPressBehavior
+                        Command="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersViewModel}"
+                        CommandParameter="{Binding .}" />
+                </Grid.Behaviors>
+
+                <BoxView Grid.ColumnSpan="4" Color="{DynamicResource ColorAccent}" Opacity="0.2"
+                         InputTransparent="True" IsVisible="{Binding Selected}" />
                 <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Text="★" IsVisible="{Binding Favorite}"
                        TextColor="{DynamicResource ColorOnSurfaceMuted}" VerticalOptions="Center" />
                 <Label Grid.Row="0" Grid.Column="1" Text="{Binding DisplayName}" Style="{StaticResource LabelTitle}"
@@ -54,11 +65,13 @@
                 <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="2" Text="{Binding NewText}"
                        IsVisible="{Binding HasNew}" TextColor="{DynamicResource ColorAccent}"
                        FontAttributes="Bold" VerticalOptions="Center" />
-                <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="3" Text="⋮" IsVisible="{Binding HasOptions}"
-                        SemanticProperties.Description="{loc:T Explorer.FolderOptions}"
-                        Style="{StaticResource OptionsButton}" VerticalOptions="Center"
-                        Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
-                        CommandParameter="{Binding .}" />
+                <Grid Grid.Row="0" Grid.RowSpan="2" Grid.Column="3" IsVisible="{Binding IsBrowsing, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}">
+                    <Button Text="⋮" IsVisible="{Binding HasOptions}"
+                            SemanticProperties.Description="{loc:T Explorer.FolderOptions}"
+                            Style="{StaticResource OptionsButton}" VerticalOptions="Center"
+                            Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                            CommandParameter="{Binding .}" />
+                </Grid>
             </Grid>
         </DataTemplate>
 
@@ -69,20 +82,32 @@
                         Command="{Binding OpenRowCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
                         CommandParameter="{Binding .}" />
                 </Grid.GestureRecognizers>
+                <Grid.Behaviors>
+                    <explorer:LongPressBehavior
+                        Command="{Binding BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersViewModel}"
+                        CommandParameter="{Binding .}" />
+                </Grid.Behaviors>
 
+                <BoxView Grid.RowSpan="4" Color="{DynamicResource ColorAccent}" Opacity="0.2"
+                         InputTransparent="True" IsVisible="{Binding Selected}" />
                 <!-- The symbol and the ⋮ button share one cell: the button sits in the top-end corner of the symbol row. -->
                 <Grid Grid.Row="0">
-                    <Path Data="M3 6 H10 L12 8 H21 V19 H3 Z" Aspect="Uniform" WidthRequest="72" HeightRequest="56"
+                    <Path Data="M3 6 H10 L12 8 H21 V19 H3 Z" Aspect="Uniform"
+                          WidthRequest="{Binding FolderIconWidth, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                          HeightRequest="{Binding FolderIconHeight, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
                           HorizontalOptions="Center" VerticalOptions="Center">
                         <Path.Fill>
                             <SolidColorBrush Color="{DynamicResource ColorOnSurfaceMuted}" />
                         </Path.Fill>
                     </Path>
-                    <Button Text="⋮" IsVisible="{Binding HasOptions}" HorizontalOptions="End" VerticalOptions="Start"
-                            SemanticProperties.Description="{loc:T Explorer.FolderOptions}"
-                            Style="{StaticResource OptionsButton}"
-                            Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
-                            CommandParameter="{Binding .}" />
+                    <Grid HorizontalOptions="End" VerticalOptions="Start"
+                          IsVisible="{Binding IsBrowsing, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}">
+                        <Button Text="⋮" IsVisible="{Binding HasOptions}"
+                                SemanticProperties.Description="{loc:T Explorer.FolderOptions}"
+                                Style="{StaticResource OptionsButton}"
+                                Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                                CommandParameter="{Binding .}" />
+                    </Grid>
                 </Grid>
 
 
@@ -168,6 +193,20 @@
             <Button Text="{loc:T Common.TryAgain}" Command="{Binding RetryPermissionCommand}" />
             <Button Text="{loc:T Explorer.OpenAppSettings}" Command="{Binding OpenAppSettingsCommand}" />
         </VerticalStackLayout>
+
+        <!-- A running batch covers the list. The tap gesture takes input so the list below gets none. -->
+        <Grid Grid.Row="1" IsVisible="{Binding IsOperationRunning}" BackgroundColor="{DynamicResource ColorSurface}" Opacity="0.92"
+              Padding="24">
+            <Grid.GestureRecognizers>
+                <TapGestureRecognizer />
+            </Grid.GestureRecognizers>
+            <VerticalStackLayout Spacing="12" HorizontalOptions="Center" VerticalOptions="Center">
+                <ActivityIndicator IsRunning="{Binding IsOperationRunning}" HorizontalOptions="Center" />
+                <Label Text="{Binding OperationName}" HorizontalTextAlignment="Center" />
+                <Button Text="{loc:T Common.Cancel}" Command="{Binding CancelOperationCommand}"
+                        IsVisible="{Binding CanCancelOperation}" HorizontalOptions="Center" />
+            </VerticalStackLayout>
+        </Grid>
 
         <Label Grid.Row="2" Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
                TextColor="{DynamicResource ColorDanger}" Margin="16" />

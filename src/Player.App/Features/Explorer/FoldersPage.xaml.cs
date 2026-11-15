@@ -7,6 +7,7 @@ namespace Player.App.Features.Explorer;
 public partial class FoldersPage : ContentPage
 {
     private readonly FoldersViewModel _viewModel;
+    private readonly BackButtonBehavior _browseBack;
 
     public FoldersPage(FoldersViewModel viewModel)
     {
@@ -15,14 +16,35 @@ public partial class FoldersPage : ContentPage
         BindingContext = viewModel;
 
         // The back arrow shows only in the file browser below the root; at the root the page behaves as before.
-        var back = new BackButtonBehavior();
-        back.SetBinding(BackButtonBehavior.IsVisibleProperty, new Binding(nameof(FoldersViewModel.CanGoUp), source: viewModel));
-        back.SetBinding(BackButtonBehavior.CommandProperty, new Binding(nameof(FoldersViewModel.GoUpCommand), source: viewModel));
-        Shell.SetBackButtonBehavior(this, back);
+        _browseBack = new BackButtonBehavior();
+        _browseBack.SetBinding(BackButtonBehavior.IsVisibleProperty, new Binding(nameof(FoldersViewModel.CanGoUp), source: viewModel));
+        _browseBack.SetBinding(BackButtonBehavior.CommandProperty, new Binding(nameof(FoldersViewModel.GoUpCommand), source: viewModel));
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         ApplyLayout();
+        ApplyToolbar();
     }
+
+    // The selection mode replaces the layout and settings actions with the selection actions, and Back leaves the mode.
+    private void ApplyToolbar()
+    {
+        ToolbarItems.Clear();
+        if (_viewModel.IsSelecting)
+        {
+            ToolbarItems.Add((ToolbarItem)Resources["SelectAllItem"]);
+            ToolbarItems.Add((ToolbarItem)Resources["MoveItem"]);
+            ToolbarItems.Add((ToolbarItem)Resources["CopyItem"]);
+            ToolbarItems.Add((ToolbarItem)Resources["DeleteItem"]);
+            Shell.SetBackButtonBehavior(this, new BackButtonBehavior { Command = _viewModel.ExitSelectionCommand });
+        }
+        else
+        {
+            ToolbarItems.Add((ToolbarItem)Resources["LayoutItem"]);
+            ToolbarItems.Add((ToolbarItem)Resources["SettingsItem"]);
+            Shell.SetBackButtonBehavior(this, _browseBack);
+        }
+    }
+
 
     // The folders show as rows or as a grid of tiles: the items layout and the item template follow the view model.
     private void ApplyLayout()
@@ -52,6 +74,11 @@ public partial class FoldersPage : ContentPage
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(FoldersViewModel.IsSelecting))
+        {
+            ApplyToolbar();
+        }
+
         if (e.PropertyName == nameof(FoldersViewModel.IsGrid) || (e.PropertyName == nameof(FoldersViewModel.Columns) && _viewModel.IsGrid))
         {
             ApplyLayout();
@@ -62,7 +89,14 @@ public partial class FoldersPage : ContentPage
 
     protected override bool OnBackButtonPressed()
     {
+        if (_viewModel.IsSelecting)
+        {
+            _viewModel.ExitSelectionCommand.Execute(null);
+            return true;
+        }
+
         if (_viewModel.CanGoUp)
+
         {
             _viewModel.GoUpCommand.Execute(null);
             return true;

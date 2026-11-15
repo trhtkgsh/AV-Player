@@ -28,6 +28,11 @@ public sealed partial class MediaRowViewModel : ObservableObject
     [ObservableProperty]
     private string _infoLine = string.Empty;
 
+    // False when no details are enabled: the details line then takes no space.
+    public bool HasInfoLine => InfoLine.Length > 0;
+
+    partial void OnInfoLineChanged(string value) => OnPropertyChanged(nameof(HasInfoLine));
+
     [ObservableProperty]
     private bool _isNew;
 
@@ -39,6 +44,10 @@ public sealed partial class MediaRowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isWatched;
+
+    // True while the row is part of the selection of the selection mode.
+    [ObservableProperty]
+    private bool _isSelected;
 
     // The font size of the file name: the base size times the explorer font scale. Set by the ViewModel.
     [ObservableProperty]

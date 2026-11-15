@@ -16,6 +16,39 @@ public partial class ItemsPage : ContentPage
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         ApplyLayout();
+        ApplyToolbar();
+    }
+
+    // The selection mode replaces the sort and layout actions with the selection actions, and Back leaves the mode.
+    private void ApplyToolbar()
+    {
+        ToolbarItems.Clear();
+        if (_viewModel.IsSelecting)
+        {
+            ToolbarItems.Add((ToolbarItem)Resources["SelectAllItem"]);
+            ToolbarItems.Add((ToolbarItem)Resources["RenameItem"]);
+            ToolbarItems.Add((ToolbarItem)Resources["MoveItem"]);
+            ToolbarItems.Add((ToolbarItem)Resources["CopyItem"]);
+            ToolbarItems.Add((ToolbarItem)Resources["DeleteItem"]);
+            Shell.SetBackButtonBehavior(this, new BackButtonBehavior { Command = _viewModel.ExitSelectionCommand });
+        }
+        else
+        {
+            ToolbarItems.Add((ToolbarItem)Resources["SortItem"]);
+            ToolbarItems.Add((ToolbarItem)Resources["LayoutItem"]);
+            Shell.SetBackButtonBehavior(this, null);
+        }
+    }
+
+    protected override bool OnBackButtonPressed()
+    {
+        if (_viewModel.IsSelecting)
+        {
+            _viewModel.ExitSelectionCommand.Execute(null);
+            return true;
+        }
+
+        return base.OnBackButtonPressed();
     }
 
     // The list shows rows or a grid of tiles: the items layout and the item template follow the view model.
@@ -46,6 +79,11 @@ public partial class ItemsPage : ContentPage
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(ItemsViewModel.IsSelecting))
+        {
+            ApplyToolbar();
+        }
+
         if (e.PropertyName == nameof(ItemsViewModel.IsGrid) || (e.PropertyName == nameof(ItemsViewModel.Columns) && _viewModel.IsGrid))
         {
             ApplyLayout();

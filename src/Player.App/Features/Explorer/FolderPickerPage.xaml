@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="Player.App.Features.Explorer.FolderPickerPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:Player.Core.Models;assembly=Player.Core"
+             xmlns:loc="clr-namespace:Player.App.Localization"
+             Title="{loc:T Explorer.ChooseFolder}">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="{loc:T Common.Cancel}" Clicked="OnCancelClicked" />
+    </ContentPage.ToolbarItems>
+
+    <Grid>
+        <!-- One tap chooses the folder. The list is the folder list order, audio-only folders included. -->
+        <CollectionView x:Name="List" SelectionMode="Single" SelectionChanged="OnFolderChosen">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:MediaFolder">
+                    <VerticalStackLayout Padding="16,12" Spacing="2">
+                        <Label Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation" />
+                        <Label Text="{Binding RelativePath}" MaxLines="2" LineBreakMode="HeadTruncation"
+                               Style="{StaticResource LabelMuted}" />
+                    </VerticalStackLayout>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Label x:Name="Empty" Grid.Row="0" Text="{loc:T Explorer.NoFolders}" IsVisible="False"
+               HorizontalOptions="Center" VerticalOptions="Center" />
+    </Grid>
+
+</ContentPage>

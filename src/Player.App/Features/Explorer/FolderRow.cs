@@ -11,7 +11,7 @@ public enum FolderRowKind { Folder, Container, FilesHere }
 /// <see cref="TreePath"/> is set for the file-browser nodes. <see cref="Favorite"/> is the folder's favorite mark.
 /// The texts follow the language of <see cref="Localizer"/>.
 /// </summary>
-public sealed record FolderRow(FolderRowKind Kind, string Name, MediaFolder? Folder, int ItemCount, int NewCount, ILocalizer Localizer, string? TreePath = null, bool Favorite = false)
+public sealed record FolderRow(FolderRowKind Kind, string Name, MediaFolder? Folder, int ItemCount, int NewCount, ILocalizer Localizer, string? TreePath = null, bool Favorite = false, bool Selected = false)
 {
     public string DisplayName => Kind == FolderRowKind.FilesHere ? Localizer.Format("Explorer.FilesHere", ItemCount) : Name;
 

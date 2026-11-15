@@ -32,6 +32,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private readonly IUiSettingsStore _uiSettings;
     private readonly IPlaybackCoordinator _coordinator;
     private readonly IFileOperations _fileOperations;
+    private readonly SelectionOperations _operations;
     private readonly TimeProvider _timeProvider;
     private readonly ILocalizer _localizer;
 
@@ -55,6 +56,15 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
 
     // The height of a grid tile's thumbnail, set on every row. Kept here for the rows made later.
     private double _thumbnailHeight;
+
+    // The width of the list, as the page reported it. The columns follow it and the item size.
+    private double _listWidth;
+
+    [ObservableProperty]
+    private double _listThumbnailWidth = ItemSizes.ListThumbnailWidth(ExplorerItemSize.Large);
+
+    [ObservableProperty]
+    private double _listThumbnailHeight = ItemSizes.ListThumbnailHeight(ExplorerItemSize.Large);
 
     [ObservableProperty]
     private string _title = string.Empty;
@@ -103,6 +113,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         IUiSettingsStore uiSettings,
         IPlaybackCoordinator coordinator,
         IFileOperations fileOperations,
+        SelectionOperations operations,
         TimeProvider timeProvider,
         ILocalizer localizer)
     {
@@ -112,6 +123,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         _uiSettings = uiSettings;
         _coordinator = coordinator;
         _fileOperations = fileOperations;
+        _operations = operations;
         _timeProvider = timeProvider;
         _localizer = localizer;
     }
@@ -143,6 +155,8 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     {
         StopSession();
         _loadVersion++;
+        _selection.Clear();
+        UpdateSelection();
     }
 
     public void VisibleRangeChanged(int firstIndex, int lastIndex)
@@ -192,8 +206,14 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     [RelayCommand]
     private async Task Open(MediaRowViewModel row)
     {
-        if (_fileOperationRunning)
+        if (_fileOperationRunning || Environment.TickCount64 < _tapGuardUntil)
         {
+            return;
+        }
+
+        if (IsSelecting)
+        {
+            ToggleSelect(row);
             return;
         }
 
@@ -342,19 +362,30 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             return;
         }
 
-        var columns = GridTiles.Columns(width);
-        var changed = columns != Columns;
-        Columns = columns;
-        _thumbnailHeight = GridTiles.TileWidth(width, columns) * 9 / 16;
+        _listWidth = width;
+        var previous = Columns;
+        UpdateColumns();
+
+        // A new span shows other tiles: their thumbnails are requested now.
+        if (Columns != previous)
+        {
+            VisibleRangeChanged(0, InitialLastIndex());
+        }
+    }
+
+    // The columns and the tile thumbnail follow the list width and the item size. Rows are updated here or by RebuildRows.
+    private void UpdateColumns()
+    {
+        if (_listWidth <= 0)
+        {
+            return;
+        }
+
+        Columns = GridTiles.Columns(_listWidth, _settings.ItemSize);
+        _thumbnailHeight = GridTiles.TileWidth(_listWidth, Columns) * 9 / 16;
         foreach (var row in Rows)
         {
             row.ThumbnailHeight = _thumbnailHeight;
-        }
-
-        // A new span shows other tiles: their thumbnails are requested now.
-        if (changed)
-        {
-            VisibleRangeChanged(0, InitialLastIndex());
         }
     }
 
@@ -561,6 +592,9 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private void RebuildRows()
     {
         IsGrid = _settings.Layout == ExplorerLayout.Grid;
+        ListThumbnailWidth = ItemSizes.ListThumbnailWidth(_settings.ItemSize);
+        ListThumbnailHeight = ItemSizes.ListThumbnailHeight(_settings.ItemSize);
+        UpdateColumns();
 
         var previous = _rows;
         _rows = new Dictionary<MediaFileId, MediaRowViewModel>(_items.Count);
@@ -596,7 +630,13 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             }
         }
 
+        foreach (var id in _selection.Keys.Where(id => !_rows.ContainsKey(id)).ToList())
+        {
+            _selection.Remove(id);
+        }
+
         UpdateIsEmpty();
+        UpdateSelection();
         VisibleRangeChanged(0, InitialLastIndex());
     }
 
@@ -737,7 +777,9 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
 
     // All media has its own title; a folder shows its name, which is not translated.
     private void RebuildTitle() =>
-        Title = _bucketId is null ? _localizer["Explorer.AllMedia"] : _folderTitle;
+        Title = IsSelecting
+            ? _localizer.Format("Explorer.SelectedCount", _selection.Count)
+            : _bucketId is null ? _localizer["Explorer.AllMedia"] : _folderTitle;
 
     // Only the load owns IsLoading and IsRefreshing; a failed command reports through ErrorMessage alone.
     private void ReportError(Exception ex) => ErrorMessage = ex.Message;

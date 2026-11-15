@@ -15,6 +15,7 @@ public static class ExplorerServiceCollectionExtensions
         services.AddTransient<FoldersPage>();
         services.AddTransient<ItemsViewModel>();
         services.AddTransient<ItemsPage>();
+        services.AddTransient<SelectionOperations>();
 
         Routing.RegisterRoute("explorer/items", typeof(ItemsPage));
         return services;
