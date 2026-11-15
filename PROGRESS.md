@@ -4,15 +4,23 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 
 ## Current phase
 
-Phase 3, revision round (started 2026-11-15 13:57). The owner tested `ArielPlayer-phase3.apk` on the phone and wrote
-"so far I have found no faults", with eleven new requests and the instruction to sort them by the order of the
-phases. He did not say that the whole checklist was run, so the Phase 3 gate is recorded as "no faults reported",
-not as a full checklist pass. The requests are sorted in `docs/specs/11-owner-requests-r3.md` (Phase 1 scope:
-explorer; Phase 2 scope: stores and settings; Phase 3 scope: player and gestures; Phase 5: file options; none
-for Phase 4) and are done in that order before Phase 4 starts.
+Phase 3, revision 2: built on 2026-11-15, waits for the owner's device test. Phase 4 does not start before it.
+The owner tested `ArielPlayer-phase3.apk` on the phone and wrote "so far I have found no faults", with eleven
+new requests and the instruction to sort them by the order of the phases. He did not say that the whole
+checklist was run, so the Phase 3 gate is recorded as "no faults reported", not as a full checklist pass. The
+requests are sorted in `docs/specs/11-owner-requests-r3.md` (Phase 1 scope: explorer; Phase 2 scope: stores and
+settings; Phase 3 scope: player and gestures; Phase 5: file options; none for Phase 4) and were built in that
+order. The table is in "Owner feedback on 2026-11-15 (Phase 3 APK)" below.
 
-Phase 3 (started 2026-11-15) is built and waits for the owner's device test. Phase 4 does not start before it.
-Phase 3 APK: `artifacts/ArielPlayer-phase3.apk` (Release, built from main at 78f6efb on 2026-11-15, 107.6 MB,
+Revision APK: `artifacts/ArielPlayer-phase3-r2.apk` (Release, built from main at 253c918 on 2026-11-15,
+108,258,080 bytes, arm64-v8a, armeabi-v7a and x86_64,
+SHA-256 86574F14AC9E629558D9DC3CCE88CA9FBCA35D42BCBE5AA5C1FDF433F41707E7, same signing certificate and the same
+permissions as the Phase 3 APK, no network permission; installs over the Phase 3 app and keeps its data).
+Checklist: `docs/qa/phase-3-r2-checklist.md` (43 items for what changed; the regression blocks of
+`docs/qa/phase-3-checklist.md` still apply). What was run and what was not is in "Phase 3 revision verification"
+below.
+
+Phase 3 APK (the build the owner tested): `artifacts/ArielPlayer-phase3.apk` (Release, built from main at 78f6efb on 2026-11-15, 107.6 MB,
 arm64-v8a, armeabi-v7a and x86_64, SHA-256 E105DF2C7F03F6A219B47186FE55CE543BB4221FA215264A523558E3F2A5D028,
 same signing certificate as the earlier APKs; installs over the Phase 2 app and keeps its data). Permissions:
 the media read permissions and, new, `BATTERY_STATS` (declared because MAUI's battery API requires the
@@ -60,6 +68,25 @@ status bar color, explorer, thumbnails, playback, HUD symbols, pause and play, p
 | 6 | In "fit to screen" the video shows at about 99% of the screen and becomes 100% after pause or play. On leaving the player the picture is stretched over the whole screen for about a second. | The engine read the size of the video track only on track events and on pause or play, and LibVLC raises no event when the decoder corrects the size. On leaving, the engine's "no format" report made the surface fill its container while the last picture was still on it. | P3-01, P3-05: the format is read again while the first pictures are shown; the surface keeps its shape when the engine stops. | Fixed in code. The 99% picture could not be reproduced on the emulators, so only the owner's phone can confirm it (checklist FIX-2, FIX-3). |
 | 7 | The play, next and previous buttons are reversed: the play triangle points left and next/previous swapped places. | The phone's language is Hebrew, so Android lays the app out right to left and MAUI mirrors the transport row and its vector symbols. Media transport controls must not be mirrored. | P3-02: the bottom bar of the player is left to right in every language; symbols are not mirrored, except the back arrow. | Done, checked on the emulator with a Hebrew app locale. Waiting for the owner (checklist FIX-1). |
 
+## Owner feedback on 2026-11-15 (Phase 3 APK): eleven requests, sorted by phase
+
+The owner's order is kept in the first column. "Phase" is the phase whose module the request changes (spec 11).
+
+| # | Request | Phase | Spec 11 | What was done | State |
+|---|---|---|---|---|---|
+| 7 | A list or grid (icons) view in the explorer. | 1 | R1-2 | "Grid" or "List" in the title bar of the folder list and the file list. Tiles with a large thumbnail (files) or a folder symbol (folders); two columns in portrait, up to four in landscape. | Done, emulator API 34 and 36. |
+| 11 | Explorer modes: all media folders, file browser, favorites; a setting to include audio-only folders; favorites are added from folder options, like the file options. | 1 | R1-1, R1-3, R1-4 | "View" opens Media folders, File browser, Favorites, All files. The file browser shows the media folders as a directory tree, one level at a time; Back goes up. Folder options open from a three-dot button on every folder: add to or remove from favorites, default speed. The switch "Show folders with audio only" is on the Interface page. | Done, emulator. File options (rename, delete) stay in Phase 5 and will use the same button. |
+| 8 | A default speed per folder. | 2 | R2-1 | New store (`IFolderSettingsStore`, agent `folder-settings-store`). Order: the file's own speed, the folder's, the general default. | Done, emulator (1.5x folder, other folder 1.0x). |
+| 9 | Font size for folder and file names. | 2 | R2-2 | "Size of names" on the Interface page, 80% to 160%. | Done, emulator. |
+| 10 (setting) | A setting for the long-press speed. | 2 | R2-3 | "Speed while holding the picture" on the Interface page, 0.25x to 4.0x, default 2.0x. | Done, emulator. |
+| 1 | The status bar and the navigation bar appear and disappear with the player controls. | 3 | R3-1 | `IVideoSurface.SetSystemBarsVisible`, the HUD keeps clear of the bars with `SystemBarInsets`; the picture does not move; the bars are see-through with white symbols. | Done, measured on API 34 and 36 in landscape with a 4:3 video. |
+| 2 | The video name on its own line. | 3 | R3-2 | First line of the top bar. | Done. |
+| 3 | Speed and decoder move to the top. | 3 | R3-3, R3-5 | The speed chip is in the top bar; the decoder is an item of the top-bar menu (orchestrator's reading of this request together with request 5). | Done. To confirm with the owner. |
+| 4 | No exit button: the system has one. | 3 | R3-4 | The Back button of the player is removed. | Done. |
+| 5 | Subtitles, audio track, decoder and repeat in a menu in the top bar, next to Lock. | 3 | R3-5 | A three-dot menu: Subtitles, Audio track, Repeat, "Decoder: HW" or "SW". | Done, emulator, English and Hebrew. |
+| 6 | The seek gesture shows a still picture of the target in real time, without playing. | 3 | R3-7 | The drag pauses, seeks while the finger moves (only the newest target is sent), and continues on release. | Done, emulator. Speed on long files with far-apart key frames is not measured: only the phone can tell. |
+| 10 (gesture) | Holding a finger on the video plays faster; the earlier speed returns when the finger lifts. | 3 | R3-8 | `GestureKind.LongPress` after half a second; the speed is not saved for the file. | Done, emulator. |
+
 ## Gates
 
 | Phase | Build | Tests | Reviewer | Owner device test | Status |
@@ -67,7 +94,8 @@ status bar color, explorer, thumbnails, playback, HUD symbols, pause and play, p
 | 0 Spike | green (spike) | n/a | n/a | pending | go on emulator, waiting for owner device test (docs/SPIKE.md) |
 | 1 | green (Debug and Release) | 349 pass (307 Core, 42 Data) | every merged task approved, except P1-27 (tests only, Sonnet, checked by the orchestrator) | passed on 2026-11-15 (owner report: all checklist items pass) | PASSED |
 | 2 | green (Debug and Release) | 900 pass (662 Core, 238 Data) | every merged task approved; engine and subtitle service had a gate review and a second round | passed on 2026-11-15 (owner report: Samsung Galaxy A55, 0 failed items, ARM-1 and ARM-2 pass) | PASSED |
-| 3 | green (Debug and Release) | 1340 pass (989 Core, 351 Data) | every merged task approved; engine, surface, gestures, theming, localization and coordinator had a gate review | 2026-11-15: "no faults found so far" (full checklist run not stated); eleven requests, see spec 11 | revision round in progress |
+| 3 | green (Debug and Release) | 1340 pass (989 Core, 351 Data) | every merged task approved; engine, surface, gestures, theming, localization and coordinator had a gate review | 2026-11-15: "no faults found so far" (full checklist run not stated); eleven requests, see spec 11 | superseded by revision 2 |
+| 3, revision 2 | green (Debug and Release) | 1634 pass (1104 Core, 530 Data) | every merged product task approved; R3-T2 (tests only, Sonnet) checked by the orchestrator | pending (`docs/qa/phase-3-r2-checklist.md`) | built, waiting for the owner |
 | 4 | - | - | - | - | not started |
 | 5 | - | - | - | - | not started |
 
@@ -268,6 +296,52 @@ Run by the orchestrator, on emulators only (x86_64). No physical device was used
 
 Not verified at all in Phase 3: the owner's 99% picture on real hardware (not reproducible on the emulators: the fix follows from the code path); the stretch on exit as the owner saw it (the emulator showed a shifted, not a stretched, last picture before the fix and an unchanged one after it); sound above 100% and real brightness (the emulator has no audio and no backlight); sharpness at 400%; gesture recognition by a hand (10 of 10); a real Hebrew phone; landscape with a camera hole; the lock across a real screen-off.
 
+## Phase 3 revision task log (2026-11-15, owner requests, spec 11)
+
+Scope decisions by the orchestrator:
+- The requests are sorted by the phase whose module they change and were built in that order: contracts first, then stores and library, then the player, then the explorer.
+- "Move the speed and the decoder up" together with "decoder in the menu": the speed is a chip in the top bar, the decoder is an item of the top-bar menu.
+- Folder options open from a three-dot button on the folder's row or tile, not from a long press (MAUI has no long-press recognizer for list rows without platform code). File options join the same pattern in Phase 5.
+- "File browser" is the tree of the media folders by their path, one level at a time. It is not a browser of every directory of the storage: the app reads MediaStore only.
+- A new agent, `folder-settings-store` (Haiku 5.5), owns the per-folder store. Like `localization`, it is registered in `.github/agents` but not available to the `task` tool until the session restarts, so it ran through `general-purpose` with the roster model.
+- The device checklist of this round is its own file (`phase-3-r2-checklist.md`), so the owner runs only what changed.
+
+| Task | Agent | Model | Result |
+|---|---|---|---|
+| R3-01, R3-02 | core-contracts, video-surface | Fable 5.2 (orchestrator) | merged. Contracts (see `docs/CONTRACTS.md` change log): `ExplorerViewMode` Tree and Favorites, `ExplorerLayout`, `GestureKind.LongPress`, `MediaFolder.AudioOnly`, `FolderSettings`, `IFolderSettingsStore`, `EdgeInsets`, four `UiSettings` fields, the resolver's folder argument, `IVideoSurface.SetSystemBarsVisible` and `SystemBarInsets`. Player mode: the window is edge to edge, the bars are shown and hidden inside it. Reviewer: approve; follow-ups in R3-02. |
+| R3-10 | gestures | Sonnet 5.5 | merged. Long press after 500 ms without movement. Reviewer: approve. |
+| R3-11, R3-15 | ui-settings | Haiku 5.5 | merged. Four stored fields, three rows on the Interface page; every stored field falls back alone; Hebrew texts. Reviewer: approve. |
+| R3-12 | folder-settings-store | Haiku 5.5 (through `general-purpose`) | merged. `FolderSettingsStore` on the settings table, `AddFolderSettings()`; a follow-up keeps the loaded map. Reviewed and approved. |
+| R3-13 | media-library | Sonnet 5.5 | merged. `MediaFolder.AudioOnly`. Reviewer: approve. |
+| R3-14 | playback-coordinator | Sonnet 5.5 | merged. The folder's default speed is read on open. Reviewer: approve. |
+| R3-50 | app-skeleton | Haiku 5.5 | merged. `AddFolderSettings()` in `MauiProgram.cs`. Reviewer: approve. |
+| R3-20, R3-21 | player-hud-ui | Haiku 5.5 | merged. Title line, second line with status, speed chip, Aspect, menu, Lock; no Back button; bottom bar with seek row and transport; menu; bars follow the controls; seek preview; long-press speed. Reviewed and approved. |
+| R3-22 | player-hud-ui | Haiku 5.5 | merged. The player page ignores the safe area (found by the orchestrator on API 36, see below). Reviewer: approve. |
+| R3-30, R3-31, R3-32 | explorer-ui | Haiku 5.5 | merged. `FolderTree`, view modes, folder options, favorites, list and grid, name size, audio-only filter. Reviewer: changes-required (the file browser stayed inside a directory that had disappeared), approve after R3-31; R3-32 closes one more note (the audio-only filter uses the newest settings). |
+| R3-03, R3-04 | video-surface | Fable 5.2 (orchestrator) | merged. Up to API 34: the bars are see-through with white symbols in player mode and the theme's look returns afterwards; the bar padding MAUI left on the pages under the player is cleared. Gate review: changes-required (the activity puts the theme look back on resume), approve after R3-04 (player mode is applied again when the window gets the focus). |
+| R3-T0, R3-T1, R3-T2 | test-writer | Sonnet 5.5 | merged. Resolver with folder settings and fakes; long press, `AudioOnly`, coordinator folder speed, folder store, UI settings fields; `FolderTree` (45 cases). No product bug. Total on main: 1634 tests (1104 Core, 530 Data). |
+| R3-60 | device-qa | Haiku 5.5 | merged. `docs/qa/phase-3-r2-checklist.md`: 15 explorer, 7 settings and 21 player items. |
+
+Faults found by the orchestrator's own emulator runs in this round, all fixed before the APK:
+- The picture shrank whenever the controls and the bars appeared (API 36, landscape, 4:3 video: 1080 px to 954 px). MAUI pads the children of the page's root layout by the safe area. The first check, in portrait with a 16:9 video, could not show it. Fixed in R3-22. SPIKE finding 27.
+- Up to API 34 the bars were painted in the theme color over the top and bottom of the picture, and in the Light theme their symbols were dark on the black player. Fixed in R3-03.
+- Up to API 34 the file list kept an empty band above the navigation bar after the player was closed (list height 1945 px before, 1879 px after). Introduced in this round by the edge-to-edge switch of R3-01; never in an APK the owner has. Fixed in R3-03. SPIKE finding 28.
+- The folder symbol of the grid tile was not drawn and the options button had a border. Fixed in R3-31.
+
+## Phase 3 revision verification (2026-11-15)
+
+Run by the orchestrator, on emulators only (x86_64). No physical device was used.
+
+| Target | Build | Result |
+|---|---|---|
+| Pixel 5 AVD, API 34 | Debug (integration builds) | Pass: view sheet with the four modes; file browser (levels, Back goes up, a directory that disappears sends the browser to its parent); folder options, favorite star, Favorites mode; folder speed; list and grid for folders and files, four columns in landscape; audio-only switch in every mode; Interface page rows; explorer and player in Hebrew (menu, folder options, top bar mirrored, bottom bar unchanged); the lock hides the controls and the bars. Light theme: white symbols in the player, also after Home and return; the light bars with dark symbols are back after Back. |
+| Pixel 5 AVD, API 34 | Release APK, installed over the Phase 3 APK | Pass, on the final build: the update keeps the data (a played file keeps its state). Folder speed 1.5x on a new file of that folder; file browser; long press shows "Speed 2.0x"; the seek drag shows the target frame; menu with the four items. Landscape, 4:3 video: the picture is 1080 px high with the controls hidden, shown and hidden again; the bars lie over it, see-through. The file list has its full height after the player, in portrait and landscape, on every repeat. On the first Release build of this round: the "All files" mode of the Phase 3 app is kept, favorites, Favorites mode, decoder switch from the menu, playback continues after a seek drag. |
+| Pixel 7 AVD, API 36 | Debug (integration builds) | Pass: the picture keeps its size after R3-22; Hebrew player in landscape; lock and unlock in landscape. |
+| Pixel 7 AVD, API 36 | Release APK | Pass, on the final build: the picture keeps its size in landscape with the controls hidden, shown and hidden; each sheet opens from the menu (a file with two audio and two subtitle tracks); a seek drag while paused stays paused on the target; Light theme with white symbols in the player and the light bars back afterwards; file list height unchanged after the player; Interface page in Hebrew with the three new rows. On the build before the last surface fix: folder grid, file grid, player with controls in portrait and landscape, the Speed sheet over the unmoved picture. |
+| arm64-v8a, armeabi-v7a | - | Not run (SPIKE finding 20; the Phase 2 and Phase 3 builds ran on the owner's arm64 phone). |
+
+Not verified at all in this round: the seek preview on a long file with far-apart key frames (the test files are 12 to 20 seconds); the long press by a real finger (a still finger moves a little; the slop decides); a real camera hole in landscape (the emulators report no cutout); the bars on Samsung's One UI; grid thumbnails on a folder with hundreds of files; folder options and favorites with a real library; the Hebrew texts on a Hebrew phone; items EXP-13, EXP-15, EXP-18, EXP-21, EXP-23, SET-3 to SET-7, PLR-5, PLR-9, PLR-13, PLR-15 to PLR-18 of the checklist, which were not run as written.
+
 ## Known gaps carried forward
 
 - Closed in Phase 3: Stretch (the engine fills the surface), immersive bars and battery (`IVideoSurface.SetImmersive`, MAUI `Battery`), system bar colors following the theme (also the status bar strip on API 35 and later).
@@ -286,6 +360,15 @@ Not verified at all in Phase 3: the owner's 99% picture on real hardware (not re
   - `AppBarTinter`: the once-per-activity mark is set before the registration succeeds; a failed registration is not retried (reviewer note).
   - The sliders and the check box keep the accent color, which is weak on the Light background for the yellow and lime accents (reviewer note).
   - In right-to-left layouts the rows of step buttons are mirrored (`Reset`, `+50 ms`, `-50 ms` from left to right), and sliders run right to left, as Android does by default.
+- Phase 3 revision leftovers, none blocking:
+  - A rotation after a file has ended can show a wrongly cut picture until playback starts again (the same cause as the aspect change after the end: nothing renders a new frame). Seen once on the API 36 emulator.
+  - The unlock button and the HUD bars take their side paddings from the physical left and right insets; in a right-to-left layout on a phone with a camera hole at one side in landscape the unlock button may get the padding of the other side (reviewer note, no device to check).
+  - Up to API 34 the HUD can be drawn for one frame without its bar paddings when the player opens (reviewer note).
+  - With a transparent navigation bar Android may draw its own translucent strip behind the three-button navigation (not checked; the emulators use gesture navigation).
+  - In split screen a resume without a focus change does not apply the player's bar look again (reviewer note, rare).
+  - In the folder list (rows) the name of a favorite folder starts further in than the others, because the star stands before it.
+  - Explorer: a layout change can still cause one extra in-place update of the rows; a change of the column count cancels thumbnail requests of tiles further down until the next scroll; a failed reload of the folder settings leaves the old stars until the next change (reviewer notes).
+  - The long-press speed is a fixed value (default 2.0x), not "one step above the current speed": with a default speed of 2.0x the owner sets it to 3.0x on the Interface page, as in his example.
 - The arm64 build cannot be tested on the emulators while paused (SPIKE finding 20). Emulator checks use x86_64.
 - Pause when the app goes to the background: Phase 1 uses a placeholder in app-skeleton; media-service owns it in Phase 4.
 - Contract doc change after the freeze (orchestrator): `IVideoOutputBinding` surface methods must be called on the UI thread; `PlayerSnapshot.Idle`; `IVideoSurface.WindowBrightness` is -1 for the system default.
@@ -320,16 +403,18 @@ Not verified at all in Phase 3: the owner's 99% picture on real hardware (not re
 | device-qa | Haiku 5.5 | all | - | 0 | - | none |
 | app-skeleton (added) | Haiku 5.5 | 1, then wiring | - | 0 | - | none |
 | localization (added in Phase 3) | Sonnet 5.5 | 3 | - | 0 | - | none. Registered in `.github/agents`; run through `general-purpose` with the roster model until the session restarts. |
+| folder-settings-store (added in the Phase 3 revision) | Haiku 5.5 | 2 (scope) | - | 0 | - | none. Registered in `.github/agents`; run through `general-purpose` with the roster model until the session restarts. |
 
 ## Open items for the owner
 
 1. Run the device test in docs/SPIKE.md to close Phase 0 (Phase 1 was started in parallel at the orchestrator's discretion).
 2. Done on 2026-11-15: `artifacts/ArielPlayer-phase1-r2.apk` installed and `docs/qa/phase-1-checklist.md` passed.
 3. Done on 2026-11-15: `artifacts/ArielPlayer-phase2.apk` and `docs/qa/phase-2-checklist.md` passed on a Samsung Galaxy A55.
-4. Install `artifacts/ArielPlayer-phase3.apk` over the Phase 2 app and run `docs/qa/phase-3-checklist.md`. Start with FIX-1 to FIX-3 (the three items of the last feedback). Report the failed item IDs and the Android version.
+4. Install `artifacts/ArielPlayer-phase3-r2.apk` over the app on the phone and run `docs/qa/phase-3-r2-checklist.md` (43 items: what changed with the eleven requests). The regression blocks of `docs/qa/phase-3-checklist.md` still apply; say whether they were run. Report the failed item IDs and the Android version of the phone: up to Android 14 and from Android 15 the player window takes different code paths.
 5. Decide: is "System default" the right default for the language (the app opens in Hebrew on a Hebrew phone), or should it open in English until Hebrew is chosen?
-6. The new agent `localization` was added to the roster without a separate approval (the earlier approval said to act by the orchestrator's judgement). Say so if it should be handled differently.
+6. The agents `localization` and `folder-settings-store` were added to the roster without a separate approval (the earlier approval said to act by the orchestrator's judgement). Say so if it should be handled differently.
 7. `docs/MASTER.md` has a local change that the orchestrator did not make (see "Known gaps"). Commit it or discard it as you see fit.
+8. Confirm or correct three readings of the requests: the decoder is an item of the top-bar menu and only the speed is a chip in the top bar; folder options open from a three-dot button and not from a long press; "File browser" walks the folders that hold media, not every directory of the storage.
 
 ## Escalation log
 

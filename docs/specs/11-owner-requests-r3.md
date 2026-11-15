@@ -18,7 +18,7 @@ The owner tested `ArielPlayer-phase3.apk`, reported no faults so far, sent eleve
 
 ## Phase 3 scope: player and gestures (spec 02). Agents: video-surface, player-engine, gestures, player-hud-ui
 
-- **R3-1 System bars follow the controls.** The status bar and the navigation bar are visible exactly while the player controls are visible. The picture never moves or resizes when they appear: the player window is laid out edge to edge and the control bars keep clear of the system bars.
+- **R3-1 System bars follow the controls.** The status bar and the navigation bar are visible exactly while the player controls are visible. The picture never moves or resizes when they appear: the player window is laid out edge to edge and the control bars keep clear of the system bars. In the player the system bars are see-through with white symbols, in every theme.
 - **R3-2 Title on its own line.** The file name has the first line of the top bar to itself.
 - **R3-3 Top bar, second line.** Clock and battery at the start; then the speed chip, the Aspect button, a menu button and the Lock button at the end. The speed chip moves here from the bottom bar.
 - **R3-4 No Back button** in the player. The system Back closes it.
@@ -37,4 +37,4 @@ No request touches background playback, Picture-in-Picture or the media session.
 
 ## Acceptance (device)
 
-Added to `docs/qa/phase-3-checklist.md` as a block "Requests of 2026-11-15" by device-qa.
+Written by device-qa as its own list, `docs/qa/phase-3-r2-checklist.md` (the items that changed since the Phase 3 APK); the regression blocks of `docs/qa/phase-3-checklist.md` still apply.
