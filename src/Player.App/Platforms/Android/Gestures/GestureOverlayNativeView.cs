@@ -81,8 +81,19 @@ internal sealed class GestureOverlayNativeView : AndroidView
     protected override void OnDetachedFromWindow()
     {
         RemoveCallbacks(_tick);
-        _source.OnPointer(PointerAction.Cancel, 0, 0, 0, SystemClock.UptimeMillis());
+        _source.Reset();
         base.OnDetachedFromWindow();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            RemoveCallbacks(_tick);
+            _tick.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     private void OnTick()

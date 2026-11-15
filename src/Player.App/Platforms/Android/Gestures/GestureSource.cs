@@ -1,3 +1,4 @@
+using Android.Util;
 using Player.Core.Contracts;
 using Player.Core.Logic.Gestures;
 using Player.Core.Models;
@@ -20,7 +21,7 @@ public sealed class GestureSource : IGestureSource
     public GestureSource(IVideoSurface surface)
     {
         _surface = surface;
-        _classifier = new GestureClassifier(gesture => Gesture?.Invoke(this, gesture));
+        _classifier = new GestureClassifier(Raise);
     }
 
     /// <inheritdoc />
@@ -53,4 +54,19 @@ public sealed class GestureSource : IGestureSource
     internal void OnMove(ReadOnlySpan<PointerSample> pointers, long timeMs) => _classifier.ProcessMove(pointers, timeMs);
 
     internal void Tick(long nowMs) => _classifier.Tick(nowMs);
+
+    internal void Reset() => _classifier.Reset();
+
+    /// <summary>A throwing subscriber must not take the UI thread down.</summary>
+    private void Raise(GestureEvent gesture)
+    {
+        try
+        {
+            Gesture?.Invoke(this, gesture);
+        }
+        catch (Exception exception)
+        {
+            Log.Error("ArielGestures", $"A gesture subscriber threw: {exception}");
+        }
+    }
 }
