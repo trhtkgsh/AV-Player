@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:surface="clr-namespace:Player.App.Surface"
     xmlns:vm="clr-namespace:Player.App.Features.PlayerHud"
+    xmlns:controls="clr-namespace:Player.App.Features.PlayerHud.Controls"
     x:DataType="vm:PlayerViewModel"
     Shell.NavBarIsVisible="False"
     Shell.TabBarIsVisible="False"
@@ -36,10 +37,13 @@
                 ColumnDefinitions="Auto,*,Auto"
                 ColumnSpacing="8"
                 BackgroundColor="{DynamicResource ColorHudBackground}">
-                <Button
+                <controls:HudIconButton
                     Grid.Column="0"
-                    Text="Back"
-                    Command="{Binding CloseCommand}" />
+                    IconData="M15.5 4 L7.5 12 L15.5 20 L17.2 18.3 L10.9 12 L17.2 5.7 Z"
+                    IconSize="24"
+                    IconColor="{DynamicResource ColorHudOnBackground}"
+                    Command="{Binding CloseCommand}"
+                    SemanticProperties.Description="Back" />
                 <Label
                     Grid.Column="1"
                     VerticalOptions="Center"
@@ -82,23 +86,58 @@
                         TextColor="{DynamicResource ColorHudOnBackground}" />
                 </Grid>
 
-                <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
-                    <Button
-                        Grid.Column="0"
-                        Text="Prev"
-                        Command="{Binding PreviousCommand}" />
-                    <Button
+                <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto,Auto,*" ColumnSpacing="20">
+                    <controls:HudIconButton
                         Grid.Column="1"
-                        Text="{Binding PlayPauseText}"
-                        Command="{Binding PlayPauseCommand}" />
-                    <Button
+                        IconData="M6 5 H8.5 V19 H6 Z M19 5 V19 L9.5 12 Z"
+                        IconSize="26"
+                        WidthRequest="56"
+                        IconColor="{DynamicResource ColorHudOnBackground}"
+                        Command="{Binding PreviousCommand}"
+                        SemanticProperties.Description="Previous" />
+                    <controls:HudIconButton
                         Grid.Column="2"
-                        Text="Next"
-                        Command="{Binding NextCommand}" />
-                    <Button
+                        IconData="M7 4.5 L19.5 12 L7 19.5 Z"
+                        IconSize="36"
+                        WidthRequest="64"
+                        IsVisible="{Binding ShowPlayIcon}"
+                        IconColor="{DynamicResource ColorHudOnBackground}"
+                        Command="{Binding PlayPauseCommand}"
+                        SemanticProperties.Description="Play" />
+                    <controls:HudIconButton
+                        Grid.Column="2"
+                        IconData="M6.5 5 H10.5 V19 H6.5 Z M13.5 5 H17.5 V19 H13.5 Z"
+                        IconSize="36"
+                        WidthRequest="64"
+                        IsVisible="{Binding IsPlaying}"
+                        IconColor="{DynamicResource ColorHudOnBackground}"
+                        Command="{Binding PlayPauseCommand}"
+                        SemanticProperties.Description="Pause" />
+                    <controls:HudIconButton
                         Grid.Column="3"
+                        IconData="M15.5 5 H18 V19 H15.5 Z M5 5 L14.5 12 L5 19 Z"
+                        IconSize="26"
+                        WidthRequest="56"
+                        IconColor="{DynamicResource ColorHudOnBackground}"
+                        Command="{Binding NextCommand}"
+                        SemanticProperties.Description="Next" />
+                    <Button
+                        Grid.Column="4"
+                        HorizontalOptions="End"
+                        VerticalOptions="Center"
                         Text="{Binding DecoderText}"
-                        Command="{Binding ToggleDecoderCommand}" />
+                        Command="{Binding ToggleDecoderCommand}"
+                        BackgroundColor="Transparent"
+                        TextColor="{DynamicResource ColorHudOnBackground}"
+                        BorderColor="{DynamicResource ColorHudOnBackground}"
+                        BorderWidth="1"
+                        CornerRadius="6"
+                        FontSize="13"
+                        Padding="10,4"
+                        MinimumHeightRequest="32"
+                        HeightRequest="32"
+                        MinimumWidthRequest="52"
+                        SemanticProperties.Description="Decoder" />
                 </Grid>
             </Grid>
         </Grid>

@@ -34,13 +34,15 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private double _durationMs = 1;
     [ObservableProperty] private string _positionText = "0:00";
     [ObservableProperty] private string _durationText = "0:00";
-    [ObservableProperty] private bool _isPlaying;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowPlayIcon))] private bool _isPlaying;
     [ObservableProperty] private bool _isOpening;
     [ObservableProperty] private bool _isHudVisible = true;
     [ObservableProperty] private string _decoderText = "...";
     [ObservableProperty] private bool _showClock;
     [ObservableProperty] private string _clockText = "";
-    [ObservableProperty] private string _playPauseText = "Play";
+
+    /// <summary>True while the play icon is shown; the pause icon is shown while playing.</summary>
+    public bool ShowPlayIcon => !IsPlaying;
 
     public PlayerViewModel(IPlayerEngine engine, IPlaybackCoordinator coordinator, IUiSettingsStore uiSettings)
     {
@@ -88,8 +90,6 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     partial void OnIsPlayingChanged(bool value)
     {
-        PlayPauseText = value ? "Pause" : "Play";
-
         // Playback started (for example after opening): the HUD must start its countdown now.
         if (value)
         {
