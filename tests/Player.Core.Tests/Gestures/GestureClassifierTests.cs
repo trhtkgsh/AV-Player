@@ -324,25 +324,25 @@ public sealed class GestureClassifierTests
     }
 
     [Fact]
-    public void NextTickMs_WhileSecondTouchIsDown_IsTheEarlierOfPendingTapDueAndItsLongPressTime()
+    public void NextTickMs_WhileSecondTouchIsDown_IsTheSecondTouchLongPressTime()
     {
         var rig = new Rig();
         rig.TapAt(500, 250, 0, 50);
         rig.Down(510, 250, 100);
 
-        // Pending tap is due at 50 + 300 = 350, the second touch's long press at 100 + 500 = 600.
-        Assert.Equal(350, rig.Classifier.NextTickMs);
+        // The pending tap has no due time while the second touch is down; its long press is at 100 + 500 = 600.
+        Assert.Equal(600, rig.Classifier.NextTickMs);
     }
 
     [Fact]
-    public void NextTickMs_WhileSecondTouchIsDownAndItsLongPressIsEarlier_IsItsLongPressTime()
+    public void NextTickMs_WhileSecondTouchIsDownWithCustomLongPressMs_IsDownTimePlusLongPressMs()
     {
         var rig = new Rig();
         rig.Classifier.Options = new GestureClassifierOptions(LongPressMs: 100);
         rig.TapAt(500, 250, 0, 50);
         rig.Down(510, 250, 100);
 
-        // Long press at 100 + 100 = 200, pending tap due at 350.
+        // Long press at 100 + 100 = 200; the pending tap has no due time while the second touch is down.
         Assert.Equal(200, rig.Classifier.NextTickMs);
     }
 
