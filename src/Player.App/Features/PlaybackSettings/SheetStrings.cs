@@ -23,7 +23,7 @@ internal sealed class SheetStrings : IStringSource
         ["Sheets.Repeat.SetA"] = new("Set A", "קבע A"),
         ["Sheets.Repeat.SetB"] = new("Set B", "קבע B"),
         ["Sheets.Repeat.ThisFile"] = new("This file", "הקובץ הזה"),
-        ["Sheets.Repeat.Title"] = new("Repeat", "חזרה"),
+        ["Sheets.Repeat.Title"] = new("Repeat", "ניגון חוזר"),
         ["Sheets.Speed.Title"] = new("Speed", "מהירות"),
         ["Sheets.Style.Background"] = new("Background", "רקע"),
         ["Sheets.Style.Bold"] = new("Bold", "מודגש"),
