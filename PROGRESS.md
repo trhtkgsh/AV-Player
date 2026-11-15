@@ -4,6 +4,13 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 
 ## Current phase
 
+Phase 3, revision round (started 2026-11-15 13:57). The owner tested `ArielPlayer-phase3.apk` on the phone and wrote
+"so far I have found no faults", with eleven new requests and the instruction to sort them by the order of the
+phases. He did not say that the whole checklist was run, so the Phase 3 gate is recorded as "no faults reported",
+not as a full checklist pass. The requests are sorted in `docs/specs/11-owner-requests-r3.md` (Phase 1 scope:
+explorer; Phase 2 scope: stores and settings; Phase 3 scope: player and gestures; Phase 5: file options; none
+for Phase 4) and are done in that order before Phase 4 starts.
+
 Phase 3 (started 2026-11-15) is built and waits for the owner's device test. Phase 4 does not start before it.
 Phase 3 APK: `artifacts/ArielPlayer-phase3.apk` (Release, built from main at 78f6efb on 2026-11-15, 107.6 MB,
 arm64-v8a, armeabi-v7a and x86_64, SHA-256 E105DF2C7F03F6A219B47186FE55CE543BB4221FA215264A523558E3F2A5D028,
@@ -60,7 +67,7 @@ status bar color, explorer, thumbnails, playback, HUD symbols, pause and play, p
 | 0 Spike | green (spike) | n/a | n/a | pending | go on emulator, waiting for owner device test (docs/SPIKE.md) |
 | 1 | green (Debug and Release) | 349 pass (307 Core, 42 Data) | every merged task approved, except P1-27 (tests only, Sonnet, checked by the orchestrator) | passed on 2026-11-15 (owner report: all checklist items pass) | PASSED |
 | 2 | green (Debug and Release) | 900 pass (662 Core, 238 Data) | every merged task approved; engine and subtitle service had a gate review and a second round | passed on 2026-11-15 (owner report: Samsung Galaxy A55, 0 failed items, ARM-1 and ARM-2 pass) | PASSED |
-| 3 | green (Debug and Release) | 1340 pass (989 Core, 351 Data) | every merged task approved; engine, surface, gestures, theming, localization and coordinator had a gate review | pending: `docs/qa/phase-3-checklist.md` with `artifacts/ArielPlayer-phase3.apk` | built, waiting for the owner |
+| 3 | green (Debug and Release) | 1340 pass (989 Core, 351 Data) | every merged task approved; engine, surface, gestures, theming, localization and coordinator had a gate review | 2026-11-15: "no faults found so far" (full checklist run not stated); eleven requests, see spec 11 | revision round in progress |
 | 4 | - | - | - | - | not started |
 | 5 | - | - | - | - | not started |
 
