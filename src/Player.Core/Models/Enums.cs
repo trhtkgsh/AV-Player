@@ -37,6 +37,22 @@ public enum GestureKind { Tap, DoubleTap, VerticalDrag, HorizontalDrag, Pinch, P
 
 public enum FileOperationStatus { Success, Cancelled, Denied, Failed }
 
+/// <summary>A physical corner of the screen. Not mirrored in right-to-left layouts.</summary>
+public enum OverlayCorner { TopLeft, TopRight, BottomLeft, BottomRight }
+
+public enum OverlayEdge { Bottom, Top }
+
+/// <summary>Which playback times the quiet display shows.</summary>
+public enum OverlayTimeMode
+{
+    None,
+    Elapsed,
+    ElapsedTotal,
+    Remaining,
+    ElapsedRemaining,
+    ElapsedTotalRemaining,
+}
+
 [Flags]
 public enum ExplorerInfoFields
 {

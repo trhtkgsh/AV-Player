@@ -35,6 +35,10 @@ Changes after the freeze (orchestrator only, each one logged in PROGRESS.md):
   `SessionPublishGate`, `MultiPressDetector`).
 - 2026-11-15, revision of Phase 4 (owner's test): `GlobalDefaults.BackgroundAudio` and
   `.PictureInPictureOnLeave` default to true.
+- 2026-11-15, Phase 5 (owner request, docs/specs/12-playback-overlay.md). Additions only:
+  `UiSettings.Overlay` (`PlaybackOverlaySettings`: progress line, its edge, clock, battery, times, corner,
+  margin, size, color), `OverlayCorner`, `OverlayEdge`, `OverlayTimeMode`, and the pure
+  `Player.Core.Logic.Overlay.PlaybackOverlayText`.
 
 Namespaces: `Player.Core.Models`, `Player.Core.Contracts`. All types are public. Nullable enabled.
 
