@@ -68,7 +68,9 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     private long _startMs;
     private bool _pauseRequested;
     private long? _seekOnStart;
-    private string? _subtitleFileUri;
+    private volatile ExternalSubtitle? _externalSubtitle;
+    private int? _externalTrackId;           // the track LibVLC created for the external file, once known
+    private int? _marginPx;                  // the subtitle margin of the open item, computed once per style
     private bool _waitingForSurface;
     private bool _startedWithoutVideo;
     private bool _settingsPending;
@@ -77,20 +79,19 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     private int _generation;
     private long _lastPositionPost;
     private volatile PlayerSnapshot _snapshot = PlayerSnapshot.Idle;
-    private volatile IReadOnlyList<TrackInfo> _audioTracks = [];
-    private volatile IReadOnlyList<TrackInfo> _subtitleTracks = [];
-    private volatile SelectedTracks _selected = SelectedTracks.Unknown;
+    private volatile TrackState _tracks = TrackState.Empty;
 
     public PlayerSnapshot Snapshot => _snapshot;
     public event EventHandler<PlayerSnapshot>? SnapshotChanged;
-    public IReadOnlyList<TrackInfo> AudioTracks => _audioTracks;
-    public IReadOnlyList<TrackInfo> SubtitleTracks => _subtitleTracks;
+    public IReadOnlyList<TrackInfo> AudioTracks => _tracks.Audio;
+    public IReadOnlyList<TrackInfo> SubtitleTracks => _tracks.Subtitles;
     public event EventHandler? TracksChanged;
-    public int? CurrentAudioTrackId => _selected.Audio;
-    public int? CurrentSubtitleTrackId => _selected.Subtitle;
+    public int? CurrentAudioTrackId => _tracks.SelectedAudio;
+    public int? CurrentSubtitleTrackId => _tracks.SelectedSubtitle;
     public long AudioDelayMs => Interlocked.Read(ref _audioDelayMs);
     public long SubtitleDelayMs => Interlocked.Read(ref _subtitleDelayMs);
     public SubtitleStyle SubtitleStyle => _subtitleStyle;
+    public string? ExternalSubtitlePath => _externalSubtitle?.Path;
 
     /// <summary>A LibVLC input exists and accepts commands.</summary>
     private bool Live =>
@@ -120,7 +121,9 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             Interlocked.Exchange(ref _audioDelayMs, settings.AudioDelayMs);
             Interlocked.Exchange(ref _subtitleDelayMs, settings.SubtitleDelayMs);
             _subtitleStyle = settings.SubtitleStyle;
-            _subtitleFileUri = null;
+            _externalSubtitle = null;
+            _externalTrackId = null;
+            _marginPx = null;
             _pauseRequested = startPaused;
             _durationMs = 0;
             SetFormat(null);
@@ -235,13 +238,10 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     public Task SelectAudioTrackAsync(int trackId, CancellationToken ct) => _queue.Enqueue(() =>
     {
         _audioTrackId = trackId;
-        if (!Live)
-            return;
 
-        _player!.SetAudioTrack(trackId);
-
-        // LibVLC confirms with ESSelected a moment later; the request is reported at once.
-        SetSelected(_selected with { Audio = trackId });
+        // LibVLC confirms with ESSelected a moment later; an accepted request is reported at once.
+        if (Live && _player!.SetAudioTrack(trackId))
+            SetTracks(_tracks with { SelectedAudio = trackId });
     }, ct);
 
     public Task SetAudioDelayAsync(long delayMs, CancellationToken ct) => _queue.Enqueue(() =>
@@ -253,12 +253,11 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
 
     public Task SelectSubtitleTrackAsync(int trackId, CancellationToken ct) => _queue.Enqueue(() =>
     {
-        _subtitleTrackId = trackId;
-        if (!Live)
-            return;
-
-        _player!.SetSpu(trackId);
-        SetSelected(_selected with { Subtitle = trackId });
+        // The external file's track gets a new id on every restart, so choosing it is remembered
+        // as "the external file", not as an id.
+        _subtitleTrackId = trackId == _externalTrackId ? null : trackId;
+        if (Live && _player!.SetSpu(trackId))
+            SetTracks(_tracks with { SelectedSubtitle = trackId });
     }, ct);
 
     public Task SetSubtitleDelayAsync(long delayMs, CancellationToken ct) => _queue.Enqueue(() =>
@@ -268,25 +267,28 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
             _player!.SetSpuDelay(delayMs * 1000);
     }, ct);
 
-    public Task AddSubtitleFileAsync(string localFilePath, CancellationToken ct)
+    public Task AddSubtitleFileAsync(string localFilePath, string displayName, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrEmpty(localFilePath);
+        ArgumentNullException.ThrowIfNull(displayName);
         return _queue.Enqueue(() =>
         {
-            var uri = new Uri(localFilePath).AbsoluteUri;
-            if (!Live || !_player!.AddSlave(MediaSlaveType.Subtitle, uri, true))
+            var external = new ExternalSubtitle(
+                localFilePath, new Uri(localFilePath).AbsoluteUri, displayName.Length > 0 ? displayName : "Subtitle file");
+            if (!Live || !_player!.AddSlave(MediaSlaveType.Subtitle, external.Uri, true))
                 throw new InvalidOperationException("The subtitle file could not be loaded.");
 
             // Remembered so that a decoder switch or a video restart loads it again.
             // LibVLC selects the new track, so an earlier track choice no longer applies.
-            _subtitleFileUri = uri;
+            _externalSubtitle = external;
+            _externalTrackId = null;
             _subtitleTrackId = null;
         }, ct);
     }
 
     /// <summary>
-    /// LibVLC 3 reads the text renderer options when the input starts, so a change restarts the
-    /// input at the current position (docs/specs/03, known risk).
+    /// The subtitle renderer reads its options from the LibVLC instance (docs/SPIKE.md finding 14),
+    /// so a change restarts the input at the current position with a new instance.
     /// </summary>
     public Task SetSubtitleStyleAsync(SubtitleStyle style, CancellationToken ct)
     {
@@ -297,6 +299,7 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
                 return;
 
             _subtitleStyle = style;
+            _marginPx = null;
             if (Live)
                 Start(CurrentPositionMs);
         }, ct);
@@ -306,15 +309,23 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     {
         _queue.Post(() =>
         {
-            Halt();
-            DisposePlayer();
-            _queue.Dispose();
+            try
+            {
+                Halt();
+                DisposePlayer();
+            }
+            finally
+            {
+                _queue.Dispose();
+            }
         });
     }
 
     /// <summary>Called only after Halt, so no input is running.</summary>
     private void DisposePlayer()
     {
+        // Anything the old player still posts must not reach its successor.
+        Interlocked.Increment(ref _generation);
         _player?.Dispose();
         _player = null;
         if (_libVlc is { } libVlc)
@@ -414,7 +425,8 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         _savedVideoTrack = null;
         _startedWithoutVideo = false;
         _hasVideo = false;
-        SetTracks([], [], SelectedTracks.Unknown);
+        _externalTrackId = null;
+        SetTracks(TrackState.Empty);
     }
 
     private void Fail(string message)
@@ -482,18 +494,27 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     /// <summary>
     /// LibVLC takes the subtitle margin in pixels of the video, measured up from its own default position,
     /// so the video height must be known before the instance is created. Zero keeps LibVLC's position.
+    /// Computed once per open item and style, so a restart never changes it (and never rebuilds the instance).
     /// </summary>
     private int SubtitleMarginPx()
     {
+        if (_marginPx is { } known)
+            return known;
+
         var standard = SubtitleStyle.Default.BottomMarginFraction;
         var fraction = Math.Clamp(_subtitleStyle.BottomMarginFraction, 0, 0.5);
-        if (_item!.Kind != MediaKind.Video || Math.Abs(fraction - standard) < 0.0005)
-            return 0;
+        var margin = 0;
+        if (_item!.Kind == MediaKind.Video && Math.Abs(fraction - standard) >= 0.0005)
+        {
+            var height = _format?.Height ?? ProbeVideoHeight();
 
-        var height = _format?.Height ?? ProbeVideoHeight();
+            // A little below the default position is possible; further down the text would leave the picture.
+            if (height > 0)
+                margin = (int)Math.Round(Math.Max(fraction - standard, -0.03) * height);
+        }
 
-        // A little below the default position is possible; further down the text would leave the picture.
-        return height > 0 ? (int)Math.Round(Math.Max(fraction - standard, -0.03) * height) : 0;
+        _marginPx = margin;
+        return margin;
     }
 
     /// <summary>The displayed height of the video, or 0 when it cannot be read. Uses its own descriptor.</summary>

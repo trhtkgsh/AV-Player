@@ -10,6 +10,9 @@ Changes after the freeze (orchestrator only, each one logged in PROGRESS.md):
 - 2026-11-15, Phase 2: `ISubtitleService.FindSidecarsAsync` returns `SubtitleFile` records (content URI, file name,
   language suffix) instead of bare URI strings. The subtitle sheet lists the files, and a content URI has no name.
   The only implementation and the only caller were written in the same phase.
+- 2026-11-15, Phase 2 (gate review): `IPlayerEngine.AddSubtitleFileAsync` takes a `displayName` for the file's track
+  (LibVLC names it after the path of the local copy), and `ExternalSubtitlePath` reports the file the engine holds,
+  so the subtitle service never adds the same file twice after a restart that the engine handled itself.
 
 Namespaces: `Player.Core.Models`, `Player.Core.Contracts`. All types are public. Nullable enabled.
 
@@ -167,6 +170,7 @@ public interface IPlayerEngine
     long AudioDelayMs { get; }
     long SubtitleDelayMs { get; }
     SubtitleStyle SubtitleStyle { get; }
+    string? ExternalSubtitlePath { get; }                    // the external subtitle file of the open item, or null
 
     Task OpenAsync(MediaItem item, EffectivePlaybackSettings settings, bool startPaused, CancellationToken ct);
     Task PlayAsync(CancellationToken ct);
@@ -181,7 +185,7 @@ public interface IPlayerEngine
     Task SetAudioDelayAsync(long delayMs, CancellationToken ct);
     Task SelectSubtitleTrackAsync(int trackId, CancellationToken ct);   // -1 = off
     Task SetSubtitleDelayAsync(long delayMs, CancellationToken ct);
-    Task AddSubtitleFileAsync(string localFilePath, CancellationToken ct);   // file inside app storage
+    Task AddSubtitleFileAsync(string localFilePath, string displayName, CancellationToken ct);   // file inside app storage
     Task SetSubtitleStyleAsync(SubtitleStyle style, CancellationToken ct);   // restarts at the current position
 }
 
