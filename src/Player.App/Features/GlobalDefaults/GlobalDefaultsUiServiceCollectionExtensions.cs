@@ -11,9 +11,12 @@ public static class GlobalDefaultsUiServiceCollectionExtensions
 
         services.AddTransient<GlobalDefaultsViewModel>();
         services.AddTransient<GlobalDefaultsPage>();
+        services.AddTransient<DefaultSubtitleStyleViewModel>();
+        services.AddTransient<DefaultSubtitleStylePage>();
 
         // The route name is flat on purpose: Shell resolves a route that starts with another route's name wrongly.
         Routing.RegisterRoute("settings-defaults", typeof(GlobalDefaultsPage));
+        Routing.RegisterRoute("settings-subtitle-style", typeof(DefaultSubtitleStylePage));
         return services;
     }
 }
