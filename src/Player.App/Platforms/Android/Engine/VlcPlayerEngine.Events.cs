@@ -171,15 +171,31 @@ public sealed partial class VlcPlayerEngine
         player.Mute = false;
     }
 
-    private MediaPlayer EnsurePlayer()
+    private MediaPlayer EnsurePlayer(int subtitleMarginPx)
     {
-        if (_player is not null)
+        if (_player is not null && _instanceStyle == _subtitleStyle && _instanceMarginPx == subtitleMarginPx)
             return _player;
+
+        // A new subtitle style needs a new LibVLC instance (see SubtitleOptions).
+        DisposePlayer();
+        var style = _subtitleStyle;
+        _instanceStyle = style;
+        _instanceMarginPx = subtitleMarginPx;
 
         // The native libraries were loaded in the constructor, on the UI thread.
         // Debug level is required: the decoder line parsed in OnLog is a debug message.
         // Subscribing to Log replaces LibVLC's own logger, so nothing is written to logcat by LibVLC itself.
-        _libVlc = new LibVLC(enableDebugLogs: true);
+        try
+        {
+            _libVlc = new LibVLC(enableDebugLogs: true, SubtitleOptions(style, subtitleMarginPx));
+        }
+        catch (VLCException ex)
+        {
+            // An option this LibVLC build does not know must not stop playback.
+            global::Android.Util.Log.Warn(Tag, $"Subtitle options rejected, using the defaults: {ex.Message}");
+            _libVlc = new LibVLC(enableDebugLogs: true);
+        }
+
         _libVlc.Log += OnLog;
 
         var player = new MediaPlayer(_libVlc);
