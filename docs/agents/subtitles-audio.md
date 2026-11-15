@@ -18,7 +18,7 @@
 1. `SidecarMatcher`: given a video display name and candidate file names, return the candidates ordered by match quality. Match: same base name, optional `.lang` suffix, extensions `.srt`, `.ass`, `.ssa`. Case-insensitive.
 2. `PreferredTrackSelector`: given `TrackInfo` lists and the preferred languages, return the track ids to select, or null to keep the engine's default.
 3. `FindSidecarsAsync`: query MediaStore Files for the item's bucket and filter with `SidecarMatcher`. Return content URIs. Return an empty list when the files are not visible to the app.
-4. `LoadExternalAsync`: copy the content URI to a file in app cache (keep the extension), call `IPlayerEngine.AddSubtitleFileAsync`, record the URI with `IPlaybackStateRecorder.Update`.
+4. `LoadExternalAsync`: copy the content URI to a file in the app data folder `subtitles` (keep the extension; not the cache, so a saved choice survives a cache clear), call `IPlayerEngine.AddSubtitleFileAsync`, record the URI with `IPlaybackStateRecorder.Update`.
 5. `PickAndLoadAsync`: system document picker (`ACTION_OPEN_DOCUMENT`), then `LoadExternalAsync`.
 6. `ApplyPreferredTracksAsync`: use `PreferredTrackSelector` and the engine's select methods. Skip any track the per-file state already fixes.
 7. Delete cached subtitle copies older than 30 days.

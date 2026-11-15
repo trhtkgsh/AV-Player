@@ -171,6 +171,7 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
     {
         Halt();
         _item = null;
+        _externalSubtitle = null;
         _status = PlayerStatus.Idle;
         _positionMs = _durationMs = 0;
         _actualDecoder = null;
@@ -280,8 +281,15 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         {
             var external = new ExternalSubtitle(
                 localFilePath, new Uri(localFilePath).AbsoluteUri, displayName.Length > 0 ? displayName : "Subtitle file");
-            if (!Live || !_player!.AddSlave(MediaSlaveType.Subtitle, external.Uri, true))
+            if (_item is not null && _status == PlayerStatus.Opening)
+            {
+                // No input runs yet: its first running event adds the file (adding it here as well
+                // would create the track twice).
+            }
+            else if (!Live || !_player!.AddSlave(MediaSlaveType.Subtitle, external.Uri, true))
+            {
                 throw new InvalidOperationException("The subtitle file could not be loaded.");
+            }
 
             // Remembered so that a decoder switch or a video restart loads it again.
             // LibVLC selects the new track, so an earlier track choice no longer applies.

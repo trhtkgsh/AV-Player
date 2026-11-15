@@ -300,8 +300,13 @@ public sealed partial class VlcPlayerEngine
                 player.SetAudioTrack(audio);
 
             // An external file is selected by LibVLC only while no track was chosen after it was added.
-            if (_externalSubtitle is { } external)
-                player.AddSlave(MediaSlaveType.Subtitle, external.Uri, _subtitleTrackId is null);
+            if (_externalSubtitle is { } external
+                && !(File.Exists(external.Path) && player.AddSlave(MediaSlaveType.Subtitle, external.Uri, _subtitleTrackId is null)))
+            {
+                // The copy is gone: stop reporting it, so the subtitle policy can choose again.
+                global::Android.Util.Log.Warn(Tag, "The external subtitle file could not be loaded again.");
+                _externalSubtitle = null;
+            }
             if (_subtitleTrackId is { } subtitle)
                 player.SetSpu(subtitle);
             if (_seekOnStart is { } seek)
@@ -319,7 +324,11 @@ public sealed partial class VlcPlayerEngine
         else if (status == PlayerStatus.Paused && !_pauseRequested)
             player.SetPause(false);
 
+        // A surface that came back can restart the input here: this event then belongs to the old one.
+        var generation = _generation;
         UpdateVideoOutput();
+        if (generation != _generation)
+            return;
 
         // An input that starts paused draws nothing (docs/SPIKE.md finding 12): a restart of a paused
         // file (decoder switch, subtitle style) would keep the old picture, or none, until Play.
