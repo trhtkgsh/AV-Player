@@ -45,6 +45,12 @@ public partial class ItemsPage : ContentPage
 
     protected override bool OnBackButtonPressed()
     {
+        // A running operation is not left by Back: the operation ends first.
+        if (_viewModel.IsOperationRunning)
+        {
+            return true;
+        }
+
         if (_viewModel.IsSelecting)
         {
             _viewModel.ExitSelectionCommand.Execute(null);

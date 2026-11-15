@@ -25,4 +25,7 @@ public sealed record FolderRow(FolderRowKind Kind, string Name, MediaFolder? Fol
     public bool HasNew => NewCount > 0;
 
     public string NewText => Localizer.Plural("Explorer.NewCount", NewCount);
+
+    // The screen reader text of a selected row: its name and "selected". Null when it is not selected, so the row reads as before.
+    public string? AccessibleName => Selected ? Localizer.Format("Explorer.SelectedItem", DisplayName) : null;
 }

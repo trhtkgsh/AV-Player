@@ -12,7 +12,7 @@
         <!-- The toolbar: the browse items and the selection items. The code-behind shows one set at a time. -->
         <ToolbarItem x:Key="SortItem" Text="{loc:T Explorer.Sort}" Command="{Binding ChooseSortCommand}" />
         <ToolbarItem x:Key="LayoutItem" Text="{Binding LayoutText}" Command="{Binding ToggleLayoutCommand}" />
-        <ToolbarItem x:Key="SelectAllItem" Text="{loc:T Explorer.SelectAll}" Command="{Binding SelectAllCommand}" />
+        <ToolbarItem x:Key="SelectAllItem" Text="{loc:T Explorer.SelectAll}" Order="Secondary" Command="{Binding SelectAllCommand}" />
         <ToolbarItem x:Key="RenameItem" Text="{loc:T Explorer.Rename}" Command="{Binding RenameSelectedCommand}"
                      IsEnabled="{Binding CanRename}" />
         <ToolbarItem x:Key="MoveItem" Text="{loc:T Explorer.Move}" Command="{Binding MoveSelectedCommand}" />
@@ -31,7 +31,8 @@
         </Style>
 
         <DataTemplate x:Key="ListItem" x:DataType="explorer:MediaRowViewModel">
-            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto">
+            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto"
+                  SemanticProperties.Description="{Binding AccessibleName}">
                 <!-- The tap and the long press come from the behavior: a MAUI tap recognizer would block the long press. -->
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
@@ -73,7 +74,8 @@
         </DataTemplate>
 
         <DataTemplate x:Key="GridItem" x:DataType="explorer:MediaRowViewModel">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="4"
+                  SemanticProperties.Description="{Binding AccessibleName}">
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
                         TapCommand="{Binding ViewModel.OpenCommand, Source={x:Reference Page}, x:DataType=explorer:ItemsPage}"

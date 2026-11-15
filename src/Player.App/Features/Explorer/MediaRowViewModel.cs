@@ -49,6 +49,10 @@ public sealed partial class MediaRowViewModel : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
+    // The screen reader text of a selected row: its name and "selected". Null when not selected. Set by the ViewModel.
+    [ObservableProperty]
+    private string? _accessibleName;
+
     // The font size of the file name: the base size times the explorer font scale. Set by the ViewModel.
     [ObservableProperty]
     private double _nameFontSize;

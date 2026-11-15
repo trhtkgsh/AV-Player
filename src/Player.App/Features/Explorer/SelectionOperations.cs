@@ -54,9 +54,10 @@ public sealed class SelectionOperations
     // "Move 12 files to the trash?" for files; "Move 12 files in 3 folders to the trash?" when folders are selected.
     public async Task<bool> ConfirmDeleteAsync(Shell shell, int files, int folders)
     {
+        var filesText = _localizer.Plural("Explorer.Files", files);
         var count = folders == 0
-            ? _localizer.Plural("Explorer.Files", files)
-            : _localizer.Format("Explorer.FilesInFolders", files, folders);
+            ? filesText
+            : filesText + " " + _localizer.Plural("Explorer.InFolders", folders);
         var question = _localizer.Format(DeleteWordingIsTrash ? "Explorer.TrashConfirm" : "Explorer.DeleteConfirm", count);
 
         return await shell.DisplayAlertAsync(

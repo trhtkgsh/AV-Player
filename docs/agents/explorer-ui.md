@@ -100,3 +100,17 @@
 - `Open`, `OpenRow` and `BeginSelect` (items and folders) return quietly for a null row.
 - Pure signatures: unchanged.
 - Not verified on a device: the user's emulator check that the tap opens the file and that the long press enters the mode.
+
+**Review fixes (2026-11-18, R7-45).**
+- Stale selection: the selection is pruned against the rows on screen whenever they change (search, filter, reload, sort, folder navigation). Items: `ExplorerSelection.KeepOnly` with the shown ids. Folders: `PruneSelection` keeps only the selectable rows in `Folders`, so a level change clears the others. `SelectedCount`, `CanRename` and `SelectedItems()` use the same set.
+- Double start: one entry guard `RunActionAsync` (`_actionBusy`) covers Delete, Move, Copy, Rename, the ⋮ menu (`OpenOptions`), and is released in `finally`. A second command while a dialog, the picker or the operation is open does nothing.
+- Back: while `IsOperationRunning`, system Back is consumed on both pages, and the bar's arrow (`ExitSelection`) does nothing. Delete and move use `CancellationToken.None` (single-file delete too); copy keeps its own `CancellationTokenSource`, not linked to the session. Activate reloads on return.
+- Plurals: the parts are `Plural("Explorer.Files")` and `Plural("Explorer.InFolders")` (`in 1 folder` / `in {0} folders`, HE `בתיקייה אחת` / `ב-{0} תיקיות`), joined with a space in code. A joiner key was dropped: the string-source test requires a Hebrew letter in every Hebrew value.
+- Folder row tint covers the whole row (`Grid.RowSpan="2"`, `ColumnSpan="4"`).
+- Accessibility: a selected row or tile sets `SemanticProperties.Description` to `Explorer.SelectedItem` ("{0}, selected"). `MediaRowViewModel.AccessibleName` is set by `UpdateSelection`; `FolderRow.AccessibleName` is computed. Null when not selected.
+- Capture after prompts: delete takes the files again after the confirmation; move and copy take them again after the picker. Empty stops quietly.
+- Result: Success covers files already in the target (the implementation counts them as done). No code change.
+- Items page count: "Select all" is `Order="Secondary"` (overflow), leaving 4 primary items as on the folders page, so the title shows "N selected". Judgment call; verify on the emulator.
+- All-files move: a moved file still belongs to the All files list, so the list reloads instead of removing the row.
+- Pure signatures changed: `ExplorerSelection<TKey>.KeepOnly(IReadOnlySet<TKey> shown)` (new). Other signatures unchanged.
+- Not verified on a device: the busy state and Back, the picker, the plurals, the selected announcement, and the count in the title.
