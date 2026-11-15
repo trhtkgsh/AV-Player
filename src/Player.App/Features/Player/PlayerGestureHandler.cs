@@ -34,6 +34,9 @@ public sealed class PlayerGestureHandler
     private long _seekDuration;
     private long _seekTarget;
     private bool _seeking;
+    private bool _seekWasPlaying; // the drag paused playback at Began; it resumes at the end
+    private long _scrubTarget; // the newest seek target; the running loop sends it
+    private Task _scrubTask = Task.CompletedTask;
     private bool _verticalActive; // set on Began; cleared on Ended, Cancelled and Detach
     private bool _horizontalActive;
     private bool _pinchActive;
@@ -67,6 +70,7 @@ public sealed class PlayerGestureHandler
     public void Detach()
     {
         _gestures.Gesture -= OnGesture;
+        if (_horizontalActive) EndSeek(_seeking ? _seekStart : null); // a drag cut off by Detach counts as cancelled
         _verticalActive = _horizontalActive = _pinchActive = _panActive = false; // a gesture cut off by Detach is over
         _osd.Hide();
     }
@@ -191,6 +195,8 @@ public sealed class PlayerGestureHandler
                 _seekDuration = snapshot.DurationMs;
                 _seekTarget = _seekStart;
                 _seeking = false;
+                _seekWasPlaying = snapshot.Status == PlayerStatus.Playing;
+                if (_seekWasPlaying) Fire(() => _engine.PauseAsync(CancellationToken.None)); // playback does not run during the drag
                 PreviewSeek(e);
                 break;
 
@@ -200,18 +206,12 @@ public sealed class PlayerGestureHandler
 
             case GesturePhase.Ended:
                 _osd.Release();
-                if (_seeking)
-                {
-                    long target = _seekTarget;
-                    Fire(() => _engine.SeekAsync(target, CancellationToken.None));
-                }
-
-                _seeking = false;
+                EndSeek(_seeking ? _seekTarget : null);
                 break;
 
             case GesturePhase.Cancelled:
                 _osd.Hide();
-                _seeking = false;
+                EndSeek(_seeking ? _seekStart : null); // the picture returns to the start position
                 break;
         }
     }
@@ -266,6 +266,57 @@ public sealed class PlayerGestureHandler
         _seeking = true;
         _seekTarget = Math.Clamp(_seekStart + (long)Math.Round(e.DeltaX * SeekMsPerScreenWidth), 0, _seekDuration);
         _osd.Hold(SeekText(_seekStart, _seekTarget));
+        Scrub(_seekTarget);
+    }
+
+    /// <summary>
+    /// Ends a seek drag: the picture goes to <paramref name="target"/> (the start for a cancelled drag), then
+    /// playback resumes if it was playing before the drag. Nothing runs when there is neither.
+    /// </summary>
+    private void EndSeek(long? target)
+    {
+        bool play = _seekWasPlaying;
+        _seeking = false;
+        _seekWasPlaying = false;
+        if (target is null && !play) return;
+
+        Fire(() => FinishSeekAsync(target, play));
+    }
+
+    private async Task FinishSeekAsync(long? target, bool play)
+    {
+        if (target is long final) await Scrub(final);
+        if (play) await _engine.PlayAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Latest wins: the newest target is the one sent, and no seeks queue up. A target that arrives while a
+    /// loop runs only replaces <see cref="_scrubTarget"/>. Returns the running loop. Never throws.
+    /// </summary>
+    private Task Scrub(long target)
+    {
+        _scrubTarget = target;
+        if (_scrubTask is { IsCompleted: false }) return _scrubTask;
+
+        _scrubTask = SendScrubTargetsAsync();
+        return _scrubTask;
+    }
+
+    private async Task SendScrubTargetsAsync()
+    {
+        long sent = -1; // targets are never negative, so the first pass always sends
+        try
+        {
+            while (sent != _scrubTarget)
+            {
+                sent = _scrubTarget;
+                await _engine.SeekAsync(sent, CancellationToken.None);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Seek preview failed: {ex}");
+        }
     }
 
     /// <summary>"[+0:14]  12:30": the signed offset from the start, then the target time.</summary>
