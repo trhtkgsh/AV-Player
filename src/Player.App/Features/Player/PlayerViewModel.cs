@@ -42,7 +42,6 @@ public sealed partial class PlayerViewModel : ObservableObject
     private bool _errorHandled;
     private double _enginePositionMs;
     private long _engineDurationMs;
-    private double _screenWidth;
     private PlaybackOverlaySettings _overlay = new();
     private string? _overlayClock;
     private int? _overlayBattery;
@@ -77,7 +76,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _isOverlayVisible;
     [ObservableProperty] private bool _progressLineEnabled = true;
     [ObservableProperty] private LayoutOptions _progressLineVertical = LayoutOptions.End;
-    [ObservableProperty] private double _progressFillWidth;
+    [ObservableProperty] private double _progressScale;
     [ObservableProperty] private string _overlayText = "";
     [ObservableProperty] private bool _overlayTextVisible;
     [ObservableProperty] private LayoutOptions _overlayVertical = LayoutOptions.Start;
@@ -213,6 +212,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     {
         // The system bars follow the controls: visible exactly while the controls are visible, never in Picture-in-Picture.
         _surface.SetSystemBarsVisible(value && !_pipActive);
+        if (value) RefreshDurationText(); // the seek row was not kept up to date while hidden
         UpdateOverlayVisibility();
     }
 
@@ -633,6 +633,9 @@ public sealed partial class PlayerViewModel : ObservableObject
     /// </summary>
     private void RefreshDurationText()
     {
+        // Only while the controls show: the row is not visible otherwise, and it is rebuilt when they show again.
+        if (!IsHudVisible) return;
+
         if (_engineDurationMs <= 0)
         {
             DurationText = TimeFormatter.Format(_engineDurationMs);
@@ -660,14 +663,6 @@ public sealed partial class PlayerViewModel : ObservableObject
         OverlayMargin = new Thickness(Math.Clamp(overlay.MarginDp, PlaybackOverlaySettings.MinMarginDp, PlaybackOverlaySettings.MaxMarginDp));
         OverlayFontSize = Math.Clamp(overlay.FontSize, PlaybackOverlaySettings.MinFontSize, PlaybackOverlaySettings.MaxFontSize);
         OverlayColor = Microsoft.Maui.Graphics.Color.FromUint(overlay.ColorArgb);
-        if (IsOverlayVisible) RefreshOverlay();
-    }
-
-    /// <summary>The width of the screen, for the progress line. Called by the page when its size changes.</summary>
-    public void SetScreenWidth(double width)
-    {
-        if (width <= 0 || width == _screenWidth) return;
-        _screenWidth = width;
         if (IsOverlayVisible) RefreshOverlay();
     }
 
@@ -706,7 +701,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private void RefreshOverlay()
     {
         long position = (long)_enginePositionMs;
-        ProgressFillWidth = _screenWidth * PlaybackOverlayText.Progress(position, _engineDurationMs);
+        ProgressScale = PlaybackOverlayText.Progress(position, _engineDurationMs);
         OverlayText = PlaybackOverlayText.FormatLine(_overlay, position, _engineDurationMs, _overlayClock, _overlayBattery);
         OverlayTextVisible = OverlayText.Length > 0;
     }
@@ -735,11 +730,20 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     private async Task RunOverlayClockAsync(CancellationToken ct)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        // Each wait ends a little after a minute boundary, so the displayed minute never lags.
+        const int SlackMs = 200;
         try
         {
-            while (await timer.WaitForNextTickAsync(ct))
+            while (true)
             {
+                var now = DateTime.Now;
+                var untilNextMinute = TimeSpan.FromMinutes(1)
+                    - TimeSpan.FromSeconds(now.Second)
+                    - TimeSpan.FromMilliseconds(now.Millisecond)
+                    + TimeSpan.FromMilliseconds(SlackMs);
+                await Task.Delay(untilNextMinute, ct);
+                if (ct.IsCancellationRequested) return; // hidden while the wait ran: nothing runs after that
+
                 ReadOverlayClockAndBattery();
                 RefreshOverlay();
             }
@@ -749,6 +753,7 @@ public sealed partial class PlayerViewModel : ObservableObject
             // Hidden or deactivated.
         }
     }
+
 
 
     private void RefreshTitle()

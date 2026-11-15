@@ -54,15 +54,16 @@
             InputTransparent="True"
             SafeAreaEdges="None"
             FlowDirection="LeftToRight">
-            <!-- The progress line: the played share of the screen width, filled from the left. -->
+            <!-- The progress line: spans the screen width and is scaled from its left edge by the played share (no layout pass per report). -->
             <BoxView
                 HeightRequest="2"
-                HorizontalOptions="Start"
+                HorizontalOptions="Fill"
                 VerticalOptions="{Binding ProgressLineVertical}"
-                WidthRequest="{Binding ProgressFillWidth}"
+                AnchorX="0"
+                ScaleX="{Binding ProgressScale}"
                 IsVisible="{Binding ProgressLineEnabled}"
                 Color="{DynamicResource ColorProgress}" />
-            <!-- The text line: one corner of the screen, flush at margin 0, with a dark shadow for readability. -->
+            <!-- The text line: one corner of the screen, flush at margin 0, with a dark shadow for readability (literal: no shadow token exists). -->
             <Label
                 VerticalOptions="{Binding OverlayVertical}"
                 HorizontalOptions="{Binding OverlayHorizontal}"

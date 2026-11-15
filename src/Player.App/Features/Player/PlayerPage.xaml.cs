@@ -14,7 +14,6 @@ public partial class PlayerPage : ContentPage
         _viewModel = viewModel;
         _localizer = localizer;
         BindingContext = viewModel;
-        SizeChanged += (_, _) => _viewModel.SetScreenWidth(Width);
     }
 
     protected override async void OnAppearing()
