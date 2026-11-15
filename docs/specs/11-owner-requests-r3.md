@@ -7,7 +7,7 @@ The owner tested `ArielPlayer-phase3.apk`, reported no faults so far, sent eleve
 - **R1-1 View modes.** The explorer has four sources, chosen from a "View" entry in the title bar: "Media folders" (every folder that holds media: today's folder list), "File browser" (the same folders as a tree: start at the storage root and go down one directory level at a time; only directories that hold media somewhere below are shown), "Favorites" (the folders the user marked), "All files" (today's flat list). Stored in `UiSettings.ViewMode` (`Folders`, `Tree`, `Favorites`, `Flat`).
 - **R1-2 List or grid.** A second entry switches between rows ("List") and tiles with a large thumbnail and the name under it ("Grid"). It applies to folder lists and file lists. Stored in `UiSettings.Layout`.
 - **R1-3 Audio-only folders.** A folder with no video file is shown only when `UiSettings.IncludeAudioOnlyFolders` is on (default on). `MediaFolder.AudioOnly` tells the explorer.
-- **R1-4 Folder options.** A long press on a folder (and a "more" button on its row or tile) opens the folder options: "Add to favorites" or "Remove from favorites", and "Default speed for this folder". File options (rename, delete) join the same pattern in Phase 5.
+- **R1-4 Folder options.** A "more" button on every folder row or tile opens the folder options: "Add to favorites" or "Remove from favorites", and "Default speed for this folder". A favorite folder shows a star. File options (rename, delete) join the same pattern in Phase 5. (MAUI has no long-press recognizer for list rows without platform code, so the entry is a button.)
 
 ## Phase 2 scope: stores and settings (specs 05, 06). Agents: folder-settings-store (new), core-contracts, playback-coordinator, ui-settings
 
