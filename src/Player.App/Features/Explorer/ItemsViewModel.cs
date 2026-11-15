@@ -20,6 +20,9 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private const int InitialVisibleLast = 12;
     private const int SearchDebounceMs = 150;
 
+    // The file-name size at the font scale 1.0 (the Label style of the app).
+    private const double BaseNameFontSize = 16;
+
     private readonly IMediaLibrary _library;
     private readonly IMediaMetadataService _metadataService;
     private readonly IPlaybackStateStore _stateStore;
@@ -59,6 +62,10 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
 
     [ObservableProperty]
     private bool _isEmpty;
+
+    // The font size of the file names: the base size times the explorer font scale.
+    [ObservableProperty]
+    private double _nameFontSize = BaseNameFontSize;
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -442,6 +449,8 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
 
     private void RebuildRows()
     {
+        NameFontSize = BaseNameFontSize * _settings.ExplorerFontScale;
+
         var previous = _rows;
         _rows = new Dictionary<MediaFileId, MediaRowViewModel>(_items.Count);
         foreach (var item in _items)

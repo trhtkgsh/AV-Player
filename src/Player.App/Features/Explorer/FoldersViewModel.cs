@@ -63,6 +63,12 @@ public sealed partial class FoldersViewModel : ObservableObject
     [ObservableProperty]
     private bool _permissionDenied;
 
+    private const double BaseNameFontSize = 22;
+
+    // The folder-name size at the font scale 1.0 (the LabelTitle style of the app).
+    [ObservableProperty]
+    private double _nameFontSize = BaseNameFontSize;
+
     [ObservableProperty]
     private bool _showNoFolders;
 
@@ -581,6 +587,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         }
 
         _settings = settings;
+        NameFontSize = BaseNameFontSize * settings.ExplorerFontScale;
         RebuildRows();
     }
 

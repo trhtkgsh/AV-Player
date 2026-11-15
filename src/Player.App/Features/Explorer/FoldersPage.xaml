@@ -26,7 +26,8 @@
 
                             <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Text="★" IsVisible="{Binding Favorite}"
                                    TextColor="{DynamicResource ColorOnSurfaceMuted}" VerticalOptions="Center" />
-                            <Label Grid.Row="0" Grid.Column="1" Text="{Binding DisplayName}" Style="{StaticResource LabelTitle}" />
+                            <Label Grid.Row="0" Grid.Column="1" Text="{Binding DisplayName}" Style="{StaticResource LabelTitle}"
+                                   FontSize="{Binding NameFontSize, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}" />
                             <Label Grid.Row="1" Grid.Column="1" Text="{Binding CountText}" IsVisible="{Binding ShowCount}"
                                    Style="{StaticResource LabelMuted}" />
                             <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="2" Text="{Binding NewText}"

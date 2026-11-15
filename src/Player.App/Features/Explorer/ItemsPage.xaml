@@ -36,7 +36,8 @@
                                 </VerticalStackLayout>
 
                                 <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                    <Label Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation"
+                                           FontSize="{Binding NameFontSize, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}" />
                                     <Label Text="{Binding InfoLine}" Style="{StaticResource LabelMuted}" />
                                     <HorizontalStackLayout Spacing="8">
                                         <Label Text="{loc:T Explorer.NewTag}" IsVisible="{Binding IsNew}"
