@@ -47,13 +47,20 @@ public sealed class StringCatalog
     public string Get(string key, string languageCode) =>
         TryGet(key, languageCode, out var text) ? text : $"[{key}]";
 
-    /// <summary>The text of a key in a language. Any code other than "he" gives English.</summary>
+    /// <summary>
+    /// The text of a key in a language. Any code other than "he" gives English. A text that is null (a default
+    /// <see cref="LocalizedText"/>) counts as unknown.
+    /// </summary>
     public bool TryGet(string key, string languageCode, out string text)
     {
         if (key is not null && _texts.TryGetValue(key, out var entry))
         {
-            text = IsHebrew(languageCode) ? entry.Hebrew : entry.English;
-            return true;
+            var found = IsHebrew(languageCode) ? entry.Hebrew : entry.English;
+            if (found is not null)
+            {
+                text = found;
+                return true;
+            }
         }
 
         text = string.Empty;
@@ -80,8 +87,9 @@ public sealed class StringCatalog
         {
             return string.Format(CultureInfo.InvariantCulture, text, args);
         }
-        catch (FormatException)
+        catch (Exception)
         {
+            // Also covers an argument whose ToString throws.
             return text;
         }
     }
