@@ -14,9 +14,9 @@ internal sealed class RecorderRig : IDisposable
 {
     public static readonly DateTimeOffset Start = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
 
-    public RecorderRig()
+    public RecorderRig(FakeTimeProvider? time = null)
     {
-        Time = new FakeTimeProvider(Start);
+        Time = time ?? new FakeTimeProvider(Start);
         Recorder = new PlaybackStateRecorder(Engine, Store, Lifecycle, Time);
     }
 
