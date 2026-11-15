@@ -5,6 +5,7 @@ namespace Player.Data.UiSettingsStorage;
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(UiSettingsDto))]
 [JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(int))]
 [JsonSerializable(typeof(bool))]
 [JsonSerializable(typeof(float))]
 [JsonSerializable(typeof(double))]
