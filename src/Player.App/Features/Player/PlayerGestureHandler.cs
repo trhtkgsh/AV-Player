@@ -35,6 +35,8 @@ public sealed class PlayerGestureHandler
     private long _seekTarget;
     private bool _seeking;
     private bool _seekWasPlaying; // the drag paused playback at Began; it resumes at the end
+    private int _dragId; // a horizontal drag's Began increments it; a finish for an older drag does not resume
+    private bool _resumePending; // a drag ended and its resume is still owed; the next drag takes it over
     private long _scrubTarget; // the newest seek target; the running loop sends it
     private Task _scrubTask = Task.CompletedTask;
     private bool _verticalActive; // set on Began; cleared on Ended, Cancelled and Detach
@@ -201,8 +203,10 @@ public sealed class PlayerGestureHandler
                 _seekDuration = snapshot.DurationMs;
                 _seekTarget = _seekStart;
                 _seeking = false;
-                _seekWasPlaying = snapshot.Status == PlayerStatus.Playing;
-                if (_seekWasPlaying) Fire(() => _engine.PauseAsync(CancellationToken.None)); // playback does not run during the drag
+                _dragId++;
+                _seekWasPlaying = snapshot.Status == PlayerStatus.Playing || _resumePending; // an earlier drag's resume is still owed
+                _resumePending = false;
+                if (snapshot.Status == PlayerStatus.Playing) Fire(() => _engine.PauseAsync(CancellationToken.None)); // playback does not run during the drag
                 PreviewSeek(e);
                 break;
 
@@ -319,15 +323,25 @@ public sealed class PlayerGestureHandler
         bool play = _seekWasPlaying;
         _seeking = false;
         _seekWasPlaying = false;
+        _resumePending = play;
         if (target is null && !play) return;
 
-        Fire(() => FinishSeekAsync(target, play));
+        int id = _dragId;
+        Fire(() => FinishSeekAsync(target, play, id));
     }
 
-    private async Task FinishSeekAsync(long? target, bool play)
+    /// <summary>
+    /// Sends the final target, then resumes only if no newer drag has begun since (<paramref name="id"/> is still
+    /// the current drag). A newer drag takes over the owed resume and resumes at its own end.
+    /// </summary>
+    private async Task FinishSeekAsync(long? target, bool play, int id)
     {
         if (target is long final) await Scrub(final);
-        if (play) await _engine.PlayAsync(CancellationToken.None);
+        if (play && id == _dragId)
+        {
+            _resumePending = false;
+            await _engine.PlayAsync(CancellationToken.None);
+        }
     }
 
     /// <summary>
