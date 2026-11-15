@@ -24,6 +24,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     private readonly IMediaLibrary _library;
     private readonly IUiSettingsStore _uiSettings;
     private readonly IFolderSettingsStore _folderSettings;
+    private readonly IPlaybackStateStore _playbackStates;
     private readonly ILocalizer _localizer;
 
     // The folders of the last successful load, and the per-folder settings read with them.
@@ -117,12 +118,13 @@ public sealed partial class FoldersViewModel : ObservableObject
     [ObservableProperty]
     private bool _showBusy;
 
-    public FoldersViewModel(IMediaLibrary library, IUiSettingsStore uiSettings, IFolderSettingsStore folderSettings, ILocalizer localizer)
+    public FoldersViewModel(IMediaLibrary library, IUiSettingsStore uiSettings, IFolderSettingsStore folderSettings, ILocalizer localizer, IPlaybackStateStore playbackStates)
     {
         _library = library;
         _uiSettings = uiSettings;
         _folderSettings = folderSettings;
         _localizer = localizer;
+        _playbackStates = playbackStates;
     }
 
     public ObservableCollection<FolderRow> Folders { get; } = new();
@@ -389,16 +391,27 @@ public sealed partial class FoldersViewModel : ObservableObject
 
         // The first choice is the general default: no speed for this folder.
         float? speed = index == 0 ? null : FolderSpeeds[index - 1];
-        await SaveFolderSettingsAsync(folder.BucketId, s => s with { Speed = speed }, ct);
+        if (await SaveFolderSettingsAsync(folder.BucketId, s => s with { Speed = speed }, ct))
+        {
+            await ClearFileSpeedsAsync(folder.BucketId, ct);
+        }
     }
 
-    private async Task SaveFolderSettingsAsync(long bucketId, Func<FolderSettings, FolderSettings> change, CancellationToken ct)
+    // The newest choice wins: a folder speed replaces the own speed of each file of the folder.
+    private async Task ClearFileSpeedsAsync(long bucketId, CancellationToken ct)
     {
         try
         {
-            // Read the latest stored entry: only the changed member moves.
-            var current = await _folderSettings.GetAsync(bucketId, ct) ?? new FolderSettings(bucketId);
-            await _folderSettings.SaveAsync(change(current), ct);
+            var items = await _library.GetItemsAsync(new MediaQuery(bucketId, null), ct);
+            var ids = items.Select(item => item.Id).ToList();
+            var states = await _playbackStates.GetManyAsync(ids, ct);
+            foreach (var state in states.Values)
+            {
+                if (state.Speed is not null)
+                {
+                    await _playbackStates.SaveAsync(state with { Speed = null }, ct);
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -407,6 +420,28 @@ public sealed partial class FoldersViewModel : ObservableObject
         {
             System.Diagnostics.Debug.WriteLine(ex);
             ErrorMessage = _localizer["Explorer.SaveFailed"];
+        }
+    }
+
+    // Returns true when the folder setting was saved.
+    private async Task<bool> SaveFolderSettingsAsync(long bucketId, Func<FolderSettings, FolderSettings> change, CancellationToken ct)
+    {
+        try
+        {
+            // Read the latest stored entry: only the changed member moves.
+            var current = await _folderSettings.GetAsync(bucketId, ct) ?? new FolderSettings(bucketId);
+            await _folderSettings.SaveAsync(change(current), ct);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(ex);
+            ErrorMessage = _localizer["Explorer.SaveFailed"];
+            return false;
         }
     }
 
