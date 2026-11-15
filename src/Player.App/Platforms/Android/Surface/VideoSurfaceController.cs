@@ -95,11 +95,23 @@ internal sealed class VideoSurfaceController : IVideoSurface
     /// </summary>
     public void SetImmersive(bool enabled)
     {
+        var insetsCleared = false;
         lock (_sync)
         {
             _immersive = enabled;
             _barsVisible = false;
+
+            // Outside player mode there are no insets to keep clear of, whether or not a window
+            // exists to read them from.
+            if (!enabled && _insets != default)
+            {
+                _insets = default;
+                insetsCleared = true;
+            }
         }
+
+        if (insetsCleared)
+            Changed?.Invoke(this, EventArgs.Empty);
 
         MainThread.BeginInvokeOnMainThread(ApplyImmersive);
     }
@@ -170,6 +182,10 @@ internal sealed class VideoSurfaceController : IVideoSurface
     /// </summary>
     internal void RefreshInsets(Android.Views.View view)
     {
+        // A posted call can arrive after the view left its window: it has no insets to report then.
+        if (!view.IsAttachedToWindow)
+            return;
+
         var insets = default(EdgeInsets);
         bool immersive;
         lock (_sync)
