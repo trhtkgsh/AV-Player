@@ -274,13 +274,15 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
             }
 
             // The three fields this page does not show keep their stored values.
-            await SaveAsync(stored => new GlobalDefaults
+            if (await SaveAsync(stored => new GlobalDefaults
             {
                 Aspect = stored.Aspect,
                 BackgroundAudio = stored.BackgroundAudio,
                 PictureInPictureOnLeave = stored.PictureInPictureOnLeave,
-            });
-            await LoadAsync();
+            }))
+            {
+                await LoadAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -290,16 +292,18 @@ public sealed partial class GlobalDefaultsViewModel : ObservableObject
 
     private Task SetAudioDelayAsync(long value)
     {
-        var delay = ClampDelay(value);
-        AudioDelayMs = delay;
-        return SaveAsync(d => d with { AudioDelayMs = delay });
+        AudioDelayMs = ClampDelay(value);
+
+        // Reads the live value when the save runs, so the last write stores the latest delay.
+        return SaveAsync(d => d with { AudioDelayMs = AudioDelayMs });
     }
 
     private Task SetSubtitleDelayAsync(long value)
     {
-        var delay = ClampDelay(value);
-        SubtitleDelayMs = delay;
-        return SaveAsync(d => d with { SubtitleDelayMs = delay });
+        SubtitleDelayMs = ClampDelay(value);
+
+        // Reads the live value when the save runs, so the last write stores the latest delay.
+        return SaveAsync(d => d with { SubtitleDelayMs = SubtitleDelayMs });
     }
 
     // Every save starts from the stored record, so fields this page does not show are preserved.
