@@ -37,6 +37,7 @@ public sealed class PlayerGestureHandler
     private bool _seeking;
     private bool _seekWasPlaying; // the drag paused playback at Began; it resumes at the end
     private int _dragId; // a horizontal drag's Began increments it; a finish for an older drag does not resume
+    private bool _suspended; // Picture-in-Picture: the gestures are ignored
     private bool _resumePending; // a drag ended and its resume is still owed; the next drag takes it over
     private long _scrubTarget; // the newest seek target; the running loop sends it
     private Task _scrubTask = Task.CompletedTask;
@@ -74,17 +75,43 @@ public sealed class PlayerGestureHandler
 
     public void Attach() => _gestures.Gesture += OnGesture;
 
+    /// <summary>
+    /// True while gestures are ignored (Picture-in-Picture). Setting it to true ends a gesture in progress, the same
+    /// way <see cref="Detach"/> does.
+    /// </summary>
+    public bool Suspended
+    {
+        get => _suspended;
+        set
+        {
+            if (value == _suspended) return;
+            _suspended = value;
+            if (value) EndGestures();
+        }
+    }
+
     public void Detach()
     {
         _gestures.Gesture -= OnGesture;
-        if (_horizontalActive) EndSeek(_seeking ? _seekStart : null); // a drag cut off by Detach counts as cancelled
+        EndGestures();
+    }
+
+    /// <summary>
+    /// Ends the gestures in progress. A seek drag cut off here keeps the picture where it is and only undoes its own
+    /// pause, so playback is not seeked; a long press restores the speed from before it. Nothing else is sent.
+    /// </summary>
+    private void EndGestures()
+    {
+        if (_horizontalActive) EndSeek(null);
         RestoreSpeed();
-        _verticalActive = _horizontalActive = _pinchActive = _panActive = _longPressActive = false; // a gesture cut off by Detach is over
+        _verticalActive = _horizontalActive = _pinchActive = _panActive = _longPressActive = false; // a gesture cut off is over
         _osd.Hide();
     }
 
     private void OnGesture(object? sender, GestureEvent e)
     {
+        if (_suspended) return;
+
         switch (e.Kind)
         {
             case GestureKind.Tap:
