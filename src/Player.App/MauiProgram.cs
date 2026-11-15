@@ -1,9 +1,13 @@
 using Player.App.Composition;
 using Player.App.Engine;
+using Player.App.Features.DefaultsSettings;
 using Player.App.Features.Explorer;
+using Player.App.Features.InterfaceSettings;
+using Player.App.Features.PlaybackSettings;
 using Player.App.Features.PlayerHud;
 using Player.App.Platforms.Android.Library;
 using Player.App.Platforms.Android.Thumbnails;
+using Player.App.Subtitles;
 using Player.App.Surface;
 using Player.App.Theming;
 using Player.Core.Contracts;
@@ -42,8 +46,12 @@ public static class MauiProgram
 		builder.Services.AddThumbnailCache();
 		builder.Services.AddTheming();
 		builder.Services.AddSingleton<IPlaybackCoordinator, PlaybackCoordinator>();
+		builder.Services.AddSubtitlesAudio();
 		builder.Services.AddExplorer();
 		builder.Services.AddPlayerHud();
+		builder.Services.AddPlaybackSettings();
+		builder.Services.AddGlobalDefaultsUi();
+		builder.Services.AddUiSettingsUi();
 
 		return builder.Build();
 	}
