@@ -21,6 +21,7 @@ public sealed partial class PlaybackCoordinator : IPlaybackCoordinator, IDisposa
     private readonly IPlaybackStateRecorder _recorder;
     private readonly IGlobalDefaultsStore _defaults;
     private readonly TimeProvider _time;
+    private readonly IVideoSurface? _videoSurface;
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
@@ -49,7 +50,8 @@ public sealed partial class PlaybackCoordinator : IPlaybackCoordinator, IDisposa
         IPlaybackStateStore stateStore,
         IPlaybackStateRecorder recorder,
         IGlobalDefaultsStore defaults,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IVideoSurface? videoSurface = null)
     {
         ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(stateStore);
@@ -62,6 +64,7 @@ public sealed partial class PlaybackCoordinator : IPlaybackCoordinator, IDisposa
         _recorder = recorder;
         _defaults = defaults;
         _time = timeProvider;
+        _videoSurface = videoSurface;
         _lifetimeToken = _lifetime.Token;
         _engine.SnapshotChanged += OnSnapshotChanged;
         _defaults.Changed += OnDefaultsChanged;
@@ -393,6 +396,16 @@ public sealed partial class PlaybackCoordinator : IPlaybackCoordinator, IDisposa
             var state = await SafeGetStateAsync(item.Id, token).ConfigureAwait(false);
             var defaults = await LoadDefaultsAsync(token).ConfigureAwait(false);
             var settings = PlaybackSettingsResolver.Resolve(state, defaults);
+            try
+            {
+                _videoSurface?.SetAspect(settings.Aspect);
+            }
+            catch (Exception)
+            {
+                // Core has no logging framework, and a surface failure (for example a surface that is not
+                // attached yet) must not fail the open: the item still plays with the surface's current mode.
+            }
+
             await _engine.OpenAsync(item, settings, startPaused: false, token).ConfigureAwait(false);
             SetCurrent(item, queue, index);
         }
