@@ -32,4 +32,17 @@ public sealed partial class SettingsHomeViewModel : ObservableObject
             // Navigation failures are ignored: the row simply does nothing.
         }
     }
+
+    [RelayCommand]
+    private async Task OpenTheme()
+    {
+        try
+        {
+            await Shell.Current.GoToAsync("settings-theme");
+        }
+        catch (Exception)
+        {
+            // Navigation failures are ignored: the row simply does nothing.
+        }
+    }
 }
