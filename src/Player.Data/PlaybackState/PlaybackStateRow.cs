@@ -1,6 +1,6 @@
 using SQLite;
 
-namespace Player.Data.PlaybackState;
+namespace Player.Data.PlaybackStateStore;
 
 /// <summary>One row of table playback_state. The table is created by <see cref="PlaybackStateMigration"/>.</summary>
 [Table("playback_state")]

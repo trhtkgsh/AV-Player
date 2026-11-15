@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Player.Core.Contracts;
 
-namespace Player.Data.PlaybackState;
+namespace Player.Data.PlaybackStateStore;
 
 public static class PlaybackStateServiceCollectionExtensions
 {

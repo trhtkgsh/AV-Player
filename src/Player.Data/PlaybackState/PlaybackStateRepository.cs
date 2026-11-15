@@ -3,7 +3,7 @@ using Player.Core.Contracts;
 using Player.Core.Models;
 using SQLite;
 
-namespace Player.Data.PlaybackState;
+namespace Player.Data.PlaybackStateStore;
 
 /// <summary>Per-file playback state in table playback_state. Never touches the settings table.</summary>
 public sealed class PlaybackStateRepository : IPlaybackStateStore
@@ -19,7 +19,7 @@ public sealed class PlaybackStateRepository : IPlaybackStateStore
         _db = db;
     }
 
-    public async Task<Player.Core.Models.PlaybackState?> GetAsync(MediaFileId id, CancellationToken ct)
+    public async Task<PlaybackState?> GetAsync(MediaFileId id, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var conn = await GetConnectionAsync(ct).ConfigureAwait(false);
@@ -34,13 +34,13 @@ public sealed class PlaybackStateRepository : IPlaybackStateStore
         return null;
     }
 
-    public async Task<IReadOnlyDictionary<MediaFileId, Player.Core.Models.PlaybackState>> GetManyAsync(
+    public async Task<IReadOnlyDictionary<MediaFileId, PlaybackState>> GetManyAsync(
         IReadOnlyCollection<MediaFileId> ids, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(ids);
         ct.ThrowIfCancellationRequested();
 
-        var result = new Dictionary<MediaFileId, Player.Core.Models.PlaybackState>();
+        var result = new Dictionary<MediaFileId, PlaybackState>();
         if (ids.Count == 0)
             return result;
 
@@ -62,7 +62,7 @@ public sealed class PlaybackStateRepository : IPlaybackStateStore
         return result;
     }
 
-    public async Task SaveAsync(Player.Core.Models.PlaybackState state, CancellationToken ct)
+    public async Task SaveAsync(PlaybackState state, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(state);
         ct.ThrowIfCancellationRequested();
@@ -88,13 +88,13 @@ public sealed class PlaybackStateRepository : IPlaybackStateStore
     }
 
     /// <summary>Returns null when the key cannot be parsed.</summary>
-    private static Player.Core.Models.PlaybackState? ToState(PlaybackStateRow row)
+    private static PlaybackState? ToState(PlaybackStateRow row)
     {
         if (!TryParseKey(row.FileKey, out var id))
             return null;
 
         var overrides = PlaybackStateOverrides.Parse(row.OverridesJson);
-        return new Player.Core.Models.PlaybackState(id)
+        return new PlaybackState(id)
         {
             PositionMs = row.PositionMs,
             DurationMs = row.DurationMs,

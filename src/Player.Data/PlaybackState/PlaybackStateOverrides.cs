@@ -2,10 +2,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Player.Core.Models;
 
-namespace Player.Data.PlaybackState;
+namespace Player.Data.PlaybackStateStore;
 
 /// <summary>
-/// The nullable per-file fields of <see cref="Player.Core.Models.PlaybackState"/>, stored together as
+/// The nullable per-file fields of <see cref="PlaybackState"/>, stored together as
 /// one JSON text. A null field is not written. New fields need no migration.
 /// </summary>
 public sealed class PlaybackStateOverrides
@@ -25,7 +25,7 @@ public sealed class PlaybackStateOverrides
         AudioDelayMs is null && SubtitleTrackId is null && SubtitleDelayMs is null &&
         ExternalSubtitleUri is null;
 
-    public static PlaybackStateOverrides From(Player.Core.Models.PlaybackState state) => new()
+    public static PlaybackStateOverrides From(PlaybackState state) => new()
     {
         Speed = state.Speed,
         Decoder = state.Decoder,
