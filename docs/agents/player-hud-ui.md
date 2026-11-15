@@ -71,6 +71,7 @@
 - Screen on: `PlayerScreenKeeper` keeps `DeviceDisplay.Current.KeepScreenOn` on while the engine is Playing and the picture is on screen (page active, or Picture-in-Picture). It is off when paused, ended, idle or failed, when the page is left, and when the app is in the background without Picture-in-Picture. Nothing set the flag before this task.
 - Double tap: a tap in the middle third (`FocusX` 1/3 up to 2/3) toggles play and pause. The left and right thirds skip as before; the direction rules, including Hebrew, are unchanged.
 - Bottom bar: row spacing 6 to 2, transport column spacing 20 to 12, transport icons 26/36 to 22/30, transport touch targets 44 (`HudIconButton.TouchHeight`), padding 8 to 4 top and bottom.
+- R7-21 (2026-11-15): the seek row is a fixed 32 units (slider and row `HeightRequest` 32), there is no spacing between the seek row and the transport row, and the padding is 2 top and bottom plus the bottom inset. The bar is about 80 units plus the inset.
 
 **Out of scope.** Touch recognition, surface rendering, engine code, settings pages, PiP implementation.
 

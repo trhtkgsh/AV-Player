@@ -76,7 +76,7 @@ public sealed partial class PlayerViewModel : ObservableObject
 
     // The bars and the OSD keep clear of the system bars and a camera cutout (see ApplyInsets).
     [ObservableProperty] private Thickness _topBarPadding = new(8, 6, 8, 6);
-    [ObservableProperty] private Thickness _bottomBarPadding = new(12, 4, 12, 4);
+    [ObservableProperty] private Thickness _bottomBarPadding = new(12, 2, 12, 2);
     [ObservableProperty] private Thickness _osdMargin = new(0, 96, 0, 0);
     [ObservableProperty] private Thickness _unlockMargin = new(16, 0, 16, 0);
 
@@ -210,7 +210,7 @@ public sealed partial class PlayerViewModel : ObservableObject
     private void ApplyInsets(EdgeInsets insets)
     {
         TopBarPadding = new Thickness(8 + insets.Left, 6 + insets.Top, 8 + insets.Right, 6);
-        BottomBarPadding = new Thickness(12 + insets.Left, 4, 12 + insets.Right, 4 + insets.Bottom);
+        BottomBarPadding = new Thickness(12 + insets.Left, 2, 12 + insets.Right, 2 + insets.Bottom);
         OsdMargin = new Thickness(insets.Left, 96, insets.Right, 0);
         UnlockMargin = new Thickness(16 + insets.Left, 0, 16 + insets.Right, 0);
     }
