@@ -193,11 +193,11 @@ internal sealed class VideoSurfaceController : IVideoSurface
     /// take no space inside the content any more: the padding would stay, an empty band above the
     /// navigation bar. The content is told directly, now and once more after the next layout.
     /// </summary>
-    private static void ClearBarPaddingOfContent(Android.Views.View decor)
+    private void ClearBarPaddingOfContent(Android.Views.View decor)
     {
         DispatchInsetsInsideBars(decor);
         if (decor.ViewTreeObserver is { IsAlive: true } observer)
-            observer.AddOnGlobalLayoutListener(new InsetsAfterLayout(decor));
+            observer.AddOnGlobalLayoutListener(new InsetsAfterLayout(this, decor));
     }
 
     private static void DispatchInsetsInsideBars(Android.Views.View decor)
@@ -214,7 +214,7 @@ internal sealed class VideoSurfaceController : IVideoSurface
         AndroidX.Core.View.ViewCompat.DispatchApplyWindowInsets(content, builder.Build());
     }
 
-    private sealed class InsetsAfterLayout(Android.Views.View decor)
+    private sealed class InsetsAfterLayout(VideoSurfaceController owner, Android.Views.View decor)
         : Java.Lang.Object, Android.Views.ViewTreeObserver.IOnGlobalLayoutListener
     {
         public void OnGlobalLayout()
@@ -222,7 +222,9 @@ internal sealed class VideoSurfaceController : IVideoSurface
             if (decor.ViewTreeObserver is { IsAlive: true } observer)
                 observer.RemoveOnGlobalLayoutListener(this);
 
-            DispatchInsetsInsideBars(decor);
+            // Not when player mode has started again in the meantime: the window is edge to edge then.
+            if (!owner._edgeToEdge)
+                DispatchInsetsInsideBars(decor);
         }
     }
 
@@ -244,7 +246,8 @@ internal sealed class VideoSurfaceController : IVideoSurface
                 insets.AppearanceLightStatusBars,
                 insets.AppearanceLightNavigationBars);
 
-            // Set on every call: a recreated activity starts with the theme's look again.
+            // Set on every call: the activity puts the theme's look back when it is created or resumed.
+            // WindowFocused applies player mode again after that.
             if (paintsBars)
             {
                 window.SetStatusBarColor(Android.Graphics.Color.Transparent);
@@ -321,6 +324,21 @@ internal sealed class VideoSurfaceController : IVideoSurface
 
             // A page for a file whose format is not known yet must not start with the previous file's shape.
             _layoutFormat = _binding.Format;
+        }
+
+        ApplyImmersive();
+    }
+
+    /// <summary>
+    /// The window of the attached container has the focus again (the app came back to the foreground,
+    /// or a dialog closed). The activity has put the theme's bar look back by then.
+    /// </summary>
+    internal void WindowFocused(VideoSurfaceContainer container)
+    {
+        lock (_sync)
+        {
+            if (!ReferenceEquals(_container, container))
+                return;
         }
 
         ApplyImmersive();
