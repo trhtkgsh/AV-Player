@@ -33,6 +33,8 @@ Changes after the freeze (orchestrator only, each one logged in PROGRESS.md):
   Picture-in-Picture counts as foreground; `IMediaSessionBridge.SessionToken` is not null after
   `ActivateAsync`. New pure logic in Core: `Player.Core.Logic.Session` (`SessionStateMapper`,
   `SessionPublishGate`, `MultiPressDetector`).
+- 2026-11-15, revision of Phase 4 (owner's test): `GlobalDefaults.BackgroundAudio` and
+  `.PictureInPictureOnLeave` default to true.
 
 Namespaces: `Player.Core.Models`, `Player.Core.Contracts`. All types are public. Nullable enabled.
 

@@ -32,6 +32,7 @@
 - Every seek names its kind: the engine calls `libvlc_media_player_set_time` itself with the "fast" argument that LibVLCSharp 3 does not pass (SPIKE finding 29).
 - A seek of a paused video with a picture on a surface: a fast seek at once, the exact seek 350 ms after the newest one, and the task completes when the picture is shown (LibVLC's debug messages, 4 s limit). `PlayAsync` sends the owed exact seek first. Cancelling the token ends only the wait (SPIKE finding 30).
 - `SetVideoEnabledAsync` is kept across files; the media service owns the switch.
+- Revision of Phase 4: the picture comes back (surface returned, video enabled again) by a restart of the input at the current position, never by selecting the track in mid-stream. A lost surface is released in order: track off, video output gone (bounded wait on the UI thread, an accepted exception to "never block the UI thread": Android keeps the surface valid only until the callback returns), then the views are detached. The engine thread reads `_hasSurface`, set by ordered commands. The rate is set for every input. Seek preview: 60 ms settle, exact seek after 250 ms (SPIKE findings 36 and 37).
 
 **Out of scope.** Views, gestures, zoom, aspect (video-surface). Queue, repeat, A-B (playback-coordinator). Service, session, audio focus. Any network input.
 

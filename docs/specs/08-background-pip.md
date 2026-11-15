@@ -33,7 +33,8 @@ Contracts: `IPlaybackServiceController`, `IPictureInPictureController`, `IMediaS
 - **Notification permission (requirement 6).** Asked by the defaults page each time "Keep playing sound in the background" is turned on; Android shows its dialog only while it may.
 - **Picture-in-Picture alone (requirements 3 and 7).** When only "Picture-in-Picture when leaving the player" is on, a playing video goes to the small window on leave and keeps playing: Picture-in-Picture wins over "pause on leave" as well.
 - **Closing the small window (requirement 8).** Android gives no "dismissed" callback and the order of its callbacks differs between versions; the controller treats a stop without a return to the full screen as a dismissal, except when the screen is off or the device is locked.
-- **Both settings off.** Leaving the app pauses playback, as before Phase 4. Both settings are off by default.
+- **Both settings on by default (changed on 2026-11-15 after the owner's test: he listed "playback stops when the app is left" as a fault).** A new installation and "Reset all to defaults" have "Keep playing sound in the background" and "Picture-in-Picture when leaving the player" on. A stored choice is kept.
+- **The picture after a return (owner's test of 2026-11-15).** When the surface comes back, the input is started again at the current position instead of selecting the video track again in mid-stream; the sound stops for a moment (SPIKE finding 36).
 
 ## Out of scope
 
