@@ -91,6 +91,8 @@ public sealed partial class PlayerViewModel : ObservableObject
         if (activation != _activation || _active) return; // deactivated, or another activation took over
 
         _active = true;
+        _gestures.Locked = IsLocked; // a locked page stays locked when it is activated again
+        if (IsLocked) IsHudVisible = false;
         ApplySettings(settings);
         _engine.SnapshotChanged += OnSnapshotChanged;
         _coordinator.Changed += OnCoordinatorChanged;
@@ -118,7 +120,8 @@ public sealed partial class PlayerViewModel : ObservableObject
         _coordinator.Changed -= OnCoordinatorChanged;
         _uiSettings.Changed -= OnUiSettingsChanged;
         _gestureHandler.Detach(); // the window stays immersive: a settings sheet may open on top
-        ReleaseLock(); // the lock never survives the page
+        CancelUnlockTimer(); // the lock itself stays: a locked screen stays locked in the background
+        IsUnlockVisible = false;
         CancelHideTimer();
         StopStatus();
     }
