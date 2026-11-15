@@ -177,8 +177,9 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
         {
             try
             {
-                // The notification is tied to the media session: the token must exist first.
-                await _session.ActivateAsync(ct).ConfigureAwait(false);
+                // The notification is tied to the media session: the token must exist first. Not for
+                // longer than a moment: the commands behind this one wait for it.
+                await _session.ActivateAsync(ct).WaitAsync(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -323,13 +324,9 @@ internal sealed class PlaybackServiceController : IPlaybackServiceController
                 Fire(ct => _engine.SetVideoEnabledAsync(true, ct));
                 return;
 
-            case PlayerStatus.Ended when !_lifecycle.IsForeground:
-                // Nothing more will play and nobody is looking: the service is not needed.
-                StopService();
-                AbandonFocus();
-                return;
-
             default:
+                // Also for a file that ended: the coordinator may start the next one (a list, a repeat)
+                // a moment later, and a service that was stopped cannot start again from the background.
                 if (!_lifecycle.IsForeground)
                     ArmIdleStop();
                 break;
