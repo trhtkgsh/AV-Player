@@ -19,6 +19,9 @@ public enum ExplorerViewMode { Folders, Flat }
 
 public enum ThemeId { DarkOled, DarkSlate, Light, HighContrast }
 
+/// <summary>The language of the user interface. System follows the language of the device.</summary>
+public enum AppLanguage { System, English, Hebrew }
+
 public enum ScreenSide { Left, Right }
 
 public enum GesturePhase { Began, Changed, Ended, Cancelled }

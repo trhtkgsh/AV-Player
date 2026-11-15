@@ -17,7 +17,13 @@ public sealed record UiSettings
     public SortField SortField { get; init; } = SortField.Name;
     public SortDirection SortDirection { get; init; } = SortDirection.Ascending;
     public int NewTagDays { get; init; } = 7;
+
+    /// <summary>Language of the user interface.</summary>
+    public AppLanguage Language { get; init; } = AppLanguage.System;
 }
+
+/// <summary>One text of the user interface in every supported language.</summary>
+public readonly record struct LocalizedText(string English, string Hebrew);
 
 public sealed record ThemeSettings
 {

@@ -41,6 +41,7 @@
                     Grid.Column="0"
                     IconData="M15.5 4 L7.5 12 L15.5 20 L17.2 18.3 L10.9 12 L17.2 5.7 Z"
                     IconSize="24"
+                    MirrorInRightToLeft="True"
                     IconColor="{DynamicResource ColorHudOnBackground}"
                     Command="{Binding CloseCommand}"
                     SemanticProperties.Description="Back" />
@@ -87,6 +88,7 @@
                 Padding="12,8"
                 RowDefinitions="Auto,Auto"
                 RowSpacing="6"
+                FlowDirection="LeftToRight"
                 BackgroundColor="{DynamicResource ColorHudBackground}">
 
                 <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">

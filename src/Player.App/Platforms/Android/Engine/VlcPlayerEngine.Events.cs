@@ -14,6 +14,8 @@ public sealed partial class VlcPlayerEngine
     private volatile VideoFormat? _format;
 
     private const int RevealAdvanceMs = 120;
+    private const int FormatChecksAfterStart = 12;   // about three seconds of position reports
+    private int _formatChecks;
     private const long FirstReportedTime = -1;
     private static readonly TimeSpan RevealTimeout = TimeSpan.FromSeconds(2);
     private volatile bool _revealingFrame;
@@ -40,14 +42,41 @@ public sealed partial class VlcPlayerEngine
         _window.SetWindowSize(widthPx, heightPx);
         _surfaceAttached = true;
         Trace($"surface ready {widthPx}x{heightPx}");
+        ReportSurfaceSize(widthPx, heightPx);
         _queue.Post(OnSurfaceChanged);
     }
 
     public void SurfaceSizeChanged(int widthPx, int heightPx)
     {
         EnsureMainThread();
-        if (_surfaceAttached)
-            _window.SetWindowSize(widthPx, heightPx);
+        if (!_surfaceAttached)
+            return;
+
+        _window.SetWindowSize(widthPx, heightPx);
+        ReportSurfaceSize(widthPx, heightPx);
+    }
+
+    private long _surfaceSize;   // width in the high half, height in the low half; written on the UI thread
+
+    private void ReportSurfaceSize(int widthPx, int heightPx)
+    {
+        Interlocked.Exchange(ref _surfaceSize, ((long)widthPx << 32) | (uint)heightPx);
+        _queue.Post(ApplySurfaceAspect);
+    }
+
+    /// <summary>
+    /// The surface view decides the shape of the picture (aspect mode, zoom). LibVLC would keep the
+    /// video's own proportions inside the surface and add bars, so it is told to fill the surface exactly.
+    /// </summary>
+    private void ApplySurfaceAspect()
+    {
+        var size = Interlocked.Read(ref _surfaceSize);
+        var width = (int)(size >> 32);
+        var height = (int)(size & 0xFFFFFFFF);
+        if (!Live || _status == PlayerStatus.Opening || width <= 0 || height <= 0)
+            return;
+
+        _player!.AspectRatio = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{width}:{height}");
     }
 
     public void SurfaceLost()
@@ -240,7 +269,22 @@ public sealed partial class VlcPlayerEngine
             var time = e.Time;
             PostEvent(() =>
             {
-                _clockStarted = true;
+                if (!_clockStarted)
+                {
+                    _clockStarted = true;
+                    _formatChecks = FormatChecksAfterStart;
+                }
+
+                // LibVLC raises no event when the decoder corrects the size of the video track
+                // (for example 1920x1088 becoming 1920x1080), so the format is read again while the
+                // first pictures are shown. Without this the surface kept the first size until the
+                // next pause or play.
+                if (_formatChecks > 0)
+                {
+                    _formatChecks--;
+                    RefreshFormat(_media?.Tracks ?? []);
+                }
+
                 if (_revealingFrame)
                 {
                     // The clock has moved past the resync point, so that picture is on screen.
@@ -330,6 +374,8 @@ public sealed partial class VlcPlayerEngine
         if (generation != _generation)
             return;
 
+        ApplySurfaceAspect();
+
         // An input that starts paused draws nothing (docs/SPIKE.md finding 12): a restart of a paused
         // file (decoder switch, subtitle style) would keep the old picture, or none, until Play.
         // LibVLC reports such an input as Playing and then Paused, so the clock tells the case apart.
@@ -358,15 +404,21 @@ public sealed partial class VlcPlayerEngine
         // Before the tracks are known LibVLC reports -1 for the subtitle, which would read as "off".
         int? subtitle = _status == PlayerStatus.Opening && subtitleTracks.Count == 0 ? null : Math.Max(-1, player.Spu);
         SetTracks(new TrackState(audioTracks, subtitleTracks, audio >= 0 ? audio : null, subtitle));
+        RefreshFormat(tracks);
+        Publish();
+    }
 
+    /// <summary>Reads the size of the video track. Raises FormatChanged only when it differs.</summary>
+    private void RefreshFormat(MediaTrack[] tracks)
+    {
         VideoFormat? format = null;
-        _hasVideo = false;
+        var hasVideo = false;
         foreach (var track in tracks)
         {
             if (track.TrackType != TrackType.Video)
                 continue;
 
-            _hasVideo = true;
+            hasVideo = true;
             var video = track.Data.Video;
             if (video.Width == 0 || video.Height == 0)
                 continue;
@@ -381,9 +433,13 @@ public sealed partial class VlcPlayerEngine
             break;
         }
 
+        _hasVideo = hasVideo;
         if (format is not null)
+        {
+            if (Diagnostics && format != _format)
+                Trace($"video format {format.Width}x{format.Height} sar {format.SarNumerator}:{format.SarDenominator}");
             SetFormat(format);
-        Publish();
+        }
     }
 
     /// <param name="external">The external subtitle file, when the list may contain its track.</param>
