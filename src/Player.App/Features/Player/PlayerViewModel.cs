@@ -103,6 +103,13 @@ public sealed partial class PlayerViewModel : ObservableObject
         var settings = await _uiSettings.GetAsync(CancellationToken.None);
         if (activation != _activation || _active) return; // deactivated, or another activation took over
 
+        if (_coordinator.Current is null)
+        {
+            // Playback was closed from outside while the page was not active: leave once, like the outside close.
+            _ = LeaveAfterOutsideCloseAsync();
+            return;
+        }
+
         _active = true;
         _gestures.Locked = IsLocked; // a locked page stays locked when it is activated again
         if (IsLocked) IsHudVisible = false;
@@ -510,10 +517,21 @@ public sealed partial class PlayerViewModel : ObservableObject
             ReleaseLock(); // playback is gone: a lock must not keep the page open
             _surface.SetImmersive(false);
             _surface.SetWindowBrightness(null);
-            if (Shell.Current is { } shell) await shell.GoToAsync("..");
+            if (Shell.Current is not { } shell)
+            {
+                _closing = false; // no shell to navigate with: allow a later attempt
+                return;
+            }
+
+            await shell.GoToAsync("..");
+        }
+        catch (OperationCanceledException)
+        {
+            _closing = false; // the page is leaving anyway; allow a later attempt
         }
         catch (Exception ex)
         {
+            _closing = false; // the leave failed: a later Back press must still work
             System.Diagnostics.Debug.WriteLine($"Leaving after outside close failed: {ex}");
         }
     }
