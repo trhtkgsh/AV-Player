@@ -33,3 +33,7 @@
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned path is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.
 
 **Report format.** `STATUS: done | blocked`, `BRANCH`, `FILES`, `BUILD`, `TESTS`, `DEVICE CHECKLIST` (items for the owner), `DEVIATIONS`, `QUESTIONS`.
+
+## Decisions
+
+- 2026-11-15 (P5-10): Player.App.FileOps namespace, folder Platforms/Android/FileOps. API 29+ tries the DISPLAY_NAME update first and asks consent only after a SecurityException (API 30+: createWriteRequest, API 29: the RecoverableSecurityException intent), then retries once. API 30+ trash is one createTrashRequest dialog. API 26-28: legacy WRITE_EXTERNAL_STORAGE (assembly attribute, max SDK 28, asked at run time); rename moves the file with File.RenameTo and then fixes _display_name and _data, because a row update alone does not rename the file there. Consent goes through the activity's ActivityResultRegistry (one-shot key, serialized, MainActivity unchanged); a destroyed activity or a cancelled token completes as Cancelled. Pure decisions are in FileOperationRules. Cached metadata is not moved on a changed MediaFileId (no contract for it); PruneAsync removes the old rows.
