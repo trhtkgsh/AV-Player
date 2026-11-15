@@ -50,5 +50,11 @@ public sealed class ExplorerSelection<TKey>
 
     public void Remove(TKey key) => _keys.Remove(key);
 
+    /// <summary>Drops every selected key that is not in <paramref name="shown"/>: the keys on screen are the only ones that stay selected.</summary>
+    public void KeepOnly(IReadOnlySet<TKey> shown)
+    {
+        _keys.RemoveWhere(key => !shown.Contains(key));
+    }
+
     public void Clear() => _keys.Clear();
 }

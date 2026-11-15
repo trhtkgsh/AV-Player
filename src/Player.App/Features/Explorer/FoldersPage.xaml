@@ -41,7 +41,8 @@
 
         <DataTemplate x:Key="ListItem" x:DataType="explorer:FolderRow">
 
-            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
+            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto"
+                  SemanticProperties.Description="{Binding AccessibleName}">
                 <!-- The tap and the long press come from the behavior: a MAUI tap recognizer would block the long press. -->
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
@@ -49,7 +50,7 @@
                         LongPressCommand="{Binding ViewModel.BeginSelectCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersPage}" />
                 </Grid.Behaviors>
 
-                <BoxView Grid.ColumnSpan="4" Color="{DynamicResource ColorAccent}" Opacity="0.2"
+                <BoxView Grid.RowSpan="2" Grid.ColumnSpan="4" Color="{DynamicResource ColorAccent}" Opacity="0.2"
                          InputTransparent="True" IsVisible="{Binding Selected}" />
                 <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Text="★" IsVisible="{Binding Favorite}"
                        TextColor="{DynamicResource ColorOnSurfaceMuted}" VerticalOptions="Center" />
@@ -71,7 +72,8 @@
         </DataTemplate>
 
         <DataTemplate x:Key="GridItem" x:DataType="explorer:FolderRow">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4" Padding="6">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4" Padding="6"
+                  SemanticProperties.Description="{Binding AccessibleName}">
                 <Grid.Behaviors>
                     <explorer:LongPressBehavior
                         TapCommand="{Binding ViewModel.OpenRowCommand, Source={x:Reference Page}, x:DataType=explorer:FoldersPage}"

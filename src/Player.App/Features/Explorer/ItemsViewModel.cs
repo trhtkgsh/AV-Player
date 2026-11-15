@@ -630,10 +630,8 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             }
         }
 
-        foreach (var id in _selection.Keys.Where(id => !_rows.ContainsKey(id)).ToList())
-        {
-            _selection.Remove(id);
-        }
+        // The selection keeps only the rows on screen: a search, a filter or a reload can hide the others.
+        _selection.KeepOnly(ordered.Select(row => row.Item.Id).ToHashSet());
 
         UpdateIsEmpty();
         UpdateSelection();
@@ -772,7 +770,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private void OnLanguageChanged(object? sender, EventArgs e)
     {
         OnPropertyChanged(nameof(LayoutText));
-        RebuildTitle();
+        UpdateSelection();
     }
 
     // All media has its own title; a folder shows its name, which is not translated.

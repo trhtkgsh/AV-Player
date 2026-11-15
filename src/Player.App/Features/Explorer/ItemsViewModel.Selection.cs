@@ -53,6 +53,12 @@ public sealed partial class ItemsViewModel
     [RelayCommand]
     private void ExitSelection()
     {
+        // Back and the bar's arrow leave the mode only when no operation runs.
+        if (IsOperationRunning)
+        {
+            return;
+        }
+
         _selection.Clear();
         UpdateSelection();
     }
@@ -80,7 +86,9 @@ public sealed partial class ItemsViewModel
     {
         foreach (var row in Rows)
         {
-            row.IsSelected = _selection.Contains(row.Item.Id);
+            var selected = _selection.Contains(row.Item.Id);
+            row.IsSelected = selected;
+            row.AccessibleName = selected ? _localizer.Format("Explorer.SelectedItem", row.Name) : null;
         }
 
         IsSelecting = _selection.IsActive;
@@ -92,36 +100,19 @@ public sealed partial class ItemsViewModel
     private List<MediaItem> SelectedItems() =>
         Rows.Where(row => _selection.Contains(row.Item.Id)).Select(row => row.Item).ToList();
 
-    [RelayCommand]
-    private async Task DeleteSelected()
+    // The guard covers the whole command: a second tap while the dialog, the picker or the operation is open does nothing.
+    private async Task RunActionAsync(Func<Shell, Task> action)
     {
         var shell = Shell.Current;
-        if (_fileOperationRunning || !IsSelecting || shell is null)
+        if (_actionBusy || _fileOperationRunning || shell is null)
         {
             return;
         }
 
-        var items = SelectedItems();
+        _actionBusy = true;
         try
         {
-            if (!await _operations.ConfirmDeleteAsync(shell, items.Count, 0))
-            {
-                return;
-            }
-
-            _fileOperationRunning = true;
-            IsOperationRunning = true;
-            OperationName = _localizer["Explorer.OperationDelete"];
-            try
-            {
-                var result = await _operations.TrashAsync(items, SessionToken);
-                await ApplyBatchResultAsync(result, "Explorer.SomeNotDeleted", () => AfterRemovalAsync(items));
-            }
-            finally
-            {
-                _fileOperationRunning = false;
-                IsOperationRunning = false;
-            }
+            await action(shell);
         }
         catch (OperationCanceledException)
         {
@@ -130,7 +121,47 @@ public sealed partial class ItemsViewModel
         {
             ReportError(ex);
         }
+        finally
+        {
+            _actionBusy = false;
+        }
     }
+
+    [RelayCommand]
+    private Task DeleteSelected() => RunActionAsync(async shell =>
+    {
+        if (!IsSelecting || SelectedItems().Count == 0)
+        {
+            return;
+        }
+
+        if (!await _operations.ConfirmDeleteAsync(shell, SelectedItems().Count, 0))
+        {
+            return;
+        }
+
+        // Taken again after the dialog: the operation uses the then-current selection.
+        var items = SelectedItems();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        _fileOperationRunning = true;
+        IsOperationRunning = true;
+        OperationName = _localizer["Explorer.OperationDelete"];
+        try
+        {
+            // The session token does not stop a delete: it runs to its result even when the page is left.
+            var result = await _operations.TrashAsync(items, CancellationToken.None);
+            await ApplyBatchResultAsync(result, "Explorer.SomeNotDeleted", () => AfterRemovalAsync(items));
+        }
+        finally
+        {
+            _fileOperationRunning = false;
+            IsOperationRunning = false;
+        }
+    });
 
     // The selection mode ends with the operation. Success runs onSuccess. Cancelled reloads only when some files were done.
     // Denied and Failed reload and show the message.
@@ -182,102 +213,80 @@ public sealed partial class ItemsViewModel
         _bucketId is null || target.BucketId == _bucketId ? LoadAsync() : Task.CompletedTask;
 
     [RelayCommand]
-    private async Task MoveSelected()
-    {
-        var shell = Shell.Current;
-        if (shell is not null && IsSelecting)
-        {
-            await TransferAsync(shell, SelectedItems(), move: true);
-        }
-    }
+    private Task MoveSelected() => RunActionAsync(shell => TransferAsync(shell, SelectedItems, move: true));
 
     [RelayCommand]
-    private async Task CopySelected()
-    {
-        var shell = Shell.Current;
-        if (shell is not null && IsSelecting)
-        {
-            await TransferAsync(shell, SelectedItems(), move: false);
-        }
-    }
+    private Task CopySelected() => RunActionAsync(shell => TransferAsync(shell, SelectedItems, move: false));
 
     [RelayCommand]
     private void CancelOperation() => _operationCts?.Cancel();
 
-    // Move and copy of the selection, or of one file from its ⋮ menu. The target is picked first. Then the list is covered
-    // while the operation runs. Move closes an open file first; copy can be cancelled.
-    private async Task TransferAsync(Shell shell, IReadOnlyList<MediaItem> items, bool move)
+    // Move and copy of the selection, or of one file from its ⋮ menu. The target is picked first; the items are taken
+    // again after the picker. Then the list is covered while the operation runs. Move closes an open file first and
+    // cannot be cancelled; copy has its own Cancel token and is not tied to the page.
+    private async Task TransferAsync(Shell shell, Func<List<MediaItem>> capture, bool move)
     {
-        if (_fileOperationRunning || items.Count == 0)
+        var items = capture();
+        if (items.Count == 0)
         {
             return;
         }
 
+        var target = await _operations.ChooseTargetAsync(shell, items, SessionToken);
+        if (target is null)
+        {
+            return;
+        }
+
+        var current = capture();
+        if (current.Count == 0)
+        {
+            return;
+        }
+
+        _fileOperationRunning = true;
+        _operationCts = new CancellationTokenSource();
+        var ct = move ? CancellationToken.None : _operationCts.Token;
+        IsOperationRunning = true;
+        CanCancelOperation = !move;
+        OperationName = _localizer[move ? "Explorer.OperationMove" : "Explorer.OperationCopy"];
         try
         {
-            var target = await _operations.ChooseTargetAsync(shell, items, SessionToken);
-            if (target is null)
-            {
-                return;
-            }
-
-            _fileOperationRunning = true;
-            _operationCts = CancellationTokenSource.CreateLinkedTokenSource(SessionToken);
-            var ct = _operationCts.Token;
-            IsOperationRunning = true;
-            CanCancelOperation = !move;
-            OperationName = _localizer[move ? "Explorer.OperationMove" : "Explorer.OperationCopy"];
-            try
-            {
-                var result = move
-                    ? await _operations.MoveAsync(items, target, ct)
-                    : await _operations.CopyAsync(items, target, ct);
-                await ApplyBatchResultAsync(
-                    result,
-                    move ? "Explorer.SomeNotMoved" : "Explorer.SomeNotCopied",
-                    () => move ? AfterRemovalAsync(items) : ReloadIfShownAsync(target));
-            }
-            finally
-            {
-                _operationCts.Dispose();
-                _operationCts = null;
-                _fileOperationRunning = false;
-                IsOperationRunning = false;
-                CanCancelOperation = false;
-            }
+            var result = move
+                ? await _operations.MoveAsync(current, target, ct)
+                : await _operations.CopyAsync(current, target, ct);
+            await ApplyBatchResultAsync(
+                result,
+                move ? "Explorer.SomeNotMoved" : "Explorer.SomeNotCopied",
+                () => move ? AfterMoveAsync(current) : ReloadIfShownAsync(target));
         }
-        catch (OperationCanceledException)
+        finally
         {
-        }
-        catch (Exception ex)
-        {
-            ReportError(ex);
+            _operationCts.Dispose();
+            _operationCts = null;
+            _fileOperationRunning = false;
+            IsOperationRunning = false;
+            CanCancelOperation = false;
         }
     }
 
+    // In the All files list a moved file still belongs to the list, so it reloads. In a folder it leaves the list in place.
+    private Task AfterMoveAsync(IReadOnlyList<MediaItem> items) =>
+        _bucketId is null ? LoadAsync() : AfterRemovalAsync(items);
+
     // Rename is offered for exactly one file. The mode ends first, then the normal rename prompt runs.
     [RelayCommand]
-    private async Task RenameSelected()
+    private Task RenameSelected() => RunActionAsync(async shell =>
     {
-        var shell = Shell.Current;
         var items = SelectedItems();
-        if (_fileOperationRunning || items.Count != 1 || !CanRename || shell is null)
+        if (!IsSelecting || items.Count != 1 || !CanRename)
         {
             return;
         }
 
         _selection.Clear();
         UpdateSelection();
-        try
-        {
-            await RenameFileAsync(shell, items[0]);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            ReportError(ex);
-        }
-    }
+        await RenameFileAsync(shell, items[0]);
+    });
 }
+

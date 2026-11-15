@@ -10,70 +10,47 @@ namespace Player.App.Features.Explorer;
 // The file options of the items page: rename and delete of one file, opened from its ⋮ button.
 public sealed partial class ItemsViewModel
 {
-    private bool _choosingFileOptions;
+    // True from the start of a ⋮ command, a selection command, a delete, move, copy or rename until it ends (prompts included).
+    // A second command meanwhile does nothing.
+    private bool _actionBusy;
 
     // True from the start of a rename or delete until its result is applied. Opening files is blocked meanwhile.
     private bool _fileOperationRunning;
 
     [RelayCommand]
-    private async Task OpenOptions(MediaRowViewModel row)
+    private Task OpenOptions(MediaRowViewModel row) => RunActionAsync(async shell =>
     {
-        if (_choosingFileOptions || _fileOperationRunning)
-        {
-            return;
-        }
+        var renameText = _localizer["Explorer.Rename"];
+        var deleteText = _localizer["Explorer.Delete"];
+        var moveText = _localizer["Explorer.Move"];
+        var copyText = _localizer["Explorer.Copy"];
+        var choice = await shell.DisplayActionSheetAsync(
+            row.Name,
+            _localizer["Common.Cancel"],
+            null,
+            renameText,
+            deleteText,
+            moveText,
+            copyText);
 
-        _choosingFileOptions = true;
-        try
+        if (choice == renameText)
         {
-            var shell = Shell.Current;
-            if (shell is null)
-            {
-                return;
-            }
+            await RenameFileAsync(shell, row.Item);
+        }
+        else if (choice == deleteText)
+        {
+            await DeleteFileAsync(shell, row.Item);
+        }
+        else if (choice == moveText)
+        {
+            await TransferAsync(shell, () => [row.Item], move: true);
+        }
+        else if (choice == copyText)
+        {
+            await TransferAsync(shell, () => [row.Item], move: false);
+        }
+    });
 
-            var renameText = _localizer["Explorer.Rename"];
-            var deleteText = _localizer["Explorer.Delete"];
-            var moveText = _localizer["Explorer.Move"];
-            var copyText = _localizer["Explorer.Copy"];
-            var choice = await shell.DisplayActionSheetAsync(
-                row.Name,
-                _localizer["Common.Cancel"],
-                null,
-                renameText,
-                deleteText,
-                moveText,
-                copyText);
-
-            if (choice == renameText)
-            {
-                await RenameFileAsync(shell, row.Item);
-            }
-            else if (choice == deleteText)
-            {
-                await DeleteFileAsync(shell, row.Item);
-            }
-            else if (choice == moveText)
-            {
-                await TransferAsync(shell, [row.Item], move: true);
-            }
-            else if (choice == copyText)
-            {
-                await TransferAsync(shell, [row.Item], move: false);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            ReportError(ex);
-        }
-        finally
-        {
-            _choosingFileOptions = false;
-        }
-    }
 
     // The prompt shows the base name only. A problem is shown in the prompt, which asks again with the typed text.
     private async Task RenameFileAsync(Shell shell, MediaItem item)
@@ -152,7 +129,8 @@ public sealed partial class ItemsViewModel
 
     private async Task DeleteFileAsync(Shell shell, MediaItem item)
     {
-        var ct = SessionToken;
+        // The session token does not stop a delete: it runs to its result even when the page is left.
+        var ct = CancellationToken.None;
         var question = _localizer.Format(
             SelectionOperations.DeleteWordingIsTrash ? "Explorer.TrashConfirm" : "Explorer.DeleteConfirm",
             item.DisplayName);
