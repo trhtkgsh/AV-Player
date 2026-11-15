@@ -41,6 +41,14 @@ public sealed class HudIconButton : ContentView
         propertyChanged: (bindable, _, newValue) =>
             ((HudIconButton)bindable)._icon.Fill = new SolidColorBrush(newValue as Color ?? Colors.White));
 
+    public static readonly BindableProperty MirrorInRightToLeftProperty = BindableProperty.Create(
+        nameof(MirrorInRightToLeft),
+        typeof(bool),
+        typeof(HudIconButton),
+        false,
+        propertyChanged: (bindable, _, newValue) =>
+            ((HudIconButton)bindable)._icon.FlowDirection = FlowDirectionFor((bool)newValue));
+
     public static readonly BindableProperty CommandProperty = BindableProperty.Create(
         nameof(Command),
         typeof(ICommand),
@@ -59,6 +67,7 @@ public sealed class HudIconButton : ContentView
             VerticalOptions = LayoutOptions.Center,
             InputTransparent = true,
             Fill = new SolidColorBrush(IconColor),
+            FlowDirection = FlowDirectionFor(MirrorInRightToLeft),
         };
 
         var grid = new Grid
@@ -100,6 +109,19 @@ public sealed class HudIconButton : ContentView
         get => (ICommand?)GetValue(CommandProperty);
         set => SetValue(CommandProperty, value);
     }
+
+    /// <summary>
+    /// False (default): the symbol is always drawn left to right, so transport controls are never mirrored.
+    /// True: the symbol follows the page direction (a back arrow points right on a right-to-left screen).
+    /// </summary>
+    public bool MirrorInRightToLeft
+    {
+        get => (bool)GetValue(MirrorInRightToLeftProperty);
+        set => SetValue(MirrorInRightToLeftProperty, value);
+    }
+
+    private static FlowDirection FlowDirectionFor(bool mirror) =>
+        mirror ? FlowDirection.MatchParent : FlowDirection.LeftToRight;
 
     private async void OnTapped(object? sender, TappedEventArgs e)
     {
