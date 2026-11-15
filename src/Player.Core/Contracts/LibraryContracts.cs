@@ -30,6 +30,19 @@ public interface IFileOperations
 {
     Task<FileOperationResult> RenameAsync(MediaItem item, string newDisplayName, CancellationToken ct);
     Task<FileOperationResult> TrashAsync(IReadOnlyList<MediaItem> items, CancellationToken ct);
+
+    /// <summary>
+    /// Moves the files into the folder. One consent dialog for the whole list. Files that could not be
+    /// moved stay where they are: the result is Failed with <see cref="FileOperationResult.CompletedCount"/>
+    /// telling how many were moved.
+    /// </summary>
+    Task<FileOperationResult> MoveAsync(IReadOnlyList<MediaItem> items, MediaFolder target, CancellationToken ct);
+
+    /// <summary>
+    /// Copies the files into the folder as new files. Cancelling stops after the file in work, whose
+    /// partial copy is removed.
+    /// </summary>
+    Task<FileOperationResult> CopyAsync(IReadOnlyList<MediaItem> items, MediaFolder target, CancellationToken ct);
 }
 
 /// <summary>Subtitle loading and the audio/subtitle track policy on top of the engine primitives.</summary>

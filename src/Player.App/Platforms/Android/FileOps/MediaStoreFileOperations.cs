@@ -12,18 +12,20 @@ using JavaSecurityException = Java.Lang.SecurityException;
 namespace Player.App.FileOps;
 
 /// <summary>Rename and trash through MediaStore. The write rules differ per API level, see docs/agents/file-ops.md.</summary>
-public sealed class MediaStoreFileOperations : IFileOperations
+public sealed partial class MediaStoreFileOperations : IFileOperations
 {
 	private const string Tag = "FileOps";
 
 	private readonly IPlaybackStateStore _stateStore;
 	private readonly ConsentLauncher _consent;
+	private readonly ISubtitleService _subtitles;
 	private readonly Context _context;
 
-	public MediaStoreFileOperations(IPlaybackStateStore stateStore, ConsentLauncher consent)
+	public MediaStoreFileOperations(IPlaybackStateStore stateStore, ConsentLauncher consent, ISubtitleService subtitles)
 	{
 		_stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
 		_consent = consent ?? throw new ArgumentNullException(nameof(consent));
+		_subtitles = subtitles ?? throw new ArgumentNullException(nameof(subtitles));
 		_context = global::Android.App.Application.Context;
 	}
 
@@ -111,10 +113,22 @@ public sealed class MediaStoreFileOperations : IFileOperations
 		try
 		{
 			var uris = items.Select(i => AndroidUri.Parse(i.ContentUri)!).ToList();
+			var subtitles = await CollectSubtitlesAsync(items, ct).ConfigureAwait(false);
 			FileOperationResult? failure;
 			if (OperatingSystem.IsAndroidVersionAtLeast(30))
 			{
-				var sender = await Task.Run(() => OperatingSystem.IsAndroidVersionAtLeast(30) ? TrashRequest(uris) : null!, ct).ConfigureAwait(false);
+				var withSubtitles = uris.Concat(subtitles.Values.SelectMany(s => s).Select(s => AndroidUri.Parse(s.ContentUri)!)).ToList();
+				IntentSender sender;
+				try
+				{
+					sender = await Task.Run(() => OperatingSystem.IsAndroidVersionAtLeast(30) ? TrashRequest(withSubtitles) : null!, ct).ConfigureAwait(false);
+				}
+				catch (Exception ex) when (ex is not OperationCanceledException && withSubtitles.Count > uris.Count)
+				{
+					Log.Warn(Tag, $"The trash request with subtitles was refused, trying without them: {ex.Message}");
+					sender = await Task.Run(() => OperatingSystem.IsAndroidVersionAtLeast(30) ? TrashRequest(uris) : null!, ct).ConfigureAwait(false);
+				}
+
 				failure = await AskAsync(sender, ct).ConfigureAwait(false);
 				if (failure is null)
 				{
@@ -141,14 +155,13 @@ public sealed class MediaStoreFileOperations : IFileOperations
 				failure = await RunLegacyAsync(() => DeleteLegacy(items, uris, removed), ct).ConfigureAwait(false);
 			}
 
-			if (failure is not null)
+			await DeleteStatesAsync(removed).ConfigureAwait(false);
+			if (!OperatingSystem.IsAndroidVersionAtLeast(30))
 			{
-				await DeleteStatesAsync(removed).ConfigureAwait(false);
-				return failure;
+				await DeleteSidecarsAsync(removed, subtitles).ConfigureAwait(false);
 			}
 
-			await DeleteStatesAsync(removed).ConfigureAwait(false);
-			return new FileOperationResult(FileOperationStatus.Success, null, null);
+			return failure ?? new FileOperationResult(FileOperationStatus.Success, null, null);
 		}
 		catch (Exception ex)
 		{

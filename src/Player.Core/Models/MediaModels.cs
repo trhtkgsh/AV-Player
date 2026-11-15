@@ -59,4 +59,8 @@ public sealed record TrackInfo(int Id, string Name, string? Language);
 /// <param name="Language">The language suffix of the file name, or null.</param>
 public sealed record SubtitleFile(string ContentUri, string DisplayName, string? Language);
 
-public sealed record FileOperationResult(FileOperationStatus Status, MediaItem? Updated, string? Error);
+public sealed record FileOperationResult(FileOperationStatus Status, MediaItem? Updated, string? Error)
+{
+    /// <summary>The number of files that were changed, also when the status is not Success.</summary>
+    public int CompletedCount { get; init; }
+}
