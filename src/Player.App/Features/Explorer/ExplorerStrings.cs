@@ -11,10 +11,10 @@ internal sealed class ExplorerStrings : IStringSource
     {
         ["Explorer.AddFavorite"] = new("Add to favorites", "הוסף למועדפים"),
         ["Explorer.AllMedia"] = new("All media", "כל המדיה"),
-        ["Explorer.FilesHere"] = new("Files in this folder ({0})", "קבצים בתיקייה הזו ({0})"),
+        ["Explorer.FilesHere"] = new("Files in this folder ({0})", "קבצים בתיקייה זו ({0})"),
         ["Explorer.FolderOptions"] = new("Folder options", "אפשרויות תיקייה"),
         ["Explorer.FolderSpeed"] = new("Default speed for this folder: {0}", "מהירות ברירת מחדל לתיקייה: {0}"),
-        ["Explorer.FolderSpeedGeneral"] = new("general default", "ברירת המחדל הכללית"),
+        ["Explorer.FolderSpeedGeneral"] = new("general default", "כללית"),
         ["Explorer.FolderSpeedUseGeneral"] = new("Use the general default", "השתמש בברירת המחדל הכללית"),
         ["Explorer.Items.Many"] = new("{0} items", "{0} פריטים"),
         ["Explorer.Items.One"] = new("1 item", "פריט אחד"),

@@ -42,6 +42,9 @@ public sealed partial class FoldersViewModel : ObservableObject
 
     private CancellationTokenSource? _session;
     private int _loadVersion;
+
+    // Counts the reads of the folder settings map, so an older read never replaces a newer one.
+    private int _folderSettingsVersion;
     private bool _flatSeen;
     private bool _openingSettings;
     private bool _choosingView;
@@ -479,8 +482,14 @@ public sealed partial class FoldersViewModel : ObservableObject
                 }
 
                 // The user came back to this page while the stored view is still Flat: show folders.
-                settings = settings with { ViewMode = ExplorerViewMode.Folders };
-                await _uiSettings.SaveAsync(settings, ct);
+                // Read the latest stored settings first: only the view mode changes.
+                var latest = await _uiSettings.GetAsync(ct);
+                if (!IsCurrentLoad(version))
+                {
+                    return;
+                }
+
+                await _uiSettings.SaveAsync(latest with { ViewMode = ExplorerViewMode.Folders }, ct);
                 if (!IsCurrentLoad(version))
                 {
                     return;
@@ -493,32 +502,41 @@ public sealed partial class FoldersViewModel : ObservableObject
                 return;
             }
 
-            if (!permitted)
+            IReadOnlyList<MediaFolder> folders = [];
+            IReadOnlyDictionary<long, FolderSettings>? folderSettings = null;
+            int? folderSettingsRead = null;
+            PermissionDenied = !permitted;
+            if (permitted)
             {
-                PermissionDenied = true;
-                _folders = [];
-                _loaded = true;
-                ApplySettings(settings);
-                return;
+                folders = await _library.GetFoldersAsync(settings.NewTagDays, ct);
+                if (!IsCurrentLoad(version))
+                {
+                    return;
+                }
+
+                folderSettingsRead = ++_folderSettingsVersion;
+                folderSettings = await _folderSettings.GetAllAsync(ct);
+                if (!IsCurrentLoad(version))
+                {
+                    return;
+                }
             }
 
-            PermissionDenied = false;
-            var folders = await _library.GetFoldersAsync(settings.NewTagDays, ct);
-            if (!IsCurrentLoad(version))
-            {
-                return;
-            }
-
-            var folderSettings = await _folderSettings.GetAllAsync(ct);
+            // Apply the newest stored settings: a change made while this load ran must not be lost.
+            var newest = await _uiSettings.GetAsync(ct);
             if (!IsCurrentLoad(version))
             {
                 return;
             }
 
             _folders = folders;
-            _folderSettingsByBucket = folderSettings;
+            if (folderSettings is not null && folderSettingsRead == _folderSettingsVersion)
+            {
+                _folderSettingsByBucket = folderSettings;
+            }
+
             _loaded = true;
-            ApplySettings(settings);
+            ApplySettings(newest);
         }
         catch (OperationCanceledException)
         {
@@ -616,9 +634,18 @@ public sealed partial class FoldersViewModel : ObservableObject
 
     private async Task ReloadFolderSettingsAsync()
     {
+        var version = ++_folderSettingsVersion;
         try
         {
-            _folderSettingsByBucket = await _folderSettings.GetAllAsync(SessionToken);
+            var folderSettings = await _folderSettings.GetAllAsync(SessionToken);
+
+            // An older read never replaces a newer one.
+            if (version != _folderSettingsVersion)
+            {
+                return;
+            }
+
+            _folderSettingsByBucket = folderSettings;
             RebuildRows();
         }
         catch (OperationCanceledException)

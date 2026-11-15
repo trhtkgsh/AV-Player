@@ -30,7 +30,7 @@
 
                 <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
                     <Label Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation"
-                           FontSize="{Binding NameFontSize, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}" />
+                           FontSize="{Binding NameFontSize}" />
                     <Label Text="{Binding InfoLine}" Style="{StaticResource LabelMuted}" />
                     <HorizontalStackLayout Spacing="8">
                         <Label Text="{loc:T Explorer.NewTag}" IsVisible="{Binding IsNew}"
@@ -51,11 +51,11 @@
                 </Grid.GestureRecognizers>
 
                 <Image Grid.Row="0" Source="{Binding ThumbnailPath}" HorizontalOptions="Fill"
-                       HeightRequest="{Binding ThumbnailHeight, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
+                       HeightRequest="{Binding ThumbnailHeight}"
                        Aspect="AspectFill" BackgroundColor="{DynamicResource ColorSurface}" />
                 <ProgressBar Grid.Row="1" Progress="{Binding Progress}" IsVisible="{Binding HasProgress}" />
                 <Label Grid.Row="2" Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation" Margin="6,0"
-                       FontSize="{Binding NameFontSize, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}" />
+                       FontSize="{Binding NameFontSize}" />
                 <Label Grid.Row="3" Text="{Binding InfoLine}" Style="{StaticResource LabelMuted}" Margin="6,0" />
                 <HorizontalStackLayout Grid.Row="4" Spacing="8" Margin="6,0">
                     <Label Text="{loc:T Explorer.NewTag}" IsVisible="{Binding IsNew}"

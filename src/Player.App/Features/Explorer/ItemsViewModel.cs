@@ -18,6 +18,9 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private const int PrefetchBefore = 2;
     private const int PrefetchAfter = 6;
     private const int InitialVisibleLast = 12;
+
+    // The rows of the first screen of a grid that get their thumbnails at once: six rows of tiles.
+    private const int GridVisibleRows = 6;
     private const int SearchDebounceMs = 150;
 
     // The file-name size at the font scale 1.0 (the Label style of the app).
@@ -49,6 +52,9 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private bool _settingsLoaded;
     private bool _choosingLayout;
 
+    // The height of a grid tile's thumbnail, set on every row. Kept here for the rows made later.
+    private double _thumbnailHeight;
+
     [ObservableProperty]
     private string _title = string.Empty;
 
@@ -64,10 +70,6 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     [ObservableProperty]
     private bool _isEmpty;
 
-    // The font size of the file names: the base size times the explorer font scale.
-    [ObservableProperty]
-    private double _nameFontSize = BaseNameFontSize;
-
     // True when the files are shown as a grid of tiles, false as a list of rows. Follows the stored layout.
     [ObservableProperty]
     private bool _isGrid;
@@ -75,11 +77,6 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     // The number of grid columns for the width of the list.
     [ObservableProperty]
     private int _columns = GridTiles.MinColumns;
-
-    // The height of a grid tile's thumbnail: the tile width in a 16:9 box.
-    [ObservableProperty]
-    private double _thumbnailHeight;
-
     [ObservableProperty]
     private string _searchText = string.Empty;
 
@@ -337,8 +334,20 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             return;
         }
 
-        Columns = GridTiles.Columns(width);
-        ThumbnailHeight = GridTiles.TileWidth(width, Columns) * 9 / 16;
+        var columns = GridTiles.Columns(width);
+        var changed = columns != Columns;
+        Columns = columns;
+        _thumbnailHeight = GridTiles.TileWidth(width, columns) * 9 / 16;
+        foreach (var row in Rows)
+        {
+            row.ThumbnailHeight = _thumbnailHeight;
+        }
+
+        // A new span shows other tiles: their thumbnails are requested now.
+        if (changed)
+        {
+            VisibleRangeChanged(0, InitialLastIndex());
+        }
     }
 
     partial void OnIsGridChanged(bool value) => OnPropertyChanged(nameof(LayoutText));
@@ -429,62 +438,65 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
                 return;
             }
 
-            _settings = settings;
-            _settingsLoaded = true;
-            SortField = _settings.SortField;
-            SortDirection = _settings.SortDirection;
-
             var permitted = await _library.EnsureReadPermissionAsync(ct);
             if (!IsCurrentLoad(version))
             {
                 return;
             }
 
-            if (!permitted)
-            {
-                PermissionDenied = true;
-                _items = [];
-                RebuildRows();
-                return;
-            }
-
-            PermissionDenied = false;
-            var items = await _library.GetItemsAsync(new MediaQuery(_bucketId, null), ct);
-            if (!IsCurrentLoad(version))
-            {
-                return;
-            }
-
-            var ids = items.Select(item => item.Id).ToList();
-            var states = await _stateStore.GetManyAsync(ids, ct);
-            if (!IsCurrentLoad(version))
-            {
-                return;
-            }
-
-            var cached = await _metadataService.GetCachedAsync(ids, ct);
-            if (!IsCurrentLoad(version))
-            {
-                return;
-            }
-
-            // The All files list leaves out the files of audio-only folders while the setting is off.
+            // The results are applied together, after the newest stored settings are read.
+            IReadOnlyList<MediaItem> items = [];
+            var states = new Dictionary<MediaFileId, PlaybackState>();
+            var metadata = new Dictionary<MediaFileId, MediaMetadata>();
             var audioOnly = new HashSet<long>();
-            if (_bucketId is null)
+            PermissionDenied = !permitted;
+            if (permitted)
             {
-                var folders = await _library.GetFoldersAsync(settings.NewTagDays, ct);
+                items = await _library.GetItemsAsync(new MediaQuery(_bucketId, null), ct);
                 if (!IsCurrentLoad(version))
                 {
                     return;
                 }
 
-                audioOnly.UnionWith(folders.Where(f => f.AudioOnly).Select(f => f.BucketId));
+                var ids = items.Select(item => item.Id).ToList();
+                states = new Dictionary<MediaFileId, PlaybackState>(await _stateStore.GetManyAsync(ids, ct));
+                if (!IsCurrentLoad(version))
+                {
+                    return;
+                }
+
+                metadata = new Dictionary<MediaFileId, MediaMetadata>(await _metadataService.GetCachedAsync(ids, ct));
+                if (!IsCurrentLoad(version))
+                {
+                    return;
+                }
+
+                // The All files list leaves out the files of audio-only folders while the setting is off.
+                if (_bucketId is null && !settings.IncludeAudioOnlyFolders)
+                {
+                    audioOnly = await ReadAudioOnlyBucketsAsync(settings.NewTagDays, ct);
+                    if (!IsCurrentLoad(version))
+                    {
+                        return;
+                    }
+                }
             }
 
+            // Apply the newest stored settings: a change made while this load ran must not be lost.
+            var newest = await _uiSettings.GetAsync(ct);
+            if (!IsCurrentLoad(version))
+            {
+                return;
+            }
+
+            _settings = newest;
+            _settingsLoaded = true;
+            SortField = newest.SortField;
+            SortDirection = newest.SortDirection;
             _items = items;
             _audioOnlyBuckets = audioOnly;
-            _states = new Dictionary<MediaFileId, PlaybackState>(states);
-            _metadata = new Dictionary<MediaFileId, MediaMetadata>(cached);
+            _states = states;
+            _metadata = metadata;
             RebuildRows();
         }
         catch (OperationCanceledException)
@@ -509,9 +521,27 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         }
     }
 
+    // The buckets of the audio-only folders. A failed query leaves every folder shown.
+    private async Task<HashSet<long>> ReadAudioOnlyBucketsAsync(int newTagDays, CancellationToken ct)
+    {
+        try
+        {
+            var folders = await _library.GetFoldersAsync(newTagDays, ct);
+            return folders.Where(f => f.AudioOnly).Select(f => f.BucketId).ToHashSet();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(ex);
+            return new HashSet<long>();
+        }
+    }
+
     private void RebuildRows()
     {
-        NameFontSize = BaseNameFontSize * _settings.ExplorerFontScale;
         IsGrid = _settings.Layout == ExplorerLayout.Grid;
 
         var previous = _rows;
@@ -528,26 +558,58 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             : _items.Where(item => !_audioOnlyBuckets.Contains(item.BucketId)).ToList();
 
         var ordered = SearchFilter.Apply(
-            MediaSorter.Sort(shown, SortField, SortDirection, _metadata),
-            SearchText);
+                MediaSorter.Sort(shown, SortField, SortDirection, _metadata),
+                SearchText)
+            .Select(item => _rows[item.Id])
+            .ToList();
 
-        Rows.Clear();
-        foreach (var item in ordered)
+        // The rows that stay are updated in place. Only a change of their set or order replaces the Rows.
+        foreach (var row in ordered)
         {
-            var row = _rows[item.Id];
             ApplyRow(row);
-            Rows.Add(row);
+        }
+
+        if (!SameOrder(ordered))
+        {
+            Rows.Clear();
+            foreach (var row in ordered)
+            {
+                Rows.Add(row);
+            }
         }
 
         UpdateIsEmpty();
-        VisibleRangeChanged(0, InitialVisibleLast);
+        VisibleRangeChanged(0, InitialLastIndex());
     }
+
+    private bool SameOrder(IReadOnlyList<MediaRowViewModel> rows)
+    {
+        if (Rows.Count != rows.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            if (!ReferenceEquals(Rows[i], rows[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private int InitialLastIndex() =>
+        IsGrid ? Math.Max(InitialVisibleLast, Columns * GridVisibleRows - 1) : InitialVisibleLast;
 
     private void ApplyRow(MediaRowViewModel row)
     {
         _metadata.TryGetValue(row.Item.Id, out var metadata);
         _states.TryGetValue(row.Item.Id, out var state);
         row.Apply(metadata, state, _settings, _timeProvider.GetUtcNow().ToUnixTimeSeconds(), TimeZoneInfo.Local);
+        row.NameFontSize = BaseNameFontSize * _settings.ExplorerFontScale;
+        row.ThumbnailHeight = _thumbnailHeight;
     }
 
     private async Task RequestMetadataAsync(MediaItem item, CancellationTokenSource request)
@@ -625,10 +687,26 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
         MainThread.BeginInvokeOnMainThread(() =>
         {
             // A callback queued before Deactivate does nothing.
-            if (_session is not null)
+            if (_session is null)
             {
-                ApplySettings(settings);
+                return;
             }
+
+            // The echo of a change this page made and applied is skipped: no second rebuild.
+            if (settings == _settings)
+            {
+                return;
+            }
+
+            // Turning the audio-only filter off needs the audio-only folders: the load reads them.
+            if (_bucketId is null && _settings.IncludeAudioOnlyFolders && !settings.IncludeAudioOnlyFolders)
+            {
+                _settings = settings;
+                _ = LoadAsync();
+                return;
+            }
+
+            ApplySettings(settings);
         });
 
     private void OnLanguageChanged(object? sender, EventArgs e)

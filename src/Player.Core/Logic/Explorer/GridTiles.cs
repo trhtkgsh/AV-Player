@@ -9,12 +9,15 @@ public static class GridTiles
     /// <summary>The fewest columns: two in portrait.</summary>
     public const int MinColumns = 2;
 
+    /// <summary>The most columns: four in landscape.</summary>
+    public const int MaxColumns = 4;
+
     /// <summary>The space between two tiles of a row and between two rows.</summary>
     public const double Spacing = 8;
 
-    /// <summary>The number of columns for a page of the given width: width / 180 rounded down, at least 2.</summary>
+    /// <summary>The number of columns for a page of the given width: width / 180 rounded down, from 2 to 4.</summary>
     public static int Columns(double width) =>
-        Math.Max(MinColumns, (int)Math.Floor(width / MinTileWidth));
+        Math.Clamp((int)(width / MinTileWidth), MinColumns, MaxColumns);
 
     /// <summary>The width of one tile when the given number of columns shares the width and the spacing.</summary>
     public static double TileWidth(double width, int columns) =>
