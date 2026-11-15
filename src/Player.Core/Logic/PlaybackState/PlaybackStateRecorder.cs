@@ -12,6 +12,9 @@ namespace Player.Core.Logic.StateRecording;
 /// Every store call (load or save) is a work item chained on one task, so loads and saves never
 /// overlap and reach the store in the order they were triggered. Work items read the state
 /// when they run, so a save always writes the newest state and is skipped when nothing changed.
+/// The lifecycle handlers (Backgrounded, Stopping) only queue the write and return, so a caller
+/// that needs the write finished must await <see cref="FlushAsync"/>.
+/// Saves queued before <see cref="Dispose"/> still run.
 /// </summary>
 public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
 {
@@ -23,7 +26,8 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
     private readonly TimeProvider _time;
 
     private readonly object _gate = new();
-    private readonly HashSet<Track> _unsaved = []; // untracked files whose last save failed
+    // Files with a save queued, running, or failed and awaiting retry; bounded by outstanding work.
+    private readonly HashSet<Track> _live = [];
     private Task _tail = Task.CompletedTask;
     private Track? _track;
     private ITimer? _timer;
@@ -103,7 +107,7 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
             _lifecycle.Backgrounded -= OnLifecycle;
             _lifecycle.Stopping -= OnLifecycle;
             CancelTimer();
-            _unsaved.Clear();
+            _live.Clear();
         }
     }
 
@@ -190,6 +194,13 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
         _track = null;
         if (id is { } newId)
         {
+            // The retries queued above run before the new track's load. If one of them fails
+            // again it must never be retried later: it would overwrite the newer state.
+            foreach (var track in _live)
+            {
+                track.Superseded |= track.Id == newId;
+            }
+
             _track = new Track(newId);
             EnqueueLoad(_track);
         }
@@ -258,13 +269,24 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
 
     private void RetryUnsaved()
     {
-        foreach (var track in _unsaved)
+        foreach (var track in _live.ToArray())
         {
-            EnqueueSave(track);
+            if (!track.Superseded && !ReferenceEquals(track, _track))
+            {
+                EnqueueSave(track);
+            }
         }
     }
 
-    private void EnqueueSave(Track track) => Enqueue(() => SaveAsync(track));
+    private void EnqueueSave(Track track)
+    {
+        if (track.NeedsSave)
+        {
+            track.SaveQueued = true;
+            _live.Add(track);
+            Enqueue(() => SaveAsync(track));
+        }
+    }
 
     private void StartTimerIfNone()
     {
@@ -389,15 +411,17 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
         long version;
         lock (_gate)
         {
+            track.SaveQueued = false;
             if (!track.IsDirty)
             {
-                _unsaved.Remove(track);
+                Release(track);
                 return;
             }
 
             snapshot = track.State with { LastPlayedUtc = _time.GetUtcNow().ToUnixTimeSeconds() };
             track.State = snapshot;
             version = track.Version;
+            track.InFlightVersion = version;
         }
 
         var saved = false;
@@ -413,19 +437,25 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
 
         lock (_gate)
         {
+            track.InFlightVersion = 0;
             if (saved)
             {
                 track.SavedVersion = Math.Max(track.SavedVersion, version);
             }
 
-            if (track.IsDirty && !ReferenceEquals(track, _track) && !_disposed)
-            {
-                _unsaved.Add(track); // nobody else will trigger a retry for an untracked file
-            }
-            else
-            {
-                _unsaved.Remove(track);
-            }
+            Release(track);
+        }
+    }
+
+    // Callers hold _gate. Stops tracking a file once nothing more can be written for it. An
+    // untracked file with a failed save stays, to be retried, unless a newer track for the same
+    // id exists: the stale state must never be written over it.
+    private void Release(Track track)
+    {
+        var retry = !_disposed && !track.Superseded && track.IsDirty && !ReferenceEquals(track, _track);
+        if (!track.SaveQueued && !retry)
+        {
+            _live.Remove(track);
         }
     }
 
@@ -445,5 +475,13 @@ public sealed class PlaybackStateRecorder : IPlaybackStateRecorder, IDisposable
         public long Version { get; set; }
         public long SavedVersion { get; set; }
         public bool IsDirty => Version != SavedVersion;
+
+        public bool SaveQueued { get; set; }
+        public long InFlightVersion { get; set; } // 0 when no write is running
+        public bool Superseded { get; set; } // a newer track exists for the same id
+
+        // A queued save writes the newest state when it runs, so one is enough; a version that
+        // is already being written needs no second save. A loading track is saved after its load.
+        public bool NeedsSave => !SaveQueued && (Loading || Version > Math.Max(SavedVersion, InFlightVersion));
     }
 }
