@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -6,6 +7,7 @@ using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Devices;
 using Player.Core.Contracts;
+using Player.Core.Logic.Overlay;
 using Player.Core.Models;
 
 namespace Player.App.Features.PlayerHud;
@@ -39,9 +41,15 @@ public sealed partial class PlayerViewModel : ObservableObject
     private bool _closing;
     private bool _errorHandled;
     private double _enginePositionMs;
+    private long _engineDurationMs;
+    private double _screenWidth;
+    private PlaybackOverlaySettings _overlay = new();
+    private string? _overlayClock;
+    private int? _overlayBattery;
     private CancellationTokenSource? _hideCts;
     private CancellationTokenSource? _statusCts;
     private CancellationTokenSource? _unlockCts;
+    private CancellationTokenSource? _overlayClockCts;
 
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private double _positionMs;
@@ -64,6 +72,19 @@ public sealed partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private Thickness _bottomBarPadding = new(12, 8, 12, 8);
     [ObservableProperty] private Thickness _osdMargin = new(0, 96, 0, 0);
     [ObservableProperty] private Thickness _unlockMargin = new(16, 0, 16, 0);
+
+    // The quiet display (spec 12), shown only while the controls are hidden. Its properties are set only while it is shown.
+    [ObservableProperty] private bool _isOverlayVisible;
+    [ObservableProperty] private bool _progressLineEnabled = true;
+    [ObservableProperty] private LayoutOptions _progressLineVertical = LayoutOptions.End;
+    [ObservableProperty] private double _progressFillWidth;
+    [ObservableProperty] private string _overlayText = "";
+    [ObservableProperty] private bool _overlayTextVisible;
+    [ObservableProperty] private LayoutOptions _overlayVertical = LayoutOptions.Start;
+    [ObservableProperty] private LayoutOptions _overlayHorizontal = LayoutOptions.End;
+    [ObservableProperty] private Thickness _overlayMargin;
+    [ObservableProperty] private double _overlayFontSize = 12;
+    [ObservableProperty] private Microsoft.Maui.Graphics.Color _overlayColor = Microsoft.Maui.Graphics.Colors.White;
 
     /// <summary>The on-screen indicator of gesture values.</summary>
     public OsdViewModel Osd { get; }
@@ -119,6 +140,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _uiSettings.Changed += OnUiSettingsChanged;
         _pip.Changed += OnPipChanged;
         _gestureHandler.Attach();
+        Osd.PropertyChanged += OnOsdPropertyChanged;
         _surface.SetImmersive(true);
         _surface.SetSystemBarsVisible(IsHudVisible && !_pip.IsActive); // the bars show exactly while the controls show
         _surface.Changed += OnSurfaceChanged;
@@ -136,6 +158,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         }
 
         RestartHideTimer();
+        UpdateOverlayVisibility();
     }
 
     /// <summary>Called when the page disappears. Unsubscribes and stops both timers. Safe to call more than once.</summary>
@@ -148,6 +171,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         _uiSettings.Changed -= OnUiSettingsChanged;
         _pip.Changed -= OnPipChanged;
         _surface.Changed -= OnSurfaceChanged;
+        Osd.PropertyChanged -= OnOsdPropertyChanged;
         _gestureHandler.Detach(); // the window stays immersive: a settings sheet may open on top
         CancelUnlockTimer(); // the lock itself stays: a locked screen stays locked in the background
         IsUnlockVisible = false;
@@ -160,7 +184,9 @@ public sealed partial class PlayerViewModel : ObservableObject
             _surface.SetSystemBarsVisible(false);
         }
         StopStatus();
+        UpdateOverlayVisibility(); // the page is not active: the display goes
     }
+
 
     /// <summary>
     /// Keeps the bars and the OSD clear of the system bars and a camera cutout. The bars sit inside the insets;
@@ -187,12 +213,14 @@ public sealed partial class PlayerViewModel : ObservableObject
     {
         // The system bars follow the controls: visible exactly while the controls are visible, never in Picture-in-Picture.
         _surface.SetSystemBarsVisible(value && !_pipActive);
+        UpdateOverlayVisibility();
     }
 
     partial void OnPositionMsChanged(double value)
     {
         // Only a drag shows the slider value. Otherwise show the engine position, so a clamped slider write-back is ignored.
         PositionText = TimeFormatter.Format((long)(_dragging ? value : _enginePositionMs));
+        RefreshDurationText();
     }
 
     partial void OnIsPlayingChanged(bool value)
@@ -492,6 +520,7 @@ public sealed partial class PlayerViewModel : ObservableObject
         {
             if (!_active) return;
             RefreshTitle();
+            UpdateOverlayVisibility();
             // Playback closed from outside (the notification, or the Picture-in-Picture window): leave the page.
             if (_coordinator.Current is null) _ = LeaveAfterOutsideCloseAsync();
         });
@@ -523,6 +552,7 @@ public sealed partial class PlayerViewModel : ObservableObject
 
         IsHudVisible = false;
         _surface.SetSystemBarsVisible(false);
+        UpdateOverlayVisibility();
     }
 
     /// <summary>
@@ -562,13 +592,15 @@ public sealed partial class PlayerViewModel : ObservableObject
         IsPlaying = snapshot.Status == PlayerStatus.Playing;
         IsOpening = snapshot.Status == PlayerStatus.Opening;
         DurationMs = Math.Max(1d, snapshot.DurationMs);
-        DurationText = TimeFormatter.Format(snapshot.DurationMs);
+        _engineDurationMs = snapshot.DurationMs;
         _enginePositionMs = snapshot.PositionMs;
         if (!_dragging)
         {
             PositionMs = _enginePositionMs;
             PositionText = TimeFormatter.Format((long)_enginePositionMs);
         }
+        RefreshDurationText();
+        if (IsOverlayVisible) RefreshOverlay();
 
         DecoderText = snapshot.ActualDecoder switch
         {
@@ -592,7 +624,132 @@ public sealed partial class PlayerViewModel : ObservableObject
         _settings = settings;
         ShowStatus = settings.ShowClock || settings.ShowBattery;
         UpdateStatusState();
+        ApplyOverlaySettings(settings.Overlay);
     }
+
+    /// <summary>
+    /// The seek row: the elapsed time is on the left (PositionText); the right shows the remaining time and the total,
+    /// as <c>-32:30 / 45:00</c>. While the duration is unknown it shows the total only, as before.
+    /// </summary>
+    private void RefreshDurationText()
+    {
+        if (_engineDurationMs <= 0)
+        {
+            DurationText = TimeFormatter.Format(_engineDurationMs);
+            return;
+        }
+
+        long position = (long)(_dragging ? PositionMs : _enginePositionMs);
+        DurationText = PlaybackOverlayText.FormatRemaining(position, _engineDurationMs)
+            + " / " + TimeFormatter.Format(_engineDurationMs);
+    }
+
+    /// <summary>Applies the quiet display settings at once, also while the page is open.</summary>
+    private void ApplyOverlaySettings(PlaybackOverlaySettings overlay)
+    {
+        _overlay = overlay;
+        ProgressLineEnabled = overlay.ProgressLine;
+        ProgressLineVertical = overlay.ProgressLineEdge == OverlayEdge.Top ? LayoutOptions.Start : LayoutOptions.End;
+        (OverlayVertical, OverlayHorizontal) = overlay.Corner switch
+        {
+            OverlayCorner.TopLeft => (LayoutOptions.Start, LayoutOptions.Start),
+            OverlayCorner.BottomLeft => (LayoutOptions.End, LayoutOptions.Start),
+            OverlayCorner.BottomRight => (LayoutOptions.End, LayoutOptions.End),
+            _ => (LayoutOptions.Start, LayoutOptions.End),
+        };
+        OverlayMargin = new Thickness(Math.Clamp(overlay.MarginDp, PlaybackOverlaySettings.MinMarginDp, PlaybackOverlaySettings.MaxMarginDp));
+        OverlayFontSize = Math.Clamp(overlay.FontSize, PlaybackOverlaySettings.MinFontSize, PlaybackOverlaySettings.MaxFontSize);
+        OverlayColor = Microsoft.Maui.Graphics.Color.FromUint(overlay.ColorArgb);
+        if (IsOverlayVisible) RefreshOverlay();
+    }
+
+    /// <summary>The width of the screen, for the progress line. Called by the page when its size changes.</summary>
+    public void SetScreenWidth(double width)
+    {
+        if (width <= 0 || width == _screenWidth) return;
+        _screenWidth = width;
+        if (IsOverlayVisible) RefreshOverlay();
+    }
+
+    /// <summary>
+    /// Shows the quiet display when a file is open, the controls are hidden, Picture-in-Picture is off and no gesture
+    /// indicator is on. Starts the one-minute clock refresh only while it is shown.
+    /// </summary>
+    private void UpdateOverlayVisibility()
+    {
+        bool show = _active
+            && _coordinator.Current is not null
+            && !IsHudVisible
+            && !_pipActive
+            && !Osd.IsVisible;
+        if (show == IsOverlayVisible) return;
+
+        IsOverlayVisible = show;
+        if (show)
+        {
+            ReadOverlayClockAndBattery();
+            RefreshOverlay();
+            StartOverlayClock();
+        }
+        else
+        {
+            StopOverlayClock();
+        }
+    }
+
+    private void OnOsdPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OsdViewModel.IsVisible)) UpdateOverlayVisibility();
+    }
+
+    /// <summary>Recomputes the progress line and the text of the display. Called only while the display is shown.</summary>
+    private void RefreshOverlay()
+    {
+        long position = (long)_enginePositionMs;
+        ProgressFillWidth = _screenWidth * PlaybackOverlayText.Progress(position, _engineDurationMs);
+        OverlayText = PlaybackOverlayText.FormatLine(_overlay, position, _engineDurationMs, _overlayClock, _overlayBattery);
+        OverlayTextVisible = OverlayText.Length > 0;
+    }
+
+    private void ReadOverlayClockAndBattery()
+    {
+        // The same clock as the status line of the controls.
+        _overlayClock = DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture);
+        _overlayBattery = ReadBatteryPercent();
+    }
+
+    private void StartOverlayClock()
+    {
+        StopOverlayClock();
+        var cts = new CancellationTokenSource();
+        _overlayClockCts = cts;
+        _ = RunOverlayClockAsync(cts.Token);
+    }
+
+    private void StopOverlayClock()
+    {
+        _overlayClockCts?.Cancel();
+        _overlayClockCts?.Dispose();
+        _overlayClockCts = null;
+    }
+
+    private async Task RunOverlayClockAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                ReadOverlayClockAndBattery();
+                RefreshOverlay();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Hidden or deactivated.
+        }
+    }
+
 
     private void RefreshTitle()
     {

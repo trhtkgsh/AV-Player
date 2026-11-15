@@ -57,6 +57,14 @@
 - A Picture-in-Picture button stands between Aspect and the menu button, for videos, where the device supports it. While the small window is shown, no control, indicator or unlock button is drawn and gestures are ignored.
 - The page leaves itself once when the coordinator has no current item (playback was closed from the notification or with the small window), also when that happened while the page was not active. `Deactivate` never pauses, stops or closes playback.
 
+**Decisions made in spec 12 (2026-11-15, owner request; they win over the text above where they differ).**
+- The quiet display is visible exactly while a file is open, the controls are hidden, Picture-in-Picture is off, the page is active and no gesture indicator (`Osd.IsVisible`) is on. `PlayerViewModel.UpdateOverlayVisibility` decides it; it runs on every change of those inputs. Nothing is computed while it is hidden.
+- Its container is a Grid in the page's root Grid, after the gesture indicator and before the unlock button. It has `InputTransparent` and `SafeAreaEdges="None"` and no padding, so it spans the whole window and never takes touches. The page and root Grid already use `SafeAreaEdges="None"`, so the corner is the real screen corner; the HUD's inset paddings are not applied to it.
+- The progress line is a 2-unit `BoxView` whose width is the screen width times `PlaybackOverlayText.Progress`. The page reports its width on `SizeChanged`. The fill uses `ColorProgress` through `DynamicResource`.
+- The text line is one `Label` in the corner `Overlay.Corner`, margin `Overlay.MarginDp` on all sides, size and color from `Overlay`, with a dark shadow. Its text is `PlaybackOverlayText.FormatLine`.
+- The clock and battery are read when the display appears and then once a minute by a timer that runs only while the display is shown. The clock uses the same `HH:mm` source as the status line; the battery uses the same `ReadBatteryPercent` as the status line.
+- The seek row's right label is `-remaining / total` (`PlaybackOverlayText.FormatRemaining`). While the duration is unknown it shows `0:00` as before.
+
 **Out of scope.** Touch recognition, surface rendering, engine code, settings pages, PiP implementation.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned path is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.
