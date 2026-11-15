@@ -3,7 +3,7 @@ using Player.Core.Contracts;
 using Player.Core.Models;
 using Player.Data.Database;
 
-namespace Player.Data.GlobalDefaultsStore;
+namespace Player.Data.GlobalDefaultsStorage;
 
 public sealed class GlobalDefaultsStore : IGlobalDefaultsStore
 {
@@ -16,7 +16,7 @@ public sealed class GlobalDefaultsStore : IGlobalDefaultsStore
 
 	private readonly SettingsRepository _settings;
 	private readonly SemaphoreSlim _gate = new(1, 1);
-	private GlobalDefaults? _cache;
+	private volatile GlobalDefaults? _cache;
 
 	public GlobalDefaultsStore(SettingsRepository settings)
 	{
@@ -62,7 +62,7 @@ public sealed class GlobalDefaultsStore : IGlobalDefaultsStore
 		try
 		{
 			normalized = Normalize(value);
-			var json = JsonSerializer.Serialize(normalized, GlobalDefaultsJsonContext.Default.GlobalDefaults);
+			var json = JsonSerializer.Serialize(ToDto(normalized), GlobalDefaultsJsonContext.Default.GlobalDefaultsDto);
 			await _settings.SetJsonAsync(SettingsKey, json, ct).ConfigureAwait(false);
 			_cache = normalized;
 		}
@@ -78,20 +78,20 @@ public sealed class GlobalDefaultsStore : IGlobalDefaultsStore
 	{
 		var json = await _settings.GetJsonAsync(SettingsKey, ct).ConfigureAwait(false);
 
-		GlobalDefaults? loaded = null;
+		GlobalDefaultsDto? dto = null;
 		if (json is not null)
 		{
 			try
 			{
-				loaded = JsonSerializer.Deserialize(json, GlobalDefaultsJsonContext.Default.GlobalDefaults);
+				dto = JsonSerializer.Deserialize(json, GlobalDefaultsJsonContext.Default.GlobalDefaultsDto);
 			}
 			catch (JsonException)
 			{
-				loaded = null;
+				dto = null;
 			}
 		}
 
-		return Normalize(loaded ?? new GlobalDefaults());
+		return Normalize(FromDto(dto));
 	}
 
 	private void RaiseChanged(GlobalDefaults value)
@@ -138,6 +138,97 @@ public sealed class GlobalDefaultsStore : IGlobalDefaultsStore
 		};
 
 		return result == value ? value : result;
+	}
+
+	private static GlobalDefaultsDto ToDto(GlobalDefaults value)
+	{
+		return new GlobalDefaultsDto
+		{
+			Speed = value.Speed,
+			Decoder = value.Decoder.ToString(),
+			Aspect = value.Aspect.ToString(),
+			Repeat = value.Repeat.ToString(),
+			ResumeFromLastPosition = value.ResumeFromLastPosition,
+			SubtitlesEnabled = value.SubtitlesEnabled,
+			PreferredAudioLanguage = value.PreferredAudioLanguage,
+			PreferredSubtitleLanguage = value.PreferredSubtitleLanguage,
+			AudioDelayMs = value.AudioDelayMs,
+			SubtitleDelayMs = value.SubtitleDelayMs,
+			SubtitleStyle = ToStyleDto(value.SubtitleStyle),
+			BackgroundAudio = value.BackgroundAudio,
+			PictureInPictureOnLeave = value.PictureInPictureOnLeave
+		};
+	}
+
+	private static SubtitleStyleDto ToStyleDto(SubtitleStyle style)
+	{
+		return new SubtitleStyleDto
+		{
+			FontScale = style.FontScale,
+			TextColorArgb = style.TextColorArgb,
+			OutlineColorArgb = style.OutlineColorArgb,
+			OutlineThickness = style.OutlineThickness,
+			BackgroundOpacity = style.BackgroundOpacity,
+			Bold = style.Bold,
+			BottomMarginFraction = style.BottomMarginFraction
+		};
+	}
+
+	// Missing or unreadable fields keep the record default; one bad field does not discard the others.
+	private static GlobalDefaults FromDto(GlobalDefaultsDto? dto)
+	{
+		var defaults = new GlobalDefaults();
+		if (dto is null)
+		{
+			return defaults;
+		}
+
+		return defaults with
+		{
+			Speed = dto.Speed ?? defaults.Speed,
+			Decoder = ParseEnum<DecoderMode>(dto.Decoder) ?? defaults.Decoder,
+			Aspect = ParseEnum<AspectMode>(dto.Aspect) ?? defaults.Aspect,
+			Repeat = ParseEnum<RepeatMode>(dto.Repeat) ?? defaults.Repeat,
+			ResumeFromLastPosition = dto.ResumeFromLastPosition ?? defaults.ResumeFromLastPosition,
+			SubtitlesEnabled = dto.SubtitlesEnabled ?? defaults.SubtitlesEnabled,
+			PreferredAudioLanguage = dto.PreferredAudioLanguage ?? defaults.PreferredAudioLanguage,
+			PreferredSubtitleLanguage = dto.PreferredSubtitleLanguage ?? defaults.PreferredSubtitleLanguage,
+			AudioDelayMs = dto.AudioDelayMs ?? defaults.AudioDelayMs,
+			SubtitleDelayMs = dto.SubtitleDelayMs ?? defaults.SubtitleDelayMs,
+			SubtitleStyle = FromStyleDto(dto.SubtitleStyle),
+			BackgroundAudio = dto.BackgroundAudio ?? defaults.BackgroundAudio,
+			PictureInPictureOnLeave = dto.PictureInPictureOnLeave ?? defaults.PictureInPictureOnLeave
+		};
+	}
+
+	private static SubtitleStyle FromStyleDto(SubtitleStyleDto? dto)
+	{
+		var defaults = SubtitleStyle.Default;
+		if (dto is null)
+		{
+			return defaults;
+		}
+
+		return defaults with
+		{
+			FontScale = dto.FontScale ?? defaults.FontScale,
+			TextColorArgb = dto.TextColorArgb ?? defaults.TextColorArgb,
+			OutlineColorArgb = dto.OutlineColorArgb ?? defaults.OutlineColorArgb,
+			OutlineThickness = dto.OutlineThickness ?? defaults.OutlineThickness,
+			BackgroundOpacity = dto.BackgroundOpacity ?? defaults.BackgroundOpacity,
+			Bold = dto.Bold ?? defaults.Bold,
+			BottomMarginFraction = dto.BottomMarginFraction ?? defaults.BottomMarginFraction
+		};
+	}
+
+	private static T? ParseEnum<T>(string? text) where T : struct, Enum
+	{
+		if (text is not null && Enum.TryParse<T>(text, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed))
+		{
+			return parsed;
+		}
+
+		return null;
 	}
 
 	private static SubtitleStyle NormalizeStyle(SubtitleStyle style)

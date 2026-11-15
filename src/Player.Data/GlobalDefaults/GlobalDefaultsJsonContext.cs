@@ -1,8 +1,7 @@
 using System.Text.Json.Serialization;
-using Player.Core.Models;
 
-namespace Player.Data.GlobalDefaultsStore;
+namespace Player.Data.GlobalDefaultsStorage;
 
-[JsonSourceGenerationOptions(UseStringEnumConverter = true)]
-[JsonSerializable(typeof(GlobalDefaults))]
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSerializable(typeof(GlobalDefaultsDto))]
 internal sealed partial class GlobalDefaultsJsonContext : JsonSerializerContext;
