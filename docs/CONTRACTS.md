@@ -22,7 +22,7 @@ Conventions for every contract:
 ```csharp
 public readonly record struct MediaFileId(long MediaStoreId, long SizeBytes, long DateModifiedSeconds)
 {
-    public string ToKey() => $"{MediaStoreId}:{SizeBytes}:{DateModifiedSeconds}";
+    public string ToKey() => $"{MediaStoreId}:{SizeBytes}:{DateModifiedSeconds}";   // formatted with the invariant culture
 }
 
 public enum MediaKind { Video, Audio }

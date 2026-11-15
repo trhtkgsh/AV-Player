@@ -1,12 +1,16 @@
 namespace Player.Core.Models;
 
+using System.Globalization;
+
 /// <summary>
 /// Identity of a media file. Never derived from a path: a file that is moved keeps its identity,
 /// a file that is replaced (new size or modified date) gets a new one.
 /// </summary>
 public readonly record struct MediaFileId(long MediaStoreId, long SizeBytes, long DateModifiedSeconds)
 {
-    public string ToKey() => $"{MediaStoreId}:{SizeBytes}:{DateModifiedSeconds}";
+    /// <summary>The database key. Culture-invariant, so the stores can parse it back.</summary>
+    public string ToKey() =>
+        string.Create(CultureInfo.InvariantCulture, $"{MediaStoreId}:{SizeBytes}:{DateModifiedSeconds}");
 }
 
 /// <param name="ContentUri">The only handle used to open the file.</param>
