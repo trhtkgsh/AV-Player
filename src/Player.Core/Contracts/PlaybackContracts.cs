@@ -98,10 +98,24 @@ public interface IVideoSurface
     void SetAspect(AspectMode mode);
 
     /// <summary>
-    /// True hides the status and navigation bars while the player is on screen (a swipe from an edge shows
-    /// them for a moment). False restores the normal window. Safe from any thread.
+    /// True puts the window in player mode: laid out edge to edge (also in a display cutout), with the
+    /// system bars hidden until <see cref="SetSystemBarsVisible"/> shows them. False restores the normal
+    /// window. Safe from any thread.
     /// </summary>
     void SetImmersive(bool enabled);
+
+    /// <summary>
+    /// Shows or hides the status and navigation bars while the window is in player mode. The content is
+    /// never resized by it: the bars are drawn over the window. Safe from any thread.
+    /// </summary>
+    void SetSystemBarsVisible(bool visible);
+
+    /// <summary>
+    /// The space the system bars and a display cutout take at each edge when they are shown in player
+    /// mode, whether they are shown now or not (zero outside player mode).
+    /// <see cref="Changed"/> is raised when it changes.
+    /// </summary>
+    EdgeInsets SystemBarInsets { get; }
 
     /// <summary>The transform is clamped to 100% .. 400% and the pan keeps the picture on screen.</summary>
     void SetTransform(ViewTransform transform);

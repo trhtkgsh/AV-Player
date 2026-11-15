@@ -15,7 +15,14 @@ public enum SortField { Name, DateAdded, Size, Duration }
 
 public enum SortDirection { Ascending, Descending }
 
-public enum ExplorerViewMode { Folders, Flat }
+/// <summary>
+/// What the explorer lists. Folders: every folder that holds media. Flat: all files in one list.
+/// Tree: the same folders as a directory tree from the storage root. Favorites: the folders the user marked.
+/// </summary>
+public enum ExplorerViewMode { Folders, Flat, Tree, Favorites }
+
+/// <summary>Rows, or tiles with a large thumbnail.</summary>
+public enum ExplorerLayout { List, Grid }
 
 public enum ThemeId { DarkOled, DarkSlate, Light, HighContrast }
 
@@ -26,7 +33,7 @@ public enum ScreenSide { Left, Right }
 
 public enum GesturePhase { Began, Changed, Ended, Cancelled }
 
-public enum GestureKind { Tap, DoubleTap, VerticalDrag, HorizontalDrag, Pinch, Pan }
+public enum GestureKind { Tap, DoubleTap, VerticalDrag, HorizontalDrag, Pinch, Pan, LongPress }
 
 public enum FileOperationStatus { Success, Cancelled, Denied, Failed }
 

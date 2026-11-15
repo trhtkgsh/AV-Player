@@ -42,6 +42,19 @@ public interface IUiSettingsStore
     Task SaveAsync(UiSettings value, CancellationToken ct);
 }
 
+/// <summary>Per-folder settings: a default speed and the favorite mark. Separate from every other store.</summary>
+public interface IFolderSettingsStore
+{
+    /// <summary>Raised after a save, on any thread.</summary>
+    event EventHandler? Changed;
+
+    Task<FolderSettings?> GetAsync(long bucketId, CancellationToken ct);
+    Task<IReadOnlyDictionary<long, FolderSettings>> GetAllAsync(CancellationToken ct);
+
+    /// <summary>Saves the row, or removes it when it has no speed and is not a favorite.</summary>
+    Task SaveAsync(FolderSettings value, CancellationToken ct);
+}
+
 public interface IThemeService
 {
     ThemeSettings Current { get; }

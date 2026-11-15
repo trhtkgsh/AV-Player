@@ -17,6 +17,15 @@ Changes after the freeze (orchestrator only, each one logged in PROGRESS.md):
   which belongs behind the same interface as the window brightness.
 - 2026-11-15, Phase 3 (owner request: a Hebrew interface as an option): `AppLanguage`, `UiSettings.Language`,
   `LocalizedText`, `ILocalizer`, `IStringSource`. See docs/specs/10-localization.md. Additions only.
+- 2026-11-15, Phase 3 revision (owner requests, docs/specs/11-owner-requests-r3.md). Additions only:
+  `ExplorerViewMode.Tree` and `.Favorites`; `ExplorerLayout`; `GestureKind.LongPress`; `MediaFolder.AudioOnly`;
+  `UiSettings.Layout`, `.ExplorerFontScale`, `.IncludeAudioOnlyFolders`, `.LongPressSpeed`; `FolderSettings` and
+  `IFolderSettingsStore` (default speed per folder, favorite mark); `PlaybackSettingsResolver.Resolve` takes an
+  optional `FolderSettings` (speed: file, then folder, then global); `EdgeInsets`,
+  `IVideoSurface.SetSystemBarsVisible` and `.SystemBarInsets` (the system bars follow the player controls;
+  `SetImmersive(true)` now means player mode: edge to edge with the bars hidden until they are shown).
+  The code in `src/Player.Core/Contracts` and `Models` is the reference for these; the listings below show
+  the Phase 3 state.
 
 Namespaces: `Player.Core.Models`, `Player.Core.Contracts`. All types are public. Nullable enabled.
 

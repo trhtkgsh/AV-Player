@@ -19,6 +19,8 @@ internal sealed class VideoSurfaceController : IVideoSurface
     private ViewTransform _transform = ViewTransform.Identity;
     private double _brightness = SystemBrightness;
     private bool _immersive;
+    private bool _barsVisible;
+    private EdgeInsets _insets;
     private VideoFormat? _layoutFormat;   // the last known format: kept after the engine stops, so the last picture is not stretched
 
     public VideoSurfaceController(IVideoOutputBinding binding)
@@ -88,31 +90,58 @@ internal sealed class VideoSurfaceController : IVideoSurface
     }
 
     /// <summary>
-    /// Hides the status and navigation bars and lets the picture use the area of a display cutout.
-    /// A swipe from an edge shows the bars for a moment. False restores the normal window.
+    /// Player mode: the window is laid out edge to edge (also in a display cutout) and the system bars
+    /// are hidden until <see cref="SetSystemBarsVisible"/> shows them. False restores the normal window.
     /// </summary>
     public void SetImmersive(bool enabled)
     {
         lock (_sync)
+        {
             _immersive = enabled;
+            _barsVisible = false;
+        }
 
         MainThread.BeginInvokeOnMainThread(ApplyImmersive);
     }
 
+    /// <summary>The bars are drawn over the window, so showing them never resizes the picture.</summary>
+    public void SetSystemBarsVisible(bool visible)
+    {
+        lock (_sync)
+        {
+            if (_barsVisible == visible)
+                return;
+
+            _barsVisible = visible;
+        }
+
+        MainThread.BeginInvokeOnMainThread(ApplyImmersive);
+    }
+
+    public EdgeInsets SystemBarInsets { get { lock (_sync) return _insets; } }
+
     /// <summary>Also runs when a container attaches: a recreated activity starts with visible bars.</summary>
     private void ApplyImmersive()
     {
-        bool immersive;
+        bool immersive, barsVisible;
         lock (_sync)
+        {
             immersive = _immersive;
+            barsVisible = _barsVisible;
+        }
 
         if (Platform.CurrentActivity?.Window is not { DecorView: { } decor } window)
             return;
 
+        // Up to API 34 the window is not edge to edge by itself: without this the content would be
+        // resized every time the bars appear.
+        if (!OperatingSystem.IsAndroidVersionAtLeast(35))
+            AndroidX.Core.View.WindowCompat.SetDecorFitsSystemWindows(window, !immersive);
+
         if (AndroidX.Core.View.WindowCompat.GetInsetsController(window, decor) is not { } insets)
             return;
 
-        if (immersive)
+        if (immersive && !barsVisible)
         {
             insets.SystemBarsBehavior = AndroidX.Core.View.WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;
             insets.Hide(AndroidX.Core.View.WindowInsetsCompat.Type.SystemBars());
@@ -130,6 +159,42 @@ internal sealed class VideoSurfaceController : IVideoSurface
                 : Android.Views.LayoutInDisplayCutoutMode.Default;
             window.Attributes = attributes;
         }
+
+        RefreshInsets(decor);
+    }
+
+    /// <summary>
+    /// Reads the space the system bars and a display cutout take when they are shown, whether they are
+    /// shown now or not. Called on the UI thread, after a mode change and after every layout of the
+    /// container (a rotation moves the bars).
+    /// </summary>
+    internal void RefreshInsets(Android.Views.View view)
+    {
+        var insets = default(EdgeInsets);
+        bool immersive;
+        lock (_sync)
+            immersive = _immersive;
+
+        if (immersive && AndroidX.Core.View.ViewCompat.GetRootWindowInsets(view) is { } root
+            && root.GetInsetsIgnoringVisibility(
+                AndroidX.Core.View.WindowInsetsCompat.Type.SystemBars()
+                | AndroidX.Core.View.WindowInsetsCompat.Type.DisplayCutout()) is { } bars)
+        {
+            var density = view.Resources?.DisplayMetrics?.Density ?? 1f;
+            if (density <= 0)
+                density = 1f;
+            insets = new EdgeInsets(bars.Left / density, bars.Top / density, bars.Right / density, bars.Bottom / density);
+        }
+
+        lock (_sync)
+        {
+            if (_insets == insets)
+                return;
+
+            _insets = insets;
+        }
+
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     internal SurfaceRect ComputeRect(int containerWidth, int containerHeight)

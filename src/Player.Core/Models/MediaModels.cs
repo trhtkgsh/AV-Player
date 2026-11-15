@@ -28,7 +28,23 @@ public sealed record MediaItem(
     long DateAddedSeconds,
     string MimeType);
 
-public sealed record MediaFolder(long BucketId, string Name, string RelativePath, int ItemCount, int NewCount);
+public sealed record MediaFolder(long BucketId, string Name, string RelativePath, int ItemCount, int NewCount)
+{
+    /// <summary>True when the folder holds no video file.</summary>
+    public bool AudioOnly { get; init; }
+}
+
+/// <summary>Per folder. A row exists only while it has a speed or the favorite mark.</summary>
+public sealed record FolderSettings(long BucketId)
+{
+    /// <summary>Default speed of the files in this folder; null means the global default.</summary>
+    public float? Speed { get; init; }
+
+    public bool Favorite { get; init; }
+}
+
+/// <summary>Space taken by the system bars at the edges of the window, in device-independent units.</summary>
+public readonly record struct EdgeInsets(double Left, double Top, double Right, double Bottom);
 
 /// <param name="ThumbnailPath">JPEG file in the app cache directory, or null when none could be produced.</param>
 public sealed record MediaMetadata(MediaFileId Id, long DurationMs, int Width, int Height, string? ThumbnailPath);

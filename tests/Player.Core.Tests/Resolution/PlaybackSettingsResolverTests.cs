@@ -191,6 +191,113 @@ public sealed class PlaybackSettingsResolverTests
         Assert.Equal(Style(), result.SubtitleStyle);
     }
 
+    private static FolderSettings Folder(float? speed) => new(7L) { Speed = speed, Favorite = true };
+
+    [Fact]
+    public void Resolve_FileSpeedAndFolderSpeedAndDefault_FileSpeedWins()
+    {
+        var state = State() with { Speed = 2.0f };
+
+        var result = PlaybackSettingsResolver.Resolve(state, Defaults(), Folder(0.75f));
+
+        Assert.Equal(2.0f, result.Speed);
+    }
+
+    [Fact]
+    public void Resolve_NoFileSpeedAndFolderSpeed_FolderSpeedWinsOverDefault()
+    {
+        var result = PlaybackSettingsResolver.Resolve(State(), Defaults(), Folder(0.75f));
+
+        Assert.Equal(0.75f, result.Speed);
+    }
+
+    [Fact]
+    public void Resolve_NullStateAndFolderSpeed_FolderSpeedWinsOverDefault()
+    {
+        var result = PlaybackSettingsResolver.Resolve(null, Defaults(), Folder(3.0f));
+
+        Assert.Equal(3.0f, result.Speed);
+    }
+
+    [Fact]
+    public void Resolve_NoFileSpeedAndNullFolder_UsesGlobalSpeed()
+    {
+        var result = PlaybackSettingsResolver.Resolve(State(), Defaults(), null);
+
+        Assert.Equal(1.5f, result.Speed);
+    }
+
+    [Fact]
+    public void Resolve_NoFileSpeedAndFolderWithNullSpeed_UsesGlobalSpeed()
+    {
+        var result = PlaybackSettingsResolver.Resolve(State(), Defaults(), Folder(null));
+
+        Assert.Equal(1.5f, result.Speed);
+    }
+
+    [Fact]
+    public void Resolve_FolderWithSpeed_ChangesNoOtherResolvedField()
+    {
+        var state = State(positionMs: 4_000) with
+        {
+            Decoder = DecoderMode.Hardware,
+            Aspect = AspectMode.Fit,
+            AudioTrackId = 2,
+            AudioDelayMs = 40,
+            SubtitleTrackId = 5,
+            SubtitleDelayMs = -20,
+            ExternalSubtitleUri = "content://subs/2.srt",
+        };
+
+        var without = PlaybackSettingsResolver.Resolve(state, Defaults());
+        var with = PlaybackSettingsResolver.Resolve(state, Defaults(), Folder(0.5f));
+
+        Assert.Equal(without with { Speed = 0.5f }, with);
+    }
+
+    [Fact]
+    public void Resolve_FolderWithSpeedAndNoFileValues_OtherFieldsStayAtGlobalDefaults()
+    {
+        var result = PlaybackSettingsResolver.Resolve(State(positionMs: 9_000), Defaults(), Folder(0.5f));
+
+        Assert.Equal(DecoderMode.Software, result.Decoder);
+        Assert.Equal(AspectMode.Crop, result.Aspect);
+        Assert.Equal(250, result.AudioDelayMs);
+        Assert.Equal(-300, result.SubtitleDelayMs);
+        Assert.Equal(9_000, result.StartPositionMs);
+        Assert.Equal(Style(), result.SubtitleStyle);
+    }
+
+    [Fact]
+    public void Resolve_FolderSpeedAndResumeOff_StartsAtZero()
+    {
+        var result = PlaybackSettingsResolver.Resolve(State(positionMs: 9_000), Defaults(resume: false), Folder(0.5f));
+
+        Assert.Equal(0, result.StartPositionMs);
+    }
+
+    [Fact]
+    public void Resolve_TwoArgumentCall_EqualsCallWithNullFolder()
+    {
+        var state = State(positionMs: 1_000) with { Aspect = AspectMode.Fit };
+
+        Assert.Equal(
+            PlaybackSettingsResolver.Resolve(state, Defaults(), null),
+            PlaybackSettingsResolver.Resolve(state, Defaults()));
+    }
+
+    [Fact]
+    public void Resolve_TwoArgumentCallWithoutFileSpeed_UsesGlobalSpeed()
+    {
+        Assert.Equal(1.5f, PlaybackSettingsResolver.Resolve(State(), Defaults()).Speed);
+    }
+
+    [Fact]
+    public void Resolve_NullDefaultsWithFolder_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => PlaybackSettingsResolver.Resolve(State(), null!, Folder(1.0f)));
+    }
+
     [Fact]
     public void Resolve_NullDefaults_ThrowsArgumentNullException()
     {
