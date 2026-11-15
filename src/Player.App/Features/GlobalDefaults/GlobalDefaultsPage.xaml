@@ -3,85 +3,96 @@
              xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:defaults="clr-namespace:Player.App.Features.DefaultsSettings"
+             xmlns:loc="clr-namespace:Player.App.Localization"
              x:DataType="defaults:GlobalDefaultsViewModel"
-             Title="Playback defaults">
+             Title="{loc:T Defaults.Title}">
 
     <ScrollView>
         <VerticalStackLayout Padding="16" Spacing="8">
 
-            <Label Text="Playback" Style="{StaticResource LabelSection}" />
+            <Label Text="{loc:T Defaults.Playback}" Style="{StaticResource LabelSection}" />
 
             <Grid ColumnDefinitions="*,Auto">
-                <Label Text="Speed" VerticalOptions="Center" />
+                <Label Text="{loc:T Defaults.Speed}" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="{Binding SpeedText}" VerticalOptions="Center" />
             </Grid>
             <Slider Minimum="0.25" Maximum="4.0" Value="{Binding Speed, Mode=TwoWay}"
                     DragCompletedCommand="{Binding SaveSpeedCommand}" />
-            <Button Text="Reset speed" Style="{StaticResource ButtonQuiet}" Command="{Binding ResetSpeedCommand}" />
+            <Button Text="{loc:T Defaults.ResetSpeed}" Style="{StaticResource ButtonQuiet}" Command="{Binding ResetSpeedCommand}" />
 
-            <Label Text="Decoder" />
-            <RadioButton Content="Hardware" GroupName="Decoder"
+            <Label Text="{loc:T Defaults.Decoder}" />
+            <RadioButton Content="{loc:T Defaults.Decoder.Hardware}" GroupName="Decoder"
                          IsChecked="{Binding IsDecoderHardware, Mode=TwoWay}" />
-            <RadioButton Content="Software" GroupName="Decoder"
+            <RadioButton Content="{loc:T Defaults.Decoder.Software}" GroupName="Decoder"
                          IsChecked="{Binding IsDecoderSoftware, Mode=TwoWay}" />
 
-            <Label Text="Repeat" />
-            <RadioButton Content="Off" GroupName="Repeat"
+            <Label Text="{loc:T Defaults.Aspect}" />
+            <RadioButton Content="{loc:T Defaults.Aspect.Fit}" GroupName="Aspect"
+                         IsChecked="{Binding IsAspectFit, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Defaults.Aspect.Stretch}" GroupName="Aspect"
+                         IsChecked="{Binding IsAspectStretch, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Defaults.Aspect.Crop}" GroupName="Aspect"
+                         IsChecked="{Binding IsAspectCrop, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Defaults.Aspect.Original}" GroupName="Aspect"
+                         IsChecked="{Binding IsAspectOriginal, Mode=TwoWay}" />
+
+            <Label Text="{loc:T Defaults.Repeat}" />
+            <RadioButton Content="{loc:T Common.Off}" GroupName="Repeat"
                          IsChecked="{Binding IsRepeatNone, Mode=TwoWay}" />
-            <RadioButton Content="Repeat file" GroupName="Repeat"
+            <RadioButton Content="{loc:T Defaults.Repeat.File}" GroupName="Repeat"
                          IsChecked="{Binding IsRepeatFile, Mode=TwoWay}" />
-            <RadioButton Content="Repeat folder" GroupName="Repeat"
+            <RadioButton Content="{loc:T Defaults.Repeat.Folder}" GroupName="Repeat"
                          IsChecked="{Binding IsRepeatFolder, Mode=TwoWay}" />
 
             <Grid ColumnDefinitions="*,Auto">
-                <Label Text="Resume from the last position" VerticalOptions="Center" />
+                <Label Text="{loc:T Defaults.ResumeFromLastPosition}" VerticalOptions="Center" />
                 <Switch Grid.Column="1" IsToggled="{Binding ResumeFromLastPosition, Mode=TwoWay}" />
             </Grid>
 
-            <Label Text="Audio" Style="{StaticResource LabelSection}" />
+            <Label Text="{loc:T Defaults.Audio}" Style="{StaticResource LabelSection}" />
 
-            <Label Text="Preferred audio language" />
+            <Label Text="{loc:T Defaults.PreferredAudioLanguage}" />
             <Entry Text="{Binding PreferredAudioLanguage, Mode=TwoWay}"
-                   Placeholder="Language code, for example he or en"
+                   Placeholder="{loc:T Defaults.LanguagePlaceholder}"
                    ReturnCommand="{Binding SaveLanguagesCommand}"
                    Unfocused="OnLanguageUnfocused" />
 
             <Grid ColumnDefinitions="*,Auto">
-                <Label Text="Audio delay" VerticalOptions="Center" />
+                <Label Text="{loc:T Defaults.AudioDelay}" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="{Binding AudioDelayText}" VerticalOptions="Center" />
             </Grid>
             <HorizontalStackLayout Spacing="8">
                 <Button Text="-50 ms" Style="{StaticResource ButtonQuiet}" Command="{Binding AudioDelayDownCommand}" />
                 <Button Text="+50 ms" Style="{StaticResource ButtonQuiet}" Command="{Binding AudioDelayUpCommand}" />
-                <Button Text="Reset" Style="{StaticResource ButtonQuiet}" Command="{Binding AudioDelayResetCommand}" />
+                <Button Text="{loc:T Common.Reset}" Style="{StaticResource ButtonQuiet}" Command="{Binding AudioDelayResetCommand}" />
             </HorizontalStackLayout>
 
-            <Label Text="Subtitles" Style="{StaticResource LabelSection}" />
+            <Label Text="{loc:T Defaults.Subtitles}" Style="{StaticResource LabelSection}" />
 
             <Grid ColumnDefinitions="*,Auto">
-                <Label Text="Show subtitles" VerticalOptions="Center" />
+                <Label Text="{loc:T Defaults.ShowSubtitles}" VerticalOptions="Center" />
                 <Switch Grid.Column="1" IsToggled="{Binding SubtitlesEnabled, Mode=TwoWay}" />
             </Grid>
 
-            <Label Text="Preferred subtitle language" />
+            <Label Text="{loc:T Defaults.PreferredSubtitleLanguage}" />
             <Entry Text="{Binding PreferredSubtitleLanguage, Mode=TwoWay}"
-                   Placeholder="Language code, for example he or en"
+                   Placeholder="{loc:T Defaults.LanguagePlaceholder}"
                    ReturnCommand="{Binding SaveLanguagesCommand}"
                    Unfocused="OnLanguageUnfocused" />
 
             <Grid ColumnDefinitions="*,Auto">
-                <Label Text="Subtitle delay" VerticalOptions="Center" />
+                <Label Text="{loc:T Defaults.SubtitleDelay}" VerticalOptions="Center" />
                 <Label Grid.Column="1" Text="{Binding SubtitleDelayText}" VerticalOptions="Center" />
             </Grid>
             <HorizontalStackLayout Spacing="8">
                 <Button Text="-50 ms" Style="{StaticResource ButtonQuiet}" Command="{Binding SubtitleDelayDownCommand}" />
                 <Button Text="+50 ms" Style="{StaticResource ButtonQuiet}" Command="{Binding SubtitleDelayUpCommand}" />
-                <Button Text="Reset" Style="{StaticResource ButtonQuiet}" Command="{Binding SubtitleDelayResetCommand}" />
+                <Button Text="{loc:T Common.Reset}" Style="{StaticResource ButtonQuiet}" Command="{Binding SubtitleDelayResetCommand}" />
             </HorizontalStackLayout>
 
-            <Button Text="Subtitle style" Style="{StaticResource ButtonQuiet}" Command="{Binding OpenSubtitleStyleCommand}" />
+            <Button Text="{loc:T Defaults.SubtitleStyle}" Style="{StaticResource ButtonQuiet}" Command="{Binding OpenSubtitleStyleCommand}" />
 
-            <Button Text="Reset all to defaults" Style="{StaticResource ButtonQuiet}" Command="{Binding ResetAllCommand}" />
+            <Button Text="{loc:T Defaults.ResetAll}" Style="{StaticResource ButtonQuiet}" Command="{Binding ResetAllCommand}" />
 
             <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
                    TextColor="{DynamicResource ColorDanger}" />
