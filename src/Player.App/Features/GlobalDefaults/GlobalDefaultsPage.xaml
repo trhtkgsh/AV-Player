@@ -9,7 +9,7 @@
     <ScrollView>
         <VerticalStackLayout Padding="16" Spacing="8">
 
-            <Label Text="Playback" Style="{StaticResource LabelMuted}" />
+            <Label Text="Playback" Style="{StaticResource LabelSection}" />
 
             <Grid ColumnDefinitions="*,Auto">
                 <Label Text="Speed" VerticalOptions="Center" />
@@ -17,7 +17,7 @@
             </Grid>
             <Slider Minimum="0.25" Maximum="4.0" Value="{Binding Speed, Mode=TwoWay}"
                     DragCompletedCommand="{Binding SaveSpeedCommand}" />
-            <Button Text="Reset speed" Command="{Binding ResetSpeedCommand}" />
+            <Button Text="Reset speed" Style="{StaticResource ButtonQuiet}" Command="{Binding ResetSpeedCommand}" />
 
             <Label Text="Decoder" />
             <RadioButton Content="Hardware" GroupName="Decoder"
@@ -38,7 +38,7 @@
                 <Switch Grid.Column="1" IsToggled="{Binding ResumeFromLastPosition, Mode=TwoWay}" />
             </Grid>
 
-            <Label Text="Audio" Style="{StaticResource LabelMuted}" />
+            <Label Text="Audio" Style="{StaticResource LabelSection}" />
 
             <Label Text="Preferred audio language" />
             <Entry Text="{Binding PreferredAudioLanguage, Mode=TwoWay}"
@@ -51,12 +51,12 @@
                 <Label Grid.Column="1" Text="{Binding AudioDelayText}" VerticalOptions="Center" />
             </Grid>
             <HorizontalStackLayout Spacing="8">
-                <Button Text="-50 ms" Command="{Binding AudioDelayDownCommand}" />
-                <Button Text="+50 ms" Command="{Binding AudioDelayUpCommand}" />
-                <Button Text="Reset" Command="{Binding AudioDelayResetCommand}" />
+                <Button Text="-50 ms" Style="{StaticResource ButtonQuiet}" Command="{Binding AudioDelayDownCommand}" />
+                <Button Text="+50 ms" Style="{StaticResource ButtonQuiet}" Command="{Binding AudioDelayUpCommand}" />
+                <Button Text="Reset" Style="{StaticResource ButtonQuiet}" Command="{Binding AudioDelayResetCommand}" />
             </HorizontalStackLayout>
 
-            <Label Text="Subtitles" Style="{StaticResource LabelMuted}" />
+            <Label Text="Subtitles" Style="{StaticResource LabelSection}" />
 
             <Grid ColumnDefinitions="*,Auto">
                 <Label Text="Show subtitles" VerticalOptions="Center" />
@@ -74,14 +74,14 @@
                 <Label Grid.Column="1" Text="{Binding SubtitleDelayText}" VerticalOptions="Center" />
             </Grid>
             <HorizontalStackLayout Spacing="8">
-                <Button Text="-50 ms" Command="{Binding SubtitleDelayDownCommand}" />
-                <Button Text="+50 ms" Command="{Binding SubtitleDelayUpCommand}" />
-                <Button Text="Reset" Command="{Binding SubtitleDelayResetCommand}" />
+                <Button Text="-50 ms" Style="{StaticResource ButtonQuiet}" Command="{Binding SubtitleDelayDownCommand}" />
+                <Button Text="+50 ms" Style="{StaticResource ButtonQuiet}" Command="{Binding SubtitleDelayUpCommand}" />
+                <Button Text="Reset" Style="{StaticResource ButtonQuiet}" Command="{Binding SubtitleDelayResetCommand}" />
             </HorizontalStackLayout>
 
-            <Button Text="Subtitle style" Command="{Binding OpenSubtitleStyleCommand}" />
+            <Button Text="Subtitle style" Style="{StaticResource ButtonQuiet}" Command="{Binding OpenSubtitleStyleCommand}" />
 
-            <Button Text="Reset all to defaults" Command="{Binding ResetAllCommand}" />
+            <Button Text="Reset all to defaults" Style="{StaticResource ButtonQuiet}" Command="{Binding ResetAllCommand}" />
 
             <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}"
                    TextColor="{DynamicResource ColorDanger}" />
