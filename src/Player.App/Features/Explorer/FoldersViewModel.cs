@@ -25,6 +25,10 @@ public sealed partial class FoldersViewModel : ObservableObject
     private CancellationTokenSource? _session;
     private int _loadVersion;
     private bool _flatSeen;
+    private bool _openingSettings;
+
+    // The NewTagDays the current or last load read from the settings. Null when no load has read them yet, or the last load failed.
+    private int? _loadedNewTagDays;
 
     [ObservableProperty]
     private bool _isLoading;
@@ -62,6 +66,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         StopSession();
         _session = new CancellationTokenSource();
         _library.Changed += OnLibraryChanged;
+        _uiSettings.Changed += OnSettingsChanged;
         await LoadAsync(LoadReason.Activate);
     }
 
@@ -130,6 +135,35 @@ public sealed partial class FoldersViewModel : ObservableObject
     private Task RetryPermission() => LoadAsync(LoadReason.Retry);
 
     [RelayCommand]
+    private async Task OpenSettings()
+    {
+        if (_openingSettings)
+        {
+            return;
+        }
+
+        _openingSettings = true;
+        try
+        {
+            if (Shell.Current is { } shell)
+            {
+                await shell.GoToAsync("settings");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception)
+        {
+            ErrorMessage = "Settings could not be opened.";
+        }
+        finally
+        {
+            _openingSettings = false;
+        }
+    }
+
+    [RelayCommand]
     private void OpenAppSettings()
     {
         try
@@ -156,6 +190,8 @@ public sealed partial class FoldersViewModel : ObservableObject
             {
                 return;
             }
+
+            _loadedNewTagDays = settings.NewTagDays;
 
             if (reason == LoadReason.Activate && settings.ViewMode == ExplorerViewMode.Flat)
             {
@@ -211,6 +247,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         {
             if (IsCurrentLoad(version))
             {
+                _loadedNewTagDays = null;
                 ReportError(ex);
             }
         }
@@ -245,6 +282,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     private void StopSession()
     {
         _library.Changed -= OnLibraryChanged;
+        _uiSettings.Changed -= OnSettingsChanged;
 
         _session?.Cancel();
         _session?.Dispose();
@@ -256,6 +294,17 @@ public sealed partial class FoldersViewModel : ObservableObject
         {
             // A callback queued before Deactivate does nothing.
             if (_session is not null)
+            {
+                _ = LoadAsync(LoadReason.Library);
+            }
+        });
+
+    private void OnSettingsChanged(object? sender, UiSettings settings) =>
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            // Only a changed new-tag window reloads. Null: no load has read the settings, the next load reads them.
+            // A callback queued before Deactivate does nothing.
+            if (_session is not null && _loadedNewTagDays is int loaded && settings.NewTagDays != loaded)
             {
                 _ = LoadAsync(LoadReason.Library);
             }
