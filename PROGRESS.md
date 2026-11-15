@@ -4,10 +4,18 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 
 ## Current phase
 
-Phase 2 (started 2026-11-15). The Phase 1 gate is passed: on 2026-11-15 the owner reported that
+Phase 2 (started 2026-11-15) is built and waits for the owner's device test. Phase 3 does not start before it.
+The Phase 1 gate is passed: on 2026-11-15 the owner reported that
 `ArielPlayer-phase1-r2.apk` installs and works on the phone and that every item of `docs/qa/phase-1-checklist.md`
 was run and passed. The owner did not name the phone model or the Android version.
 The roster was approved on 2026-11-14 and the HARD GATE was passed then.
+
+Phase 2 APK: `artifacts/ArielPlayer-phase2.apk` (Release, built from main at aaa5f15 on 2026-11-15, 107 MB,
+arm64-v8a, armeabi-v7a and x86_64, SHA-256 28ABA7B8FBAD1EDCA1E333586E791E5FDC5C9AE8FF153DC772E74F2D84B0B1F3,
+same signing certificate as the Phase 1 APK, no network permission). Checklist: `docs/qa/phase-2-checklist.md`.
+What was run and what was not is in "Phase 2 verification" below. One open risk: the arm64 half stops
+responding on the emulator's ARM translation when the video is paused; the cause points to the translation
+layer, and only a real phone can settle it (checklist items ARM-1 and ARM-2).
 
 Phase 1 APK: `artifacts/ArielPlayer-phase1-r2.apk` (Release, built from main at acf3f1c on 2026-11-15, 105 MB,
 arm64-v8a, armeabi-v7a and x86_64, SHA-256 DEDAD755AB8A3AF9C178BFFF4BA01B7C34DA12AA612594600CE7E4242789B838). It replaces
@@ -31,7 +39,7 @@ status bar color, explorer, thumbnails, playback, HUD symbols, pause and play, p
 |---|---|---|---|---|---|
 | 0 Spike | green (spike) | n/a | n/a | pending | go on emulator, waiting for owner device test (docs/SPIKE.md) |
 | 1 | green (Debug and Release) | 349 pass (307 Core, 42 Data) | every merged task approved, except P1-27 (tests only, Sonnet, checked by the orchestrator) | passed on 2026-11-15 (owner report: all checklist items pass) | PASSED |
-| 2 | - | - | - | - | in progress |
+| 2 | green (Debug and Release) | 900 pass (662 Core, 238 Data) | every merged task approved; engine and subtitle service had a gate review and a second round | pending: `docs/qa/phase-2-checklist.md` with `artifacts/ArielPlayer-phase2.apk` | built, waiting for the owner |
 | 3 | - | - | - | - | not started |
 | 4 | - | - | - | - | not started |
 | 5 | - | - | - | - | not started |
@@ -149,7 +157,7 @@ Phase 2 scope decisions by the orchestrator:
 | P2-11, P2-22 | global-defaults-store | Haiku 5.5 | 4 rounds, 1 | merged. Playback defaults page and default subtitle style page. Reviewer: changes-required twice (quick taps dropped by `[RelayCommand]` on async methods; a reset that lost its error), then approve. |
 | P2-12, P2-23 | ui-settings | Haiku 5.5 | 1, 1 | merged. Interface settings page, settings home, review follow-ups. Reviewer: approve. |
 | P2-13a, P2-13b | playback-settings-ui | Haiku 5.5 | 2, 1 | merged. Speed, repeat and A-B, audio sheets. Reviewer: approve. The modal sheet is see-through over the video (SPIKE finding 18). |
-| P2-13c, P2-32 | playback-settings-ui | Haiku 5.5 | in review | Subtitle sheet and subtitle style sheet. Reviewer: changes-required (a style could be applied twice). Fix round running, with readable panels. |
+| P2-13c, P2-32, P2-35 | playback-settings-ui | Haiku 5.5 | 3 rounds | merged. Subtitle sheet and subtitle style sheet. Reviewer: changes-required (a style could be applied twice), approve after P2-32 (one apply under a gate, a single navigation to the style sheet, A-B draft fixes, a backdrop that makes all five sheets readable over the picture), approve of P2-35 ("Save as default" waits for a running apply). Open, not blocking: after a failed apply "Save as default" refuses until the next successful apply. |
 | P2-16, P2-20 | player-hud-ui | Haiku 5.5 | 1, 1 | merged. HUD entry points (three icons, speed label), per-file decoder choice, the HUD hides under a sheet. Reviewer: approve. |
 | P2-17 | explorer-ui | Haiku 5.5 | 2 rounds | merged. Settings entry, folder list follows the new-tag age. Reviewer: changes-required (a null value made every settings event reload), approve after the fix. |
 | P2-19 | playback-state-store | Sonnet 5.5 | 1 | merged. A failed save is retried on a timer and by `FlushAsync` (found by the test writer). |
@@ -157,10 +165,33 @@ Phase 2 scope decisions by the orchestrator:
 | P2-26 | core-contracts, subtitles-audio | Fable (orchestrator), Sonnet 5.5 | 1 | merged. Contract: `FindSidecarsAsync` returns `SubtitleFile` records with names. |
 | P2-27 | player-engine | Fable 5.2 (orchestrator) | 2 builds | merged. Subtitle style as LibVLC instance options (SPIKE findings 14 to 16): before this no style was applied at all. Text direction automatic. Margin in video pixels. Emulator: all options visible, live style change restarts once and keeps the position. |
 | P2-28 | subtitles-audio | Sonnet 5.5 | 1 | merged. Legacy code page from the file name and from the bytes (a Windows-1255 file showed Latin garbage on an English device). Emulator: Hebrew shown. |
-| P2-30, P2-31 | core-contracts, player-engine, subtitles-audio | Fable (orchestrator), Sonnet 5.5 | in progress | Gate review of the engine: changes-required (an external subtitle chosen by its id was lost on a restart; a style change while paused left a black picture). Gate review of the subtitle service: changes-required (a slow load could reach the next file; a failed restore stopped the policy; replay added the file twice; one bad byte turned UTF-8 into garbage; I/O on the caller's thread). Contract: `AddSubtitleFileAsync` takes a display name, `ExternalSubtitlePath` added. |
-| P2-T1, T2, T3, T6, T7 | test-writer | Sonnet 5.5 | 1 each | merged. Recorder 59 + 11 retry tests, state repository 42, defaults store 60, text encoding and theme brightness 94. No product bug. One finding: a failed save was not retried without a new event (fixed in P2-19). Total: 896 tests. |
+| P2-30, P2-31 | core-contracts, player-engine, subtitles-audio | Fable (orchestrator), Sonnet 5.5 | 1, 1 | merged. Gate review of the engine: changes-required (an external subtitle chosen by its id was lost on a restart; a style change while paused left a black picture). Gate review of the subtitle service: changes-required (a slow load could reach the next file; a failed restore stopped the policy; replay added the file twice; one bad byte turned UTF-8 into garbage; I/O on the caller's thread). All fixed. Contract: `AddSubtitleFileAsync` takes a display name, `ExternalSubtitlePath` added. |
+| P2-33 | player-engine | Fable 5.2 (orchestrator) | 1 | merged. Found in the integration run: a restart of a paused file lost its position (0 after the second restart) and kept the old picture (SPIKE finding 19). The reveal added in P2-30 never ran, because LibVLC reports such an input as Playing and then Paused. Fixed with a clock flag; verified with engine traces. |
+| P2-36 | player-engine | Fable 5.2 (orchestrator) | 1 | merged. Second review round of the branch: approve, no blocking finding. Four of its notes fixed (a stale event after a restart, a file added twice while opening, a missing copy still reported, Stop). Open, not blocking: a subtitle load that crosses an open of the next file can land on the new file (needs the engine to know the item: contract change); the name match of the external track assumes the store's 16-hex names. |
+| P2-34, P2-37 | device-qa | Haiku 5.5 | 2 rounds, 1 | merged. `docs/qa/phase-2-checklist.md`: 53 Phase 2 items and the 67 Phase 1 items as a regression block. The agent stopped once, correctly, on two spec conflicts (skip length hidden in Phase 2; who writes global defaults); specs 03 and 06 were amended. |
+| P2-T1, T2, T3, T6, T7, T8 | test-writer | Sonnet 5.5 | 1 each | merged. Recorder 59 + 11 retry tests, state repository 42, defaults store 60, text encoding and theme brightness 94, fake engine contract and tolerant UTF-8 17. No product bug. One finding: a failed save was not retried without a new event (fixed in P2-19). Total on main: 900 tests (662 Core, 238 Data). |
 
-Findings on the emulator in Phase 2 that changed the plan: SPIKE findings 14 to 18. Not possible on the platform: an `.ass` or `.ssa` file next to the video is not listed by MediaStore on API 34 for an app with only the media permissions, so it is opened with the file picker.
+Findings on the emulator in Phase 2 that changed the plan: SPIKE findings 14 to 20. Not possible on the platform: an `.ass` or `.ssa` file next to the video is not listed by MediaStore on API 34 for an app with only the media permissions, so it is opened with the file picker.
+
+## Phase 2 verification (2026-11-15)
+
+Run by the orchestrator, on emulators only. No physical device was used.
+
+| Target | Build | Result |
+|---|---|---|
+| Pixel 5 AVD, API 34, x86_64 | Debug (integration of all Phase 2 branches) | Pass: sidecar `.srt` loads by itself; Hebrew right to left with the punctuation on the left; Windows-1255 decoded; external track shown by its file name; style change while playing and while paused (position kept, new picture drawn); margin from 0% to 30%; decoder switch while paused keeps the external track; repeat "This file" keeps one subtitle track; `.ass` through the system file picker; per-file speed and decoder; resume after force-stop; a watched file starts at 0. |
+| Pixel 5 AVD, API 34, x86_64 | Release APK, installed over the Phase 1 r2 APK | Pass: the update installs and keeps the app data; all five sheets; "Save as default"; settings home, playback defaults, interface settings; the clock switch reaches the HUD; default decoder Software applies to a new file; resume after force-stop. |
+| Pixel 7 AVD, API 36, x86_64 | Release APK | Pass, two runs: pause, subtitle sheet, style sheet, style change, two decoder switches, back. |
+| Pixel 7 AVD, API 36, arm64 through the image's ARM translation | Release APK | Playback, subtitles and three paused style changes worked once. Then it failed in two ways, see below. |
+| armeabi-v7a | - | Never run (no image runs it). |
+
+The arm64 failures on the ARM translation (SPIKE finding 20):
+- The app stops responding when sheets are opened while the video is paused: 8 of 10 paused runs, also with the Speed sheet alone (4th opening), so it does not depend on the subtitle code. The ANR dump shows the .NET threads stopped for a garbage collection and never resumed.
+- Two crashes (SIGSEGV) inside the translator's JNI trampoline (`berberis::ToHostJNIEnv`), on a LibVLC audio thread.
+- The same APK's x86_64 half on the same emulator passes the same steps. The Phase 1 APK's arm64 half, paused and sent four rotation requests, did not fail, but it has much less UI to open while paused, so it is a weak control.
+- Assessment: the translator does not run a signal handler of a thread that is blocked in a system call, and the .NET runtime stops its threads with signals, so a paused player (LibVLC threads blocked for good) cannot finish a garbage collection there. A real ARM kernel delivers the signal. This is a reasoned explanation, not a proof: it has not been run on a real arm64 device. The checklist starts with ARM-1 and ARM-2 for this.
+
+Not verified at all in Phase 2: pitch at 0.25x and 4.0x and the audio delay by ear (the emulator runs without audio), a file with several audio tracks or embedded subtitle tracks (no such test file), the preferred language defaults on a real file, A-B repeat on the emulator (unit tests only), repeat "Folder" wrap-around on the emulator (unit tests only).
 
 ## Known gaps carried forward
 
@@ -169,7 +200,11 @@ Findings on the emulator in Phase 2 that changed the plan: SPIKE findings 14 to 
 - System bar colors follow a theme change at runtime: Phase 3, theming-engine. Phase 1 uses fixed colors in `colors.xml` that match Dark OLED.
 - The Release APK is 105 MB because it carries three ABIs. A smaller per-ABI APK is possible once the owner's phone is known.
 - The armeabi-v7a part of the APK has never run (no emulator image runs it).
-- Subtitle style: applied only when playback starts; the freetype options are unverified. Phase 2.
+- A subtitle style change or a decoder switch restarts the input (LibVLC 3). While paused the position moves forward by 250 to 500 ms per restart.
+- `.ass` and `.ssa` files next to the video are not found automatically (MediaStore hides them); the file picker loads them.
+- The speed sheet, the settings pages and the HUD have no test file with several audio or subtitle tracks behind them yet.
+- Phase 2 leftovers, none blocking: the HUD stays hidden until a tap when `Shell.Current` is null as a sheet closes (P2-20); a local margin on the "File list" header (P2-23); A-B range edge cases in the coordinator; the Repeat button does not show the active mode.
+- The arm64 build cannot be tested on the emulators while paused (SPIKE finding 20). Emulator checks use x86_64.
 - Pause when the app goes to the background: Phase 1 uses a placeholder in app-skeleton; media-service owns it in Phase 4.
 - Contract doc change after the freeze (orchestrator): `IVideoOutputBinding` surface methods must be called on the UI thread; `PlayerSnapshot.Idle`; `IVideoSurface.WindowBrightness` is -1 for the system default.
 
@@ -205,8 +240,8 @@ Findings on the emulator in Phase 2 that changed the plan: SPIKE findings 14 to 
 ## Open items for the owner
 
 1. Run the device test in docs/SPIKE.md to close Phase 0 (Phase 1 was started in parallel at the orchestrator's discretion).
-2. Install `artifacts/ArielPlayer-phase1-r2.apk`. If the phone refuses it, report the exact message, the phone model and the Android version (checklist item APP-3).
-3. Run `docs/qa/phase-1-checklist.md` on the phone for the Phase 1 gate.
+2. Done on 2026-11-15: `artifacts/ArielPlayer-phase1-r2.apk` installed and `docs/qa/phase-1-checklist.md` passed.
+3. Install `artifacts/ArielPlayer-phase2.apk` over the Phase 1 app and run `docs/qa/phase-2-checklist.md`. Start with ARM-1 and ARM-2. Report the failed item IDs, the phone model and the Android version.
 
 ## Escalation log
 

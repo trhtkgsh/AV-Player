@@ -15,7 +15,8 @@ Phase: 2. Agent: ui-settings. Contracts: `IUiSettingsStore`, `UiSettings`.
 ## Acceptance
 
 - Data tests: round trip, missing-field fallback, clamping, `Changed` raised once per save.
-- Device: change hide time and skip length, return to the player: both apply. Toggle an explorer field: the list rows update.
+- Device: change hide time, return to the player: it applies. Toggle an explorer field: the list rows update.
+- Device, Phase 3 (the skip length and the battery switch are hidden on the page until the gestures and the battery indicator exist): change skip length, return to the player: it applies.
 
 ## Out of scope
 

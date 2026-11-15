@@ -15,7 +15,7 @@ Contracts: `IPlayerEngine`, `ISubtitleService`, `IPlaybackCoordinator`, `IPlayba
 8. **Manual load.** A system file picker loads any subtitle file. The content is copied into the app data folder (`subtitles`), converted to UTF-8, before it is given to the engine. The copy is kept, so the saved choice of a file survives a cache clear.
 9. **Subtitle delay.** -5000 ms to +5000 ms in 50 ms steps.
 10. **Subtitle style.** Font scale, text color, outline color and thickness, background opacity, bold, bottom margin. ASS files keep their own styling.
-11. **Persistence.** Every change made on this page during playback is written to the per-file state through `IPlaybackStateRecorder.Update`. Nothing here writes to global defaults.
+11. **Persistence.** Speed, decoder, audio track, subtitle track, the external subtitle file and both delays are written to the per-file state through `IPlaybackStateRecorder.Update`. Two exceptions, decided in Phase 2: the repeat mode is a global default (requirement 3) and is saved through the coordinator; the subtitle style applies to the running session and reaches the global defaults only through "Save as default" in the style sheet. Nothing else here writes to global defaults.
 12. All changes apply to the running playback without leaving the player.
 
 ## Known risk
