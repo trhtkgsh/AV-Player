@@ -1,0 +1,66 @@
+using Player.Core.Contracts;
+using Player.Core.Models;
+
+namespace Player.App.Features.DefaultsSettings;
+
+/// <summary>The texts of the playback defaults pages. Shared texts are in <c>CommonStrings</c>.</summary>
+internal sealed class DefaultsStrings : IStringSource
+{
+    /// <inheritdoc />
+    public IReadOnlyDictionary<string, LocalizedText> Texts { get; } = new Dictionary<string, LocalizedText>
+    {
+        ["Defaults.Aspect"] = new("Aspect", "יחס תצוגה"),
+        ["Defaults.Aspect.Crop"] = new("Crop", "חיתוך"),
+        ["Defaults.Aspect.Fit"] = new("Fit", "התאמה"),
+        ["Defaults.Aspect.Original"] = new("100%", "100%"),
+        ["Defaults.Aspect.Stretch"] = new("Stretch", "מתיחה"),
+        ["Defaults.Audio"] = new("Audio", "שמע"),
+        ["Defaults.AudioDelay"] = new("Audio delay", "השהיית שמע"),
+        ["Defaults.Decoder"] = new("Decoder", "מפענח"),
+        ["Defaults.Decoder.Hardware"] = new("Hardware", "חומרה"),
+        ["Defaults.Decoder.Software"] = new("Software", "תוכנה"),
+        ["Defaults.LanguagePlaceholder"] = new("Language code, for example he or en", "קוד שפה, למשל he או en"),
+        ["Defaults.Playback"] = new("Playback", "ניגון"),
+        ["Defaults.PreferredAudioLanguage"] = new("Preferred audio language", "שפת שמע מועדפת"),
+        ["Defaults.PreferredSubtitleLanguage"] = new("Preferred subtitle language", "שפת כתוביות מועדפת"),
+        ["Defaults.Repeat"] = new("Repeat", "חזרה"),
+        ["Defaults.Repeat.File"] = new("Repeat file", "חזרה על הקובץ"),
+        ["Defaults.Repeat.Folder"] = new("Repeat folder", "חזרה על התיקייה"),
+        ["Defaults.ResetAll"] = new("Reset all to defaults", "אפס הכול לברירות המחדל"),
+        ["Defaults.ResetAllConfirm"] = new("Reset all playback defaults?", "לאפס את כל ברירות המחדל לניגון?"),
+        ["Defaults.ResetSpeed"] = new("Reset speed", "אפס מהירות"),
+        ["Defaults.ResumeFromLastPosition"] = new("Resume from the last position", "המשך מהמקום האחרון"),
+        ["Defaults.ShowSubtitles"] = new("Show subtitles", "הצג כתוביות"),
+        ["Defaults.Speed"] = new("Speed", "מהירות"),
+        ["Defaults.Style.Background"] = new("Background", "רקע"),
+        ["Defaults.Style.Bold"] = new("Bold", "מודגש"),
+        ["Defaults.Style.BottomMargin"] = new("Distance from the bottom", "מרחק מהתחתית"),
+        ["Defaults.Style.Color.Black"] = new("Black", "שחור"),
+        ["Defaults.Style.Color.Cyan"] = new("Cyan", "טורקיז"),
+        ["Defaults.Style.Color.DarkGray"] = new("Dark gray", "אפור כהה"),
+        ["Defaults.Style.Color.Green"] = new("Green", "ירוק"),
+        ["Defaults.Style.Color.LightGray"] = new("Light gray", "אפור בהיר"),
+        ["Defaults.Style.Color.Navy"] = new("Navy", "כחול כהה"),
+        ["Defaults.Style.Color.Pink"] = new("Pink", "ורוד"),
+        ["Defaults.Style.Color.White"] = new("White", "לבן"),
+        ["Defaults.Style.Color.Yellow"] = new("Yellow", "צהוב"),
+        ["Defaults.Style.Darker"] = new("Darker", "כהה יותר"),
+        ["Defaults.Style.Higher"] = new("Higher", "גבוה יותר"),
+        ["Defaults.Style.Larger"] = new("Larger", "גדול יותר"),
+        ["Defaults.Style.Lighter"] = new("Lighter", "בהיר יותר"),
+        ["Defaults.Style.Lower"] = new("Lower", "נמוך יותר"),
+        ["Defaults.Style.Note"] = new("Applies to text subtitles (for example .srt). Subtitles in the ASS format keep their own style.", "חל על כתוביות טקסט (למשל .srt). כתוביות בפורמט ASS שומרות על העיצוב שלהן."),
+        ["Defaults.Style.OutlineColor"] = new("Outline color", "צבע קו המתאר"),
+        ["Defaults.Style.OutlineThickness"] = new("Outline thickness", "עובי קו המתאר"),
+        ["Defaults.Style.Reset"] = new("Reset style", "אפס עיצוב"),
+        ["Defaults.Style.Smaller"] = new("Smaller", "קטן יותר"),
+        ["Defaults.Style.TextColor"] = new("Text color", "צבע הטקסט"),
+        ["Defaults.Style.TextSize"] = new("Text size", "גודל הטקסט"),
+        ["Defaults.Style.Thicker"] = new("Thicker", "עבה יותר"),
+        ["Defaults.Style.Thinner"] = new("Thinner", "דק יותר"),
+        ["Defaults.SubtitleDelay"] = new("Subtitle delay", "השהיית כתוביות"),
+        ["Defaults.SubtitleStyle"] = new("Subtitle style", "עיצוב כתוביות"),
+        ["Defaults.Subtitles"] = new("Subtitles", "כתוביות"),
+        ["Defaults.Title"] = new("Playback defaults", "ברירות מחדל לניגון"),
+    };
+}

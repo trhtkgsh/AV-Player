@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
+using Player.Core.Contracts;
 
 namespace Player.App.Features.DefaultsSettings;
 
@@ -9,6 +10,7 @@ public static class GlobalDefaultsUiServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.AddSingleton<IStringSource, DefaultsStrings>();
         services.AddTransient<GlobalDefaultsViewModel>();
         services.AddTransient<GlobalDefaultsPage>();
         services.AddTransient<DefaultSubtitleStyleViewModel>();
