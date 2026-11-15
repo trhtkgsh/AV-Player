@@ -17,6 +17,7 @@ public sealed class PlayerGestureHandler
     private const int MaxVolumePercent = 200;
     private const double DefaultBrightness = 0.5;
     private const double MinBrightness = 0.01;
+    private const long ScrubStepMs = 300;
 
     private readonly IGestureSource _gestures;
     private readonly IPlayerEngine _engine;
@@ -36,9 +37,11 @@ public sealed class PlayerGestureHandler
     private bool _seeking;
     private bool _seekWasPlaying; // the drag paused playback at Began; it resumes at the end
     private int _dragId; // a horizontal drag's Began increments it; a finish for an older drag does not resume
+    private bool _suspended; // Picture-in-Picture: the gestures are ignored
     private bool _resumePending; // a drag ended and its resume is still owed; the next drag takes it over
     private long _scrubTarget; // the newest seek target; the running loop sends it
     private Task _scrubTask = Task.CompletedTask;
+    private CancellationTokenSource _scrubCts = new(); // ends the wait for a picture; replaced at each drag's Began, never disposed
     private bool _verticalActive; // set on Began; cleared on Ended, Cancelled and Detach
     private bool _horizontalActive;
     private bool _pinchActive;
@@ -72,17 +75,43 @@ public sealed class PlayerGestureHandler
 
     public void Attach() => _gestures.Gesture += OnGesture;
 
+    /// <summary>
+    /// True while gestures are ignored (Picture-in-Picture). Setting it to true ends a gesture in progress, the same
+    /// way <see cref="Detach"/> does.
+    /// </summary>
+    public bool Suspended
+    {
+        get => _suspended;
+        set
+        {
+            if (value == _suspended) return;
+            _suspended = value;
+            if (value) EndGestures();
+        }
+    }
+
     public void Detach()
     {
         _gestures.Gesture -= OnGesture;
-        if (_horizontalActive) EndSeek(_seeking ? _seekStart : null); // a drag cut off by Detach counts as cancelled
+        EndGestures();
+    }
+
+    /// <summary>
+    /// Ends the gestures in progress. A seek drag cut off here keeps the picture where it is and only undoes its own
+    /// pause, so playback is not seeked; a long press restores the speed from before it. Nothing else is sent.
+    /// </summary>
+    private void EndGestures()
+    {
+        if (_horizontalActive) EndSeek(null);
         RestoreSpeed();
-        _verticalActive = _horizontalActive = _pinchActive = _panActive = _longPressActive = false; // a gesture cut off by Detach is over
+        _verticalActive = _horizontalActive = _pinchActive = _panActive = _longPressActive = false; // a gesture cut off is over
         _osd.Hide();
     }
 
     private void OnGesture(object? sender, GestureEvent e)
     {
+        if (_suspended) return;
+
         switch (e.Kind)
         {
             case GestureKind.Tap:
@@ -208,6 +237,8 @@ public sealed class PlayerGestureHandler
                 _seekWasPlaying = snapshot.Status == PlayerStatus.Playing || _resumePending; // an earlier drag's resume is still owed
                 _resumePending = false;
                 if (snapshot.Status == PlayerStatus.Playing) Fire(() => _engine.PauseAsync(CancellationToken.None)); // playback does not run during the drag
+                _scrubCts.Cancel();
+                _scrubCts = new CancellationTokenSource(); // the picture of an older drag's target is no longer waited for
                 PreviewSeek(e);
                 break;
 
@@ -318,10 +349,14 @@ public sealed class PlayerGestureHandler
     {
         if (_seekDuration <= 0) return; // nothing to seek in
 
+        bool first = !_seeking; // the first target of this drag is always sent
         _seeking = true;
         _seekTarget = Math.Clamp(_seekStart + (long)Math.Round(e.DeltaX * SeekMsPerScreenWidth), 0, _seekDuration);
         _osd.Hold(SeekText(_seekStart, _seekTarget));
-        Scrub(_seekTarget);
+
+        // _scrubTarget is the last target sent. A finger that rests sends nothing: the same target is not sent twice.
+        bool edge = (_seekTarget == 0 || _seekTarget == _seekDuration) && _seekTarget != _scrubTarget;
+        if (first || edge || Math.Abs(_seekTarget - _scrubTarget) >= ScrubStepMs) Scrub(_seekTarget);
     }
 
     /// <summary>
@@ -337,20 +372,52 @@ public sealed class PlayerGestureHandler
         if (target is null && !play) return;
 
         int id = _dragId;
-        Fire(() => FinishSeekAsync(target, play, id));
+        CancellationTokenSource scrubCts = _scrubCts; // the drag's own source: a newer drag may already have replaced the field
+        Fire(() => FinishSeekAsync(target, play, id, scrubCts));
     }
 
     /// <summary>
     /// Sends the final target, then resumes only if no newer drag has begun since (<paramref name="id"/> is still
-    /// the current drag). A newer drag takes over the owed resume and resumes at its own end.
+    /// the current drag). A newer drag takes over the owed resume and resumes at its own end. The final seek is
+    /// sent before the resume, and the resume ends its wait for the picture.
     /// </summary>
-    private async Task FinishSeekAsync(long? target, bool play, int id)
+    private async Task FinishSeekAsync(long? target, bool play, int id, CancellationTokenSource scrubCts)
     {
-        if (target is long final) await Scrub(final);
-        if (play && id == _dragId)
+        scrubCts.Cancel(); // the picture of an older target is no longer waited for
+        await _scrubTask; // never throws
+        if (id != _dragId) return; // a newer drag has begun: it takes over the resume and sends its own final target
+
+        Task seek = Task.CompletedTask;
+        if (target is long final)
         {
-            _resumePending = false;
-            await _engine.PlayAsync(CancellationToken.None);
+            _scrubTarget = final;
+            seek = SendFinalSeekAsync(final);
+        }
+
+        try
+        {
+            if (play && id == _dragId)
+            {
+                _resumePending = false;
+                await _engine.PlayAsync(CancellationToken.None);
+            }
+        }
+        finally
+        {
+            await seek; // never throws: a failed final seek is logged, and the resume above still ran
+        }
+    }
+
+    /// <summary>Sends the final seek of a drag. Its failure is logged; it never throws.</summary>
+    private async Task SendFinalSeekAsync(long target)
+    {
+        try
+        {
+            await _engine.SeekAsync(target, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Final seek failed: {ex}");
         }
     }
 
@@ -367,6 +434,11 @@ public sealed class PlayerGestureHandler
         return _scrubTask;
     }
 
+    /// <summary>
+    /// The one loop: it sends the newest target and runs while there is one. Each pass reads the field's token, so a
+    /// pass that starts after a new drag began uses the new token. A wait ended by a newer drag sends the target again
+    /// with the newer token; a wait ended by the finish of its own drag ends the loop.
+    /// </summary>
     private async Task SendScrubTargetsAsync()
     {
         long sent = -1; // targets are never negative, so the first pass always sends
@@ -375,7 +447,17 @@ public sealed class PlayerGestureHandler
             while (sent != _scrubTarget)
             {
                 sent = _scrubTarget;
-                await _engine.SeekAsync(sent, CancellationToken.None);
+                CancellationTokenSource source = _scrubCts; // read at the start of every pass
+                try
+                {
+                    await _engine.SeekAsync(sent, source.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // The seek itself stays sent. End the loop unless a newer drag has taken over with a live token.
+                    if (source == _scrubCts || _scrubCts.Token.IsCancellationRequested) return;
+                    sent = -1; // the new drag's first target was never sent: send it now, with its own token
+                }
             }
         }
         catch (Exception ex)
