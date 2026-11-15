@@ -1,3 +1,6 @@
+המסמך באנגלית בכוונה: המודלים עובדים איתו טוב יותר, ואין ערבוב כיווני כתיבה. פייבל מתבקש בו לדבר איתך בעברית. שמור אותו כ-`docs/MASTER.md` ותן לפייבל פקודה אחת: "קרא את docs/MASTER.md ופעל לפיו".
+
+```
 # MASTER PLAN: Local Android Media Player (.NET MAUI)
 
 ## 0. Your role
@@ -99,3 +102,4 @@ Build: dotnet build -f net10.0-android. Tests: dotnet test.
 5. Write docs/specs/01-09 from section 2 and a docs/agents/<id>.md for every roster agent.
 6. Show the owner the roster table with the model per agent, and wait for approval.
 7. Start Phase 1.
+```
