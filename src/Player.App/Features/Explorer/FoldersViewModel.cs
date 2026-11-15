@@ -46,6 +46,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     private bool _openingSettings;
     private bool _choosingView;
     private bool _choosingOptions;
+    private bool _choosingLayout;
     private bool _opening;
 
     // The speeds of the folder speed sheet, after the general default.
@@ -68,6 +69,14 @@ public sealed partial class FoldersViewModel : ObservableObject
     // The folder-name size at the font scale 1.0 (the LabelTitle style of the app).
     [ObservableProperty]
     private double _nameFontSize = BaseNameFontSize;
+
+    // True when the folders are shown as a grid of tiles, false as a list of rows. Follows the stored layout.
+    [ObservableProperty]
+    private bool _isGrid;
+
+    // The number of grid columns for the width of the list.
+    [ObservableProperty]
+    private int _columns = GridTiles.MinColumns;
 
     [ObservableProperty]
     private bool _showNoFolders;
@@ -243,6 +252,51 @@ public sealed partial class FoldersViewModel : ObservableObject
             await NavigateToAllAsync();
         }
     }
+
+    // The button shows the other layout: "Grid" while the list is shown, "List" while the grid is shown.
+    public string LayoutText => _localizer[IsGrid ? "Explorer.LayoutList" : "Explorer.LayoutGrid"];
+
+    [RelayCommand]
+    private async Task ToggleLayout()
+    {
+        if (_choosingLayout)
+        {
+            return;
+        }
+
+        _choosingLayout = true;
+        try
+        {
+            // Read the latest stored settings: only the layout changes.
+            var ct = SessionToken;
+            var settings = await _uiSettings.GetAsync(ct);
+            var saved = settings with { Layout = settings.Layout == ExplorerLayout.Grid ? ExplorerLayout.List : ExplorerLayout.Grid };
+            await _uiSettings.SaveAsync(saved, ct);
+            ApplySettings(saved);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
+        finally
+        {
+            _choosingLayout = false;
+        }
+    }
+
+    // The list width gives the number of grid columns. Called when the list changes size.
+    public void SetListWidth(double width)
+    {
+        if (width > 0)
+        {
+            Columns = GridTiles.Columns(width);
+        }
+    }
+
+    partial void OnIsGridChanged(bool value) => OnPropertyChanged(nameof(LayoutText));
 
     [RelayCommand]
     private async Task OpenOptions(FolderRow row)
@@ -576,7 +630,11 @@ public sealed partial class FoldersViewModel : ObservableObject
         }
     }
 
-    private void OnLanguageChanged(object? sender, EventArgs e) => RebuildRows();
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(LayoutText));
+        RebuildRows();
+    }
 
     private void ApplySettings(UiSettings settings)
     {
@@ -588,6 +646,7 @@ public sealed partial class FoldersViewModel : ObservableObject
 
         _settings = settings;
         NameFontSize = BaseNameFontSize * settings.ExplorerFontScale;
+        IsGrid = settings.Layout == ExplorerLayout.Grid;
         RebuildRows();
     }
 

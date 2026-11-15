@@ -18,6 +18,8 @@ internal sealed class ExplorerStrings : IStringSource
         ["Explorer.FolderSpeedUseGeneral"] = new("Use the general default", "השתמש בברירת המחדל הכללית"),
         ["Explorer.Items.Many"] = new("{0} items", "{0} פריטים"),
         ["Explorer.Items.One"] = new("1 item", "פריט אחד"),
+        ["Explorer.LayoutGrid"] = new("Grid", "רשת"),
+        ["Explorer.LayoutList"] = new("List", "רשימה"),
         ["Explorer.NewCount.Many"] = new("{0} new", "{0} חדשים"),
         ["Explorer.NewCount.One"] = new("1 new", "חדש אחד"),
         ["Explorer.NewTag"] = new("NEW", "חדש"),

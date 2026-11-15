@@ -9,39 +9,71 @@
 
     <ContentPage.ToolbarItems>
         <ToolbarItem Text="{loc:T Explorer.View}" Command="{Binding ChooseViewCommand}" />
+        <ToolbarItem Text="{Binding LayoutText}" Command="{Binding ToggleLayoutCommand}" />
         <ToolbarItem Text="{loc:T Common.Settings}" Order="Secondary" Command="{Binding OpenSettingsCommand}" />
     </ContentPage.ToolbarItems>
 
+    <ContentPage.Resources>
+        <DataTemplate x:Key="ListItem" x:DataType="explorer:FolderRow">
+            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer
+                        Command="{Binding OpenRowCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                        CommandParameter="{Binding .}" />
+                </Grid.GestureRecognizers>
+
+                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Text="★" IsVisible="{Binding Favorite}"
+                       TextColor="{DynamicResource ColorOnSurfaceMuted}" VerticalOptions="Center" />
+                <Label Grid.Row="0" Grid.Column="1" Text="{Binding DisplayName}" Style="{StaticResource LabelTitle}"
+                       FontSize="{Binding NameFontSize, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}" />
+                <Label Grid.Row="1" Grid.Column="1" Text="{Binding CountText}" IsVisible="{Binding ShowCount}"
+                       Style="{StaticResource LabelMuted}" />
+                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="2" Text="{Binding NewText}"
+                       IsVisible="{Binding HasNew}" TextColor="{DynamicResource ColorAccent}"
+                       FontAttributes="Bold" VerticalOptions="Center" />
+                <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="3" Text="⋮" IsVisible="{Binding HasOptions}"
+                        SemanticProperties.Description="{loc:T Explorer.FolderOptions}"
+                        Style="{StaticResource ButtonQuiet}" Padding="10,0" VerticalOptions="Center"
+                        Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                        CommandParameter="{Binding .}" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="GridItem" x:DataType="explorer:FolderRow">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4" Padding="6">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer
+                        Command="{Binding OpenRowCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                        CommandParameter="{Binding .}" />
+                </Grid.GestureRecognizers>
+
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                    <Path Grid.Column="0" Data="M3 6 H10 L12 8 H21 V19 H3 Z" Aspect="Uniform" HeightRequest="56"
+                          HorizontalOptions="Center" Fill="{DynamicResource ColorOnSurfaceMuted}" />
+                    <Button Grid.Column="1" Text="⋮" IsVisible="{Binding HasOptions}" VerticalOptions="Start"
+                            SemanticProperties.Description="{loc:T Explorer.FolderOptions}"
+                            Style="{StaticResource ButtonQuiet}" Padding="10,0"
+                            Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                            CommandParameter="{Binding .}" />
+                </Grid>
+
+                <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
+                    <Label Grid.Column="0" Text="★" IsVisible="{Binding Favorite}" TextColor="{DynamicResource ColorOnSurfaceMuted}" />
+                    <Label Grid.Column="1" Text="{Binding DisplayName}" Style="{StaticResource LabelTitle}"
+                           MaxLines="2" LineBreakMode="TailTruncation"
+                           FontSize="{Binding NameFontSize, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}" />
+                </Grid>
+                <Label Grid.Row="2" Text="{Binding CountText}" IsVisible="{Binding ShowCount}" Style="{StaticResource LabelMuted}" />
+                <Label Grid.Row="3" Text="{Binding NewText}" IsVisible="{Binding HasNew}"
+                       TextColor="{DynamicResource ColorAccent}" FontAttributes="Bold" />
+            </Grid>
+        </DataTemplate>
+    </ContentPage.Resources>
+
     <Grid RowDefinitions="*,Auto">
         <RefreshView IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
-            <CollectionView ItemsSource="{Binding Folders}" SelectionMode="None">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="explorer:FolderRow">
-                        <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
-                            <Grid.GestureRecognizers>
-                                <TapGestureRecognizer
-                                    Command="{Binding OpenRowCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
-                                    CommandParameter="{Binding .}" />
-                            </Grid.GestureRecognizers>
-
-                            <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Text="★" IsVisible="{Binding Favorite}"
-                                   TextColor="{DynamicResource ColorOnSurfaceMuted}" VerticalOptions="Center" />
-                            <Label Grid.Row="0" Grid.Column="1" Text="{Binding DisplayName}" Style="{StaticResource LabelTitle}"
-                                   FontSize="{Binding NameFontSize, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}" />
-                            <Label Grid.Row="1" Grid.Column="1" Text="{Binding CountText}" IsVisible="{Binding ShowCount}"
-                                   Style="{StaticResource LabelMuted}" />
-                            <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="2" Text="{Binding NewText}"
-                                   IsVisible="{Binding HasNew}" TextColor="{DynamicResource ColorAccent}"
-                                   FontAttributes="Bold" VerticalOptions="Center" />
-                            <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="3" Text="⋮" IsVisible="{Binding HasOptions}"
-                                    SemanticProperties.Description="{loc:T Explorer.FolderOptions}"
-                                    Style="{StaticResource ButtonQuiet}" Padding="10,0" VerticalOptions="Center"
-                                    Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
-                                    CommandParameter="{Binding .}" />
-                        </Grid>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
+            <CollectionView x:Name="List" ItemsSource="{Binding Folders}" SelectionMode="None"
+                            SizeChanged="OnListSizeChanged" />
         </RefreshView>
 
         <ActivityIndicator IsRunning="{Binding ShowBusy}" IsVisible="{Binding ShowBusy}"

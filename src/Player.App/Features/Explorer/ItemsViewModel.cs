@@ -47,6 +47,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private HashSet<long> _audioOnlyBuckets = new();
     private int _loadVersion;
     private bool _settingsLoaded;
+    private bool _choosingLayout;
 
     [ObservableProperty]
     private string _title = string.Empty;
@@ -66,6 +67,18 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     // The font size of the file names: the base size times the explorer font scale.
     [ObservableProperty]
     private double _nameFontSize = BaseNameFontSize;
+
+    // True when the files are shown as a grid of tiles, false as a list of rows. Follows the stored layout.
+    [ObservableProperty]
+    private bool _isGrid;
+
+    // The number of grid columns for the width of the list.
+    [ObservableProperty]
+    private int _columns = GridTiles.MinColumns;
+
+    // The height of a grid tile's thumbnail: the tile width in a 16:9 box.
+    [ObservableProperty]
+    private double _thumbnailHeight;
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -265,7 +278,9 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             SortField = field;
             SortDirection = direction;
 
-            _settings = _settings with { SortField = field, SortDirection = direction };
+            // Read the latest stored settings: only the sort changes.
+            var latest = await _uiSettings.GetAsync(SessionToken);
+            _settings = latest with { SortField = field, SortDirection = direction };
             await _uiSettings.SaveAsync(_settings, SessionToken);
             RebuildRows();
         }
@@ -280,6 +295,53 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
 
     [RelayCommand]
     private Task RetryPermission() => LoadAsync();
+
+    // The button shows the other layout: "Grid" while the list is shown, "List" while the grid is shown.
+    public string LayoutText => _localizer[IsGrid ? "Explorer.LayoutList" : "Explorer.LayoutGrid"];
+
+    [RelayCommand]
+    private async Task ToggleLayout()
+    {
+        if (_choosingLayout)
+        {
+            return;
+        }
+
+        _choosingLayout = true;
+        try
+        {
+            // Read the latest stored settings: only the layout changes.
+            var latest = await _uiSettings.GetAsync(SessionToken);
+            var saved = latest with { Layout = latest.Layout == ExplorerLayout.Grid ? ExplorerLayout.List : ExplorerLayout.Grid };
+            await _uiSettings.SaveAsync(saved, SessionToken);
+            ApplySettings(saved);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            ReportError(ex);
+        }
+        finally
+        {
+            _choosingLayout = false;
+        }
+    }
+
+    // The list width gives the number of grid columns and the thumbnail height of a tile. Called when the list changes size.
+    public void SetListWidth(double width)
+    {
+        if (width <= 0)
+        {
+            return;
+        }
+
+        Columns = GridTiles.Columns(width);
+        ThumbnailHeight = GridTiles.TileWidth(width, Columns) * 9 / 16;
+    }
+
+    partial void OnIsGridChanged(bool value) => OnPropertyChanged(nameof(LayoutText));
 
     [RelayCommand]
     private void OpenAppSettings()
@@ -450,6 +512,7 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private void RebuildRows()
     {
         NameFontSize = BaseNameFontSize * _settings.ExplorerFontScale;
+        IsGrid = _settings.Layout == ExplorerLayout.Grid;
 
         var previous = _rows;
         _rows = new Dictionary<MediaFileId, MediaRowViewModel>(_items.Count);
@@ -568,7 +631,11 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             }
         });
 
-    private void OnLanguageChanged(object? sender, EventArgs e) => RebuildTitle();
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(LayoutText));
+        RebuildTitle();
+    }
 
     // All media has its own title; a folder shows its name, which is not translated.
     private void RebuildTitle() =>
