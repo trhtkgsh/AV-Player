@@ -91,7 +91,6 @@ public sealed partial class DefaultSubtitleStyleViewModel : ObservableObject
         OutlineColors = CreateSwatches(OutlinePalette);
         MarkSelected(TextColors, TextColorArgb);
         MarkSelected(OutlineColors, OutlineColorArgb);
-        _localizer.Changed += OnLocalizerChanged;
     }
 
     public IReadOnlyList<ColorSwatch> TextColors { get; private set; }
@@ -141,9 +140,25 @@ public sealed partial class DefaultSubtitleStyleViewModel : ObservableObject
         MarkSelected(OutlineColors, value);
     }
 
+    /// <summary>Called when the page appears. Follows the language while the page is shown and refreshes the swatch names once.</summary>
+    public void Activate()
+    {
+        _localizer.Changed -= OnLocalizerChanged;
+        _localizer.Changed += OnLocalizerChanged;
+        RefreshSwatches();
+    }
+
+    /// <summary>Called when the page disappears. Stops following the language, so the singleton localizer does not keep this ViewModel alive.</summary>
+    public void Deactivate()
+    {
+        _localizer.Changed -= OnLocalizerChanged;
+    }
+
     // The swatch names are set when the swatches are created, so they are rebuilt in the new language.
     // The selection is kept by MarkSelected.
-    private void OnLocalizerChanged(object? sender, EventArgs e)
+    private void OnLocalizerChanged(object? sender, EventArgs e) => RefreshSwatches();
+
+    private void RefreshSwatches()
     {
         TextColors = CreateSwatches(TextPalette);
         OutlineColors = CreateSwatches(OutlinePalette);
