@@ -19,9 +19,15 @@ public sealed class ThemeService : IThemeService
         ct.ThrowIfCancellationRequested();
 
         var resolved = ThemeResolver.Resolve(settings);
-        await MainThread.InvokeOnMainThreadAsync(() => WriteResources(resolved)).ConfigureAwait(false);
+        var dark = ThemeBrightness.IsDark(settings.Theme);
+        await MainThread.InvokeOnMainThreadAsync(() =>
+        {
+            WriteResources(resolved);
+            // On Android MAUI maps this to the AppCompat night mode: native widgets, popups and dialogs follow.
+            Application.Current!.UserAppTheme = dark ? AppTheme.Dark : AppTheme.Light;
+            Current = settings;
+        });
 
-        Current = settings;
         Changed?.Invoke(this, settings);
     }
 
