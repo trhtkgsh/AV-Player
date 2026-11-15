@@ -18,6 +18,13 @@ public sealed class StringSourceFilesTests
         "Defaults.Aspect.Original",
     };
 
+    // Keys whose English value may contain Hebrew letters: a language picker shows each language
+    // in its own script, so the Hebrew language is named "עברית" in every UI language.
+    private static readonly HashSet<string> NativeLanguageNames = new(StringComparer.Ordinal)
+    {
+        "Common.Language.Hebrew",
+    };
+
     private static readonly string[] RequiredFiles =
     [
         "Localization/CommonStrings.cs",
@@ -467,7 +474,7 @@ public sealed class StringSourceFilesTests
     public void Values_English_ContainNoHebrewLetters()
     {
         var bad = Data.Value.Entries
-            .Where(e => HasHebrewLetter(e.English))
+            .Where(e => HasHebrewLetter(e.English) && !NativeLanguageNames.Contains(e.Key))
             .Select(e => $"{e.Key} ({e.Where}): English \"{e.English}\"");
 
         AssertNone(bad, "Keys whose English value contains Hebrew letters:");
