@@ -10,8 +10,15 @@ public static class PlaybackSettingsServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         services.AddTransient<SpeedSheetViewModel>();
         services.AddTransient<SpeedSheet>();
-        // Flat route name on purpose: a route that starts with another registered route's name is resolved wrongly by Shell.
+        services.AddSingleton<AbRepeatDraft>();
+        services.AddTransient<RepeatSheetViewModel>();
+        services.AddTransient<RepeatSheet>();
+        services.AddTransient<AudioSheetViewModel>();
+        services.AddTransient<AudioSheet>();
+        // Flat route names on purpose: a route that starts with another registered route's name is resolved wrongly by Shell.
         Routing.RegisterRoute("player-speed", typeof(SpeedSheet));
+        Routing.RegisterRoute("player-repeat", typeof(RepeatSheet));
+        Routing.RegisterRoute("player-audio", typeof(AudioSheet));
         return services;
     }
 }

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Player.App.Features.PlaybackSettings.RepeatSheet"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:Player.App.Features.PlaybackSettings"
+    x:DataType="local:RepeatSheetViewModel"
+    Shell.PresentationMode="ModalNotAnimated"
+    Shell.NavBarIsVisible="False"
+    BackgroundColor="Transparent">
+
+    <Grid RowDefinitions="*,Auto">
+
+        <!-- (a) The video stays visible here. A tap outside the panel closes the sheet. -->
+        <ContentView Grid.Row="0" BackgroundColor="Transparent">
+            <ContentView.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding CloseCommand}" />
+            </ContentView.GestureRecognizers>
+        </ContentView>
+
+        <!-- (b) The translucent panel. -->
+        <VerticalStackLayout
+            Grid.Row="1"
+            Padding="16,12,16,24"
+            Spacing="12"
+            BackgroundColor="{DynamicResource ColorHudBackground}">
+
+            <Label Text="Repeat" Style="{StaticResource LabelHud}" />
+
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                <Button
+                    Grid.Column="0"
+                    Text="Off"
+                    Command="{Binding SetRepeatNoneCommand}"
+                    Style="{StaticResource ButtonHud}">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsRepeatNone}" Value="True">
+                            <Setter Property="BackgroundColor" Value="{DynamicResource ColorAccent}" />
+                            <Setter Property="TextColor" Value="{DynamicResource ColorOnAccent}" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button
+                    Grid.Column="1"
+                    Text="This file"
+                    Command="{Binding SetRepeatFileCommand}"
+                    Style="{StaticResource ButtonHud}">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsRepeatFile}" Value="True">
+                            <Setter Property="BackgroundColor" Value="{DynamicResource ColorAccent}" />
+                            <Setter Property="TextColor" Value="{DynamicResource ColorOnAccent}" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button
+                    Grid.Column="2"
+                    Text="Folder"
+                    Command="{Binding SetRepeatFolderCommand}"
+                    Style="{StaticResource ButtonHud}">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsRepeatFolder}" Value="True">
+                            <Setter Property="BackgroundColor" Value="{DynamicResource ColorAccent}" />
+                            <Setter Property="TextColor" Value="{DynamicResource ColorOnAccent}" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+            </Grid>
+
+            <Label Text="A-B repeat" Style="{StaticResource LabelHud}" />
+
+            <Label Text="{Binding AbText}" Style="{StaticResource LabelHud}" />
+
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                <Button
+                    Grid.Column="0"
+                    Text="Set A"
+                    Command="{Binding SetACommand}"
+                    Style="{StaticResource ButtonHud}" />
+                <Button
+                    Grid.Column="1"
+                    Text="Set B"
+                    Command="{Binding SetBCommand}"
+                    IsEnabled="{Binding CanSetB}"
+                    Style="{StaticResource ButtonHud}" />
+                <Button
+                    Grid.Column="2"
+                    Text="Clear"
+                    Command="{Binding ClearAbCommand}"
+                    Style="{StaticResource ButtonHud}" />
+            </Grid>
+
+            <Label
+                Text="{Binding ErrorMessage}"
+                IsVisible="{Binding HasError}"
+                TextColor="{DynamicResource ColorDanger}" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>
