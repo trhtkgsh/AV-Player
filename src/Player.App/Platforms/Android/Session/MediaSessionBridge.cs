@@ -167,7 +167,10 @@ public sealed class MediaSessionBridge : IMediaSessionBridge
             }
 
             session.Active = true;
-            _active = true;
+            lock (_publishLock)
+            {
+                _active = true;
+            }
         }).ConfigureAwait(false);
         Log.Debug(Tag, "Media session active");
     }
@@ -305,7 +308,7 @@ public sealed class MediaSessionBridge : IMediaSessionBridge
         lock (_publishLock)
         {
             var session = _session;
-            if (session is null)
+            if (session is null || !_active)
             {
                 return;
             }
