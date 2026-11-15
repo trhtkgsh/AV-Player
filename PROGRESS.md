@@ -4,15 +4,19 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 
 ## Current phase
 
-Phase 0 (spike). HARD GATE active: no product code until every roster agent is registered in
-.github/agents/<id>.agent.md with its model set and the owner approved the roster.
+Phase 1, waiting for the owner's device test. The roster was approved on 2026-11-14 and the HARD GATE was passed then.
+Phase 2 does not start before the owner has run `docs/qa/phase-1-checklist.md` on a phone (MASTER.md section 7).
+
+APK for the owner: `artifacts/ArielPlayer-phase1.apk` (Release, built from main at 2826f17 on 2026-11-15, 70.1 MB,
+arm64-v8a and x86_64, SHA-256 E4149D8A9469FA04E23575C19796A929B2F98AB6C9EFEAFB6BFD07DE60F79F36). The same file was
+smoke-tested on the emulator: explorer, playback, HUD, decoder switch, 4 background cycles.
 
 ## Gates
 
 | Phase | Build | Tests | Reviewer | Owner device test | Status |
 |---|---|---|---|---|---|
 | 0 Spike | green (spike) | n/a | n/a | pending | go on emulator, waiting for owner device test (docs/SPIKE.md) |
-| 1 | green | 91 pass (Core) | partial | pending | in progress: runs end to end on the emulator |
+| 1 | green (Debug and Release) | 307 pass (Core). Data layer: none yet | every merged task approved | pending | built and verified on the emulator, waiting for the owner |
 | 2 | - | - | - | - | not started |
 | 3 | - | - | - | - | not started |
 | 4 | - | - | - | - | not started |
@@ -65,7 +69,12 @@ the orchestrator.
 | P1-22 | device-qa | Haiku 5.5 | task/p1-22-device-qa | 1 | merged. 60 items. The agent had no shell tool (orchestrator's definition error, fixed); the orchestrator created the folder and committed for it. |
 | P1-23 | media-library | Sonnet 5.5 | task/p1-23-library-permissions | 1 | merged. Fixes the gate reviewer's changes-required (API 34 partial access re-requested on every load). Reviewer: approve. Not run on a device. |
 | P1-24 | player-engine, video-surface | Fable 5.2 (orchestrator) | task/p1-24-engine-surface-fixes | 1 | merged. Gate review fixes, plus a paused black frame after backgrounding found while testing them (SPIKE.md finding 12). Emulator: 16 of 16 cycles. Not re-reviewed. |
-| P1-25 | playback-coordinator | Sonnet 5.5 | task/p1-25-coordinator-fixes | 1 | merged. 11 fixes for the gate reviewer's findings. Reviewer: approve. Next, Prev (restart and previous item) checked on the emulator. No unit tests yet. |
+| P1-25 | playback-coordinator | Sonnet 5.5 | task/p1-25-coordinator-fixes | 1 | merged. 11 fixes for the gate reviewer's findings. Reviewer: approve. Next, Prev (restart and previous item) checked on the emulator. |
+| P1-16a/b | test-writer | Sonnet 5.5 (escalated) | task/p1-16-tests-core-b | 1 each | merged. Surface geometry, theming, info formatter, sorter and resolver gaps. No product bug found. |
+| P1-26 | test-writer | Sonnet 5.5 | task/p1-26-tests-coordinator | 1 | merged. 77 coordinator test cases with fakes, 5 runs in a row green. No product bug found. Core total: 307. |
+| P1-27 | test-writer | Sonnet 5.5 | task/p1-27-tests-data | 1 launch died on the same model stream error after about 7 hours with only a `Support` folder written, and no completion notice reached the orchestrator. | OPEN: the data layer (`DbConnectionProvider`, `SettingsRepository`, `MediaMetadataRepository`) has no tests. |
+| P1-28 | player-engine, video-surface | Fable 5.2 (orchestrator) | task/p1-28-reveal-fixes | 1 | merged. Reviewer of P1-24: changes-required (a seek during a frame reveal), approve after the fix. Emulator: 10 of 10 and 6 of 6 paused background cycles, 10 rapid open/close cycles. |
+| publish | orchestrator | - | main at 2826f17 | 3 | Release APK. Attempt 1 (`-r android-x64`) built an APK without LibVLC. Attempt 2 (`-p:RuntimeIdentifiers`) failed to build. Attempt 3 (no RID) is correct and verified on the emulator. See ARCHITECTURE.md section 5. |
 
 Gate review (2026-11-14, three reviewer runs on main at a21d967): media-library changes-required then approve (P1-23); thumbnail-cache approve; playback-coordinator approve; core-contracts approve (matches docs/CONTRACTS.md member by member); video-surface approve; player-engine fixes approve; theming-engine approve; shell route approve.
 
@@ -81,7 +90,11 @@ picture restored and hardware decoding kept, vertical video, audio file, 8 rapid
 Defects found and fixed: shell route (P1-18), native library load thread and late picture after backgrounding (P1-19).
 Not verified: anything on a physical device, HEVC, 4K, 500+ files, API levels other than 34, a Release build on a device.
 
-Phase 1 tasks not finished yet: P1-16a/b/c, P1-25, tests for the coordinator and the data layer, owner device test.
+Phase 1 tasks not finished: P1-27 (data layer tests), owner device test.
+
+The stream error is not tied to the model: it hit test-writer on Haiku three times and on Sonnet once (4 of 8
+launches), and no other agent. Its cause is unknown. A failed launch does not always notify the orchestrator, so a
+background test-writer must be polled.
 
 Lessons recorded for later briefs:
 - An agent that builds with a relative path can build in the main checkout and corrupt its `obj` folder (a crash at startup that a clean build removed). Every brief now gives full paths for build commands.

@@ -85,9 +85,22 @@ Rules that keep the paths disjoint:
 
 Thumbnails are JPEG files in the app cache directory. Rows for files that no longer exist are pruned by their owner.
 
-## 5. Build and test
+## 5. Build, test and publish
 
 `dotnet build src/Player.App -f net10.0-android` and `dotnet test`. Every task must leave both green.
+
+Installable APK (Release, trimmed and AOT compiled, signed with the debug key, sideload only):
+
+`dotnet publish src/Player.App -f net10.0-android -c Release -p:AndroidPackageFormat=apk -o artifacts/release`
+
+The result is `artifacts/release/com.arielplayer.app-Signed.apk` (about 70 MB, `arm64-v8a` for phones and `x86_64` for the emulator). `artifacts/` is ignored by git.
+
+Do NOT pass `-r android-arm64` or `-p:RuntimeIdentifiers=...` on the command line:
+- With `-r`, the VideoLAN.LibVLC.Android package does not add `libvlc.so` and `libc++_shared.so` (its targets look only at the plural `RuntimeIdentifiers`). The APK builds, installs, and every file fails with "Cannot play".
+- A global `RuntimeIdentifiers` also reaches Player.Core and Player.Data and breaks their build.
+A single-ABI APK needs a property set inside `Player.App.csproj` (app-skeleton task, not done yet).
+
+Before handing over an APK, check it: it must contain `lib/arm64-v8a/libvlc.so`, and `dumpsys package com.arielplayer.app` must list no INTERNET or network permission.
 
 ## 6. Refinements to MASTER.md (approved by the owner on 2026-11-14)
 
