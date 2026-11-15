@@ -7,9 +7,21 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 Phase 1, waiting for the owner's device test. The roster was approved on 2026-11-14 and the HARD GATE was passed then.
 Phase 2 does not start before the owner has run `docs/qa/phase-1-checklist.md` on a phone (MASTER.md section 7).
 
-APK for the owner: `artifacts/ArielPlayer-phase1.apk` (Release, built from main at 2826f17 on 2026-11-15, 70.1 MB,
-arm64-v8a and x86_64, SHA-256 E4149D8A9469FA04E23575C19796A929B2F98AB6C9EFEAFB6BFD07DE60F79F36). The same file was
-smoke-tested on the emulator: explorer, playback, HUD, decoder switch, 4 background cycles.
+APK for the owner: `artifacts/ArielPlayer-phase1-r2.apk` (Release, built from main at acf3f1c on 2026-11-15, 105 MB,
+arm64-v8a, armeabi-v7a and x86_64, SHA-256 DEDAD755AB8A3AF9C178BFFF4BA01B7C34DA12AA612594600CE7E4242789B838). It replaces
+`ArielPlayer-phase1.apk` (2826f17), which the owner could not install. The same file was run on two emulators: API 36 as
+x86_64 and as arm64 (through the image's ARM translation), API 34 as x86_64. Checked: install, launcher icon, splash,
+status bar color, explorer, thumbnails, playback, HUD symbols, pause and play, previous, next, back, decoder switch
+(mediacodec to avcodec on arm64). The armeabi-v7a part has not run anywhere.
+
+## Owner feedback on 2026-11-15 (first APK)
+
+| # | Feedback | What was found | What was done | State |
+|---|---|---|---|---|
+| 1 | The app cannot be installed on the phone. | The owner gave no error text and no phone model. The first APK is valid: v2 and v3 signatures verify, minSdk 26, zip aligned, installs on API 34 and API 36. It contained only arm64-v8a and x86_64, so a phone that runs a 32-bit Android refuses it as not compatible. | P1-30 adds armeabi-v7a. The arm64 part was run for the first time (on the emulators' ARM translation) and works. | Not confirmed. The cause on the owner's phone is still unknown; other causes are outside the APK (Play Protect, Samsung Auto Blocker, the permission to install unknown apps, Android older than 8.0). The owner must report the exact message if r2 also fails. |
+| 2 | The player buttons look like ordinary buttons. They must be white symbols with no background. | The HUD used text buttons with the accent fill. | P1-29: vector symbols for back, previous, play or pause, next; the decoder is an outlined HW/SW label. | Done, checked on API 34 and API 36 in the Release build. |
+| 3 | The app needs its own icon, on the launcher and on the splash screen. | Both were the purple ".NET" template images. | P1-30: a white play triangle on a blue gradient (launcher), the same symbol in a blue circle on black (splash). | Done, checked on API 34 and API 36. |
+| 4 | The Android status bar must have the color of the app design. | It was purple: the template colors in `colors.xml`. | P1-30: `colorPrimary` and `colorPrimaryDark` are the Dark OLED surface color, `colorAccent` the accent blue. | Done for the one theme of Phase 1, checked on API 34 and API 36. Following a theme change at runtime stays a Phase 3 task (ARCHITECTURE.md section 5). |
 
 ## Gates
 
@@ -75,6 +87,11 @@ the orchestrator.
 | P1-27 | test-writer | Sonnet 5.5 | task/p1-27-tests-data | 6 launches, 3 died on the model stream error (the first one silently, overnight) | merged. Split into three launches of one test file each, with a commit after each. 42 tests against a real SQLite file: `DbConnectionProvider` 12, `SettingsRepository` 13, `MediaMetadataMigration` and `MediaMetadataRepository` 17. No product bug found. No separate reviewer pass: the orchestrator read the tests and ran the whole suite. |
 | P1-28 | player-engine, video-surface | Fable 5.2 (orchestrator) | task/p1-28-reveal-fixes | 1 | merged. Reviewer of P1-24: changes-required (a seek during a frame reveal), approve after the fix. Emulator: 10 of 10 and 6 of 6 paused background cycles, 10 rapid open/close cycles. |
 | publish | orchestrator | - | main at 2826f17 | 3 | Release APK. Attempt 1 (`-r android-x64`) built an APK without LibVLC. Attempt 2 (`-p:RuntimeIdentifiers`) failed to build. Attempt 3 (no RID) is correct and verified on the emulator. See ARCHITECTURE.md section 5. |
+| P1-29 | player-hud-ui | Haiku 5.5 | task/p1-29-hud-icons | 1 | merged. `HudIconButton` (a `Path` in a tappable grid) and the HUD layout. Reviewer: approve. Non-blocking, open: a null `IconColor` throws; the dim also runs when the command cannot execute; the decoder label's description hides "HW"/"SW" from TalkBack. |
+| P1-30 | app-skeleton | Haiku 5.5 | task/p1-30-icon-splash-abi | 2 | merged. Icon and splash SVG, `colors.xml`, Release `RuntimeIdentifiers` with android-arm. Reviewer: changes-required (the comment in `colors.xml` was missing), fixed. |
+| P1-31 | theming-engine | - | - | 0 | not started, moved to Phase 3. Runtime system bar colors are not needed while one theme exists; the API 35 finding is in `docs/agents/theming-engine.md` step 3. |
+| publish r2 | orchestrator | - | main at acf3f1c | 1 | Release APK with three ABIs, 105 MB. Checked: `libvlc.so` in each ABI, no network permission, v2 and v3 signatures, runs on API 34 and API 36. |
+| P1-32 | device-qa | Haiku 5.5 | task/p1-32-qa-update | 1 | merged. Checklist: 67 items (7 new: HUD-14, HUD-15, APP-3 to APP-5, THEME-2, THEME-3), wording matches the symbols, APK install line. The session again had no shell tool, so the orchestrator made the commit. Text only, read by the orchestrator, no reviewer pass. |
 
 Gate review (2026-11-14, three reviewer runs on main at a21d967): media-library changes-required then approve (P1-23); thumbnail-cache approve; playback-coordinator approve; core-contracts approve (matches docs/CONTRACTS.md member by member); video-surface approve; player-engine fixes approve; theming-engine approve; shell route approve.
 
@@ -105,6 +122,9 @@ Lessons recorded for later briefs:
 
 - Stretch aspect mode: LibVLC letterboxes inside the surface, so the engine must force the display aspect. Phase 3, needs a contract decision.
 - Immersive system bars on the player page, battery in the HUD: Phase 3 (platform code, owner to be decided).
+- System bar colors follow a theme change at runtime: Phase 3, theming-engine. Phase 1 uses fixed colors in `colors.xml` that match Dark OLED.
+- The Release APK is 105 MB because it carries three ABIs. A smaller per-ABI APK is possible once the owner's phone is known.
+- The armeabi-v7a part of the APK has never run (no emulator image runs it).
 - Subtitle style: applied only when playback starts; the freetype options are unverified. Phase 2.
 - Pause when the app goes to the background: Phase 1 uses a placeholder in app-skeleton; media-service owns it in Phase 4.
 - Contract doc change after the freeze (orchestrator): `IVideoOutputBinding` surface methods must be called on the UI thread; `PlayerSnapshot.Idle`; `IVideoSurface.WindowBrightness` is -1 for the system default.
@@ -141,6 +161,8 @@ Lessons recorded for later briefs:
 ## Open items for the owner
 
 1. Run the device test in docs/SPIKE.md to close Phase 0 (Phase 1 was started in parallel at the orchestrator's discretion).
+2. Install `artifacts/ArielPlayer-phase1-r2.apk`. If the phone refuses it, report the exact message, the phone model and the Android version (checklist item APP-3).
+3. Run `docs/qa/phase-1-checklist.md` on the phone for the Phase 1 gate.
 
 ## Escalation log
 

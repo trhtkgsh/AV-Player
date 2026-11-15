@@ -93,14 +93,20 @@ Installable APK (Release, trimmed and AOT compiled, signed with the debug key, s
 
 `dotnet publish src/Player.App -f net10.0-android -c Release -p:AndroidPackageFormat=apk -o artifacts/release`
 
-The result is `artifacts/release/com.arielplayer.app-Signed.apk` (about 70 MB, `arm64-v8a` for phones and `x86_64` for the emulator). `artifacts/` is ignored by git.
+The result is `artifacts/release/com.arielplayer.app-Signed.apk` (about 105 MB). `artifacts/` is ignored by git.
+
+The ABIs of the Release APK are set in `Player.App.csproj` (`RuntimeIdentifiers`, Release only): `arm64-v8a` for 64-bit phones, `armeabi-v7a` for phones that run a 32-bit Android, `x86_64` for the emulator. One file for all three, so that the file tested on the emulator is the file the owner installs. To change the list, change the csproj (app-skeleton task).
 
 Do NOT pass `-r android-arm64` or `-p:RuntimeIdentifiers=...` on the command line:
 - With `-r`, the VideoLAN.LibVLC.Android package does not add `libvlc.so` and `libc++_shared.so` (its targets look only at the plural `RuntimeIdentifiers`). The APK builds, installs, and every file fails with "Cannot play".
 - A global `RuntimeIdentifiers` also reaches Player.Core and Player.Data and breaks their build.
-A single-ABI APK needs a property set inside `Player.App.csproj` (app-skeleton task, not done yet).
 
-Before handing over an APK, check it: it must contain `lib/arm64-v8a/libvlc.so`, and `dumpsys package com.arielplayer.app` must list no INTERNET or network permission.
+Before handing over an APK, check it:
+- It contains `lib/<abi>/libvlc.so` for each of the three ABIs.
+- `dumpsys package com.arielplayer.app` lists no INTERNET or network permission.
+- It runs on the emulator as x86_64 (`adb install -r <apk>`) and as arm64 (`adb install -r --abi arm64-v8a <apk>`; the API 34 and API 36 emulator images translate arm64). The 32-bit ARM part cannot run on these emulators.
+
+System bars: before `ThemeService` runs, and for the whole of Phase 1, the status bar color comes from `Platforms/Android/Resources/values/colors.xml`. Up to API 34 the status bar uses `colorPrimaryDark`. From API 35 the window is edge to edge and the area behind the status bar is the background of the Shell `AppBarLayout`, which uses `colorPrimary`; `Window.SetStatusBarColor` does nothing there. Both colors are set to the Dark OLED `ColorSurface`. Following a theme change at runtime is a Phase 3 task of theming-engine (spec 07, requirement 7).
 
 ## 6. Refinements to MASTER.md (approved by the owner on 2026-11-14)
 

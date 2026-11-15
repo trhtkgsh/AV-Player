@@ -18,6 +18,7 @@
 1. Define the twelve token keys from spec 07 as constants. Define one `ThemePalette` (token to ARGB) per `ThemeId` in Core/Logic/Theming. Original colors only.
 2. `ContrastCalculator`: WCAG contrast ratio, and a readable on-accent color (black or white) for any accent.
 3. `ThemeService.ApplyAsync`: write every token into `Application.Current.Resources` as a `Color` on the UI thread, apply the accent override and the HUD background alpha, then set status and navigation bar colors and icon brightness. Raise `Changed`. Save.
+   System bars (Phase 3, found on 2026-11-15, see docs/ARCHITECTURE.md section 5): up to API 34 use `Window.SetStatusBarColor` and `SetNavigationBarColor`. From API 35 these calls do nothing: the area behind the status bar is the background of the Shell `AppBarLayout` (theme `colorPrimary`), so that background must follow `ColorSurface`. Icon brightness goes through `WindowInsetsControllerCompat` on every API level. The activity does not exist yet when `InitializeAsync` runs, so apply the bars again when an activity is created. Check on emulators with API 34 and API 36.
 4. `InitializeAsync`: load the saved settings (defaults when missing) and apply before the first page appears.
 5. `Styles.xaml`: shared styles for Page, Label, Button, Entry, Slider, Switch, CollectionView rows. `DynamicResource` only. No literal colors.
 6. Phase 3: `ThemePage` with theme list, live preview, 12-color accent palette, HUD opacity slider. Changes apply immediately.
