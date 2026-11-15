@@ -119,6 +119,31 @@ does not always notify the orchestrator.
 Lessons recorded for later briefs:
 - An agent that builds with a relative path can build in the main checkout and corrupt its `obj` folder (a crash at startup that a clean build removed). Every brief now gives full paths for build commands.
 - Reviewers that build at the same time need separate worktrees.
+- A namespace must never have the name of a type that other code uses by its simple name. `Player.Core.Logic.PlaybackState`, `Player.Data.GlobalDefaults` and `Player.Data.UiSettingsStore` (same name as its class) each broke or would have broken sibling code with CS0118. Rule: `Player.Data.<Area>Storage`, `Player.Core.Logic.StateRecording`, `Player.App.Features.DefaultsSettings`, `Player.App.Features.InterfaceSettings`.
+- The System.Text.Json source generator sets an `init` property, or a record constructor parameter, that is missing in the JSON to `default(T)`, not to the record's initializer. Checked with a scratch program on 2026-11-15: `{}` gave speed 0 and a null style. Stores never serialize the Core records: they use a private DTO with nullable fields and merge it onto `new T()`.
+- Shell routes are flat names (`settings-ui`, `player-speed`). A registered route that starts with another route's name was resolved wrongly in Phase 1 (P1-18).
+
+## Phase 2 task log
+
+Phase 2 scope decisions by the orchestrator:
+- Settings whose feature does not exist yet are not shown on the settings pages and keep their stored values: aspect (Phase 3), double-tap skip length and battery (Phase 3), background audio and Picture-in-Picture (Phase 4). The theme row of the settings home arrives in Phase 3.
+- Contract change after the freeze (docs/CONTRACTS.md): `IPlayerEngine` gained `TracksChanged`, `CurrentAudioTrackId`, `CurrentSubtitleTrackId`, `AudioDelayMs`, `SubtitleDelayMs`, `SubtitleStyle`.
+- `SubtitleService` applies its policy by itself when a file opens (it follows the engine); nobody calls it. External subtitle files are copied as UTF-8 into app data, and the per-file state stores the `file://` URI of the copy.
+
+| Task | Agent | Model | Attempts | Result |
+|---|---|---|---|---|
+| P2-01 | playback-state-store | Sonnet 5.5 | 3 rounds | merged. `PlaybackStateRecorder`. Reviewer: approve; all traced interleavings correct. Fixed on the way: a failed load can no longer overwrite saved overrides, one pending retry per file, no redundant queued saves. |
+| P2-02 | playback-state-store | Sonnet 5.5 | 3 rounds | merged. `playback_state` table, repository, DI. Reviewer: approve. Enum overrides are stored as names and read tolerantly. |
+| P2-03 | global-defaults-store | Haiku 5.5 | 3 rounds | merged. Store. Reviewer: changes-required (missing JSON fields lost their defaults, a fault of the brief), approve after the DTO fix. |
+| P2-04 | ui-settings | Haiku 5.5 | 2 rounds | merged. Store. Reviewer: changes-required (same JSON finding), approve after the fix. |
+| P2-06 | core-contracts, player-engine | Fable 5.2 (orchestrator) | 1 | merged. Contract additions above; `SetSubtitleStyleAsync` restarts the input at the current position; an external subtitle no longer overrides a track chosen after it. Not yet run on an emulator. Open: the bottom margin of the subtitle style is not applied, and the freetype options are unverified. |
+| P2-07 | test-writer | Sonnet 5.5 | 1 | merged with P2-06. `FakePlayerEngine` implements the new members. |
+| P2-08 | subtitles-audio | Sonnet 5.5 | 1 | merged. `LanguageCodes`, `SidecarMatcher`, `PreferredTrackSelector`. |
+| P2-09 | subtitles-audio | Sonnet 5.5 | 1 | merged, not yet run. `SubtitleService`, `SubtitleFileStore`, `SubtitleTextEncoding` (Windows-1255 and other legacy code pages to UTF-8). Gate review and emulator check pending. |
+| P2-18 | theming-engine | Sonnet 5.5 | 1 | merged. Styles for RadioButton, CheckBox, Picker, Editor and keyed styles for settings rows and HUD panels. |
+| core fix | core-contracts | Fable 5.2 (orchestrator) | 1 | `MediaFileId.ToKey` is culture-invariant (reviewer of P2-02). |
+| P2-T4 | test-writer | Sonnet 5.5 | 1 | merged. 94 tests for `UiSettingsStore`. No product bug. |
+| P2-T5 | test-writer | Sonnet 5.5 | 1 | merged. 174 tests for the subtitle logic. No product bug. |
 
 ## Known gaps carried forward
 
