@@ -54,6 +54,83 @@
                 <Switch Grid.Column="1" IsToggled="{Binding ShowBattery, Mode=TwoWay}" />
             </Grid>
 
+            <Label Text="{loc:T Interface.Overlay.Title}" Style="{StaticResource LabelSection}" Margin="0,16,0,0" />
+
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{loc:T Interface.Overlay.ProgressLine}" VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding OverlayProgressLine, Mode=TwoWay}" />
+            </Grid>
+            <Label Text="{loc:T Interface.Overlay.Edge}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Edge.Bottom}" GroupName="OverlayEdge"
+                         IsChecked="{Binding IsEdgeBottom, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Edge.Top}" GroupName="OverlayEdge"
+                         IsChecked="{Binding IsEdgeTop, Mode=TwoWay}" />
+
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{loc:T Interface.Overlay.Clock}" VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding OverlayClock, Mode=TwoWay}" />
+            </Grid>
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{loc:T Interface.Overlay.Battery}" VerticalOptions="Center" />
+                <Switch Grid.Column="1" IsToggled="{Binding OverlayBattery, Mode=TwoWay}" />
+            </Grid>
+
+            <Label Text="{loc:T Interface.Overlay.Time}" />
+            <RadioButton Content="{loc:T Common.Off}" GroupName="OverlayTime"
+                         IsChecked="{Binding IsTimeOff, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Time.Elapsed}" GroupName="OverlayTime"
+                         IsChecked="{Binding IsTimeElapsed, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Time.ElapsedTotal}" GroupName="OverlayTime"
+                         IsChecked="{Binding IsTimeElapsedTotal, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Time.Remaining}" GroupName="OverlayTime"
+                         IsChecked="{Binding IsTimeRemaining, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Time.ElapsedRemaining}" GroupName="OverlayTime"
+                         IsChecked="{Binding IsTimeElapsedRemaining, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Time.ElapsedTotalRemaining}" GroupName="OverlayTime"
+                         IsChecked="{Binding IsTimeElapsedTotalRemaining, Mode=TwoWay}" />
+
+            <Label Text="{loc:T Interface.Overlay.Corner}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.TopLeft}" GroupName="OverlayCorner"
+                         IsChecked="{Binding IsCornerTopLeft, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.TopRight}" GroupName="OverlayCorner"
+                         IsChecked="{Binding IsCornerTopRight, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.BottomLeft}" GroupName="OverlayCorner"
+                         IsChecked="{Binding IsCornerBottomLeft, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.BottomRight}" GroupName="OverlayCorner"
+                         IsChecked="{Binding IsCornerBottomRight, Mode=TwoWay}" />
+
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{loc:T Interface.Overlay.Margin}" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding OverlayMarginText}" VerticalOptions="Center" />
+            </Grid>
+            <Slider Minimum="0" Maximum="48"
+                    Value="{Binding OverlayMargin, Mode=TwoWay}"
+                    DragCompletedCommand="{Binding SaveOverlayMarginCommand}" />
+
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{loc:T Interface.Overlay.Size}" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding OverlaySizeText}" VerticalOptions="Center" />
+            </Grid>
+            <Slider Minimum="10" Maximum="24"
+                    Value="{Binding OverlaySize, Mode=TwoWay}"
+                    DragCompletedCommand="{Binding SaveOverlaySizeCommand}" />
+
+            <Label Text="{loc:T Interface.Overlay.Color}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Color.White}" GroupName="OverlayColor"
+                         IsChecked="{Binding IsColorWhite, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Color.LightGray}" GroupName="OverlayColor"
+                         IsChecked="{Binding IsColorLightGray, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Color.Yellow}" GroupName="OverlayColor"
+                         IsChecked="{Binding IsColorYellow, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Color.Green}" GroupName="OverlayColor"
+                         IsChecked="{Binding IsColorGreen, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Color.Cyan}" GroupName="OverlayColor"
+                         IsChecked="{Binding IsColorCyan, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Color.Orange}" GroupName="OverlayColor"
+                         IsChecked="{Binding IsColorOrange, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Color.Red}" GroupName="OverlayColor"
+                         IsChecked="{Binding IsColorRed, Mode=TwoWay}" />
+
             <Label Text="{loc:T Interface.FileList}" Style="{StaticResource LabelSection}" Margin="0,16,0,0" />
 
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
