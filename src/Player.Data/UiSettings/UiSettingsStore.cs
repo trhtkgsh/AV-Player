@@ -103,15 +103,15 @@ public sealed class UiSettingsStore : IUiSettingsStore
 
 	private static UiSettingsDto ToDto(UiSettings value) => new()
 	{
-		HudAutoHideSeconds = value.HudAutoHideSeconds,
-		SkipSeconds = value.SkipSeconds,
-		ShowClock = value.ShowClock,
-		ShowBattery = value.ShowBattery,
+		HudAutoHideSeconds = ToElement(value.HudAutoHideSeconds),
+		SkipSeconds = ToElement(value.SkipSeconds),
+		ShowClock = ToElement(value.ShowClock),
+		ShowBattery = ToElement(value.ShowBattery),
 		ExplorerFields = Name(value.ExplorerFields),
 		ViewMode = Name(value.ViewMode),
 		SortField = Name(value.SortField),
 		SortDirection = Name(value.SortDirection),
-		NewTagDays = value.NewTagDays,
+		NewTagDays = ToElement(value.NewTagDays),
 		Language = Name(value.Language),
 		Layout = Name(value.Layout),
 		ExplorerFontScale = ToElement(value.ExplorerFontScale),
@@ -121,6 +121,9 @@ public sealed class UiSettingsStore : IUiSettingsStore
 
 	private static JsonElement Name<T>(T value) where T : struct, Enum =>
 		JsonSerializer.SerializeToElement(value.ToString(), UiSettingsJsonContext.Default.String);
+
+	private static JsonElement ToElement(int value) =>
+		JsonSerializer.SerializeToElement(value, UiSettingsJsonContext.Default.Int32);
 
 	private static JsonElement ToElement(double value) =>
 		JsonSerializer.SerializeToElement(value, UiSettingsJsonContext.Default.Double);
@@ -143,15 +146,15 @@ public sealed class UiSettingsStore : IUiSettingsStore
 
 		return new UiSettings
 		{
-			HudAutoHideSeconds = dto.HudAutoHideSeconds ?? defaults.HudAutoHideSeconds,
-			SkipSeconds = dto.SkipSeconds ?? defaults.SkipSeconds,
-			ShowClock = dto.ShowClock ?? defaults.ShowClock,
-			ShowBattery = dto.ShowBattery ?? defaults.ShowBattery,
+			HudAutoHideSeconds = ParseInt(dto.HudAutoHideSeconds, defaults.HudAutoHideSeconds),
+			SkipSeconds = ParseInt(dto.SkipSeconds, defaults.SkipSeconds),
+			ShowClock = ParseBool(dto.ShowClock, defaults.ShowClock),
+			ShowBattery = ParseBool(dto.ShowBattery, defaults.ShowBattery),
 			ExplorerFields = ParseEnum(dto.ExplorerFields, defaults.ExplorerFields),
 			ViewMode = ParseEnum(dto.ViewMode, defaults.ViewMode),
 			SortField = ParseEnum(dto.SortField, defaults.SortField),
 			SortDirection = ParseEnum(dto.SortDirection, defaults.SortDirection),
-			NewTagDays = dto.NewTagDays ?? defaults.NewTagDays,
+			NewTagDays = ParseInt(dto.NewTagDays, defaults.NewTagDays),
 			Language = ParseEnum(dto.Language, defaults.Language),
 			Layout = ParseEnum(dto.Layout, defaults.Layout),
 			ExplorerFontScale = ParseNumber(dto.ExplorerFontScale, defaults.ExplorerFontScale),
@@ -159,6 +162,11 @@ public sealed class UiSettingsStore : IUiSettingsStore
 			LongPressSpeed = (float)ParseNumber(dto.LongPressSpeed, defaults.LongPressSpeed),
 		};
 	}
+
+	private static int ParseInt(JsonElement? element, int fallback) =>
+		element is { ValueKind: JsonValueKind.Number } value && value.TryGetInt32(out var number)
+			? number
+			: fallback;
 
 	private static double ParseNumber(JsonElement? element, double fallback) =>
 		element is { ValueKind: JsonValueKind.Number } value && value.TryGetDouble(out var number)
