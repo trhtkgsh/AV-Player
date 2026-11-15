@@ -38,4 +38,9 @@ public sealed record MediaQuery(long? BucketId, MediaKind? Kind);
 
 public sealed record TrackInfo(int Id, string Name, string? Language);
 
+/// <summary>A subtitle file found next to a media file.</summary>
+/// <param name="DisplayName">The file name, for lists.</param>
+/// <param name="Language">The language suffix of the file name, or null.</param>
+public sealed record SubtitleFile(string ContentUri, string DisplayName, string? Language);
+
 public sealed record FileOperationResult(FileOperationStatus Status, MediaItem? Updated, string? Error);

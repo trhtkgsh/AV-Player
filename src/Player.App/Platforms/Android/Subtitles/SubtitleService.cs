@@ -30,6 +30,7 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
     private PlayerStatus _lastStatus = PlayerStatus.Idle;
     private MediaFileId? _pending;
     private bool _disposed;
+    private volatile string? _engineCopy; // the last copy given to the engine for the current file
 
     public SubtitleService(
         IPlayerEngine engine,
@@ -65,7 +66,7 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
         _lifetime.Dispose();
     }
 
-    public async Task<IReadOnlyList<string>> FindSidecarsAsync(MediaItem item, CancellationToken ct)
+    public async Task<IReadOnlyList<SubtitleFile>> FindSidecarsAsync(MediaItem item, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(item);
         try
@@ -191,14 +192,19 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
 
     private async Task<bool> AddToEngineAsync(string local, bool record, CancellationToken ct)
     {
-        try
+        // Already the engine's external subtitle for this file: adding it again would duplicate the track.
+        if (!string.Equals(local, _engineCopy, StringComparison.Ordinal))
         {
-            await _engine.AddSubtitleFileAsync(local, ct).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            Warn("The engine rejected the subtitle file", ex);
-            return false;
+            try
+            {
+                await _engine.AddSubtitleFileAsync(local, ct).ConfigureAwait(false);
+                _engineCopy = local;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Warn("The engine rejected the subtitle file", ex);
+                return false;
+            }
         }
 
         if (record)
@@ -210,7 +216,7 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
         return true;
     }
 
-    private IReadOnlyList<string> QuerySidecars(MediaItem item, string? preferredLanguage, CancellationToken ct)
+    private IReadOnlyList<SubtitleFile> QuerySidecars(MediaItem item, string? preferredLanguage, CancellationToken ct)
     {
         var collection = MediaStore.Files.GetContentUri("external");
         if (collection is null)
@@ -239,10 +245,11 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
             }
         }
 
-        var result = new List<string>();
+        var result = new List<SubtitleFile>();
         foreach (var match in SidecarMatcher.Match(item.DisplayName, ids.Keys, preferredLanguage))
         {
-            result.Add(ContentUris.WithAppendedId(collection, ids[match.FileName])!.ToString()!);
+            var uri = ContentUris.WithAppendedId(collection, ids[match.FileName])!.ToString()!;
+            result.Add(new SubtitleFile(uri, match.FileName, match.Language));
         }
 
         return result;
@@ -304,6 +311,7 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
             if (snapshot.Current is not { } id)
             {
                 _pending = null;
+                _engineCopy = null;
                 return;
             }
 
@@ -312,6 +320,7 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
             if (previousId != id || restart)
             {
                 _pending = id;
+                _engineCopy = null;
             }
 
             if (_pending == id && snapshot.Status is PlayerStatus.Playing or PlayerStatus.Paused)
@@ -348,6 +357,7 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
 
                 SubtitleFileStore.Touch(saved);
                 await _engine.AddSubtitleFileAsync(saved, ct).ConfigureAwait(false);
+                _engineCopy = saved;
                 subtitleDecided = true;
 
                 if (state!.SubtitleTrackId is { } track)
@@ -365,7 +375,7 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
                 var sidecars = await FindSidecarsAsync(item, ct).ConfigureAwait(false);
                 if (sidecars.Count > 0 && IsCurrent(id))
                 {
-                    subtitleDecided = await LoadAsync(sidecars[0], false, ct).ConfigureAwait(false);
+                    subtitleDecided = await LoadAsync(sidecars[0].ContentUri, false, ct).ConfigureAwait(false);
                 }
             }
 

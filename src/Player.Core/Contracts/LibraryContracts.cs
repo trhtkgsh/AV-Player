@@ -35,9 +35,10 @@ public interface IFileOperations
 /// <summary>Subtitle loading and the audio/subtitle track policy on top of the engine primitives.</summary>
 public interface ISubtitleService
 {
-    /// <summary>Content URIs of subtitle files that belong to the item, best match first.</summary>
-    Task<IReadOnlyList<string>> FindSidecarsAsync(MediaItem item, CancellationToken ct);
+    /// <summary>Subtitle files that belong to the item, best match first.</summary>
+    Task<IReadOnlyList<SubtitleFile>> FindSidecarsAsync(MediaItem item, CancellationToken ct);
 
+    /// <param name="contentUri">A content URI, for example <see cref="SubtitleFile.ContentUri"/>.</param>
     Task<bool> LoadExternalAsync(string contentUri, CancellationToken ct);
 
     /// <summary>Opens the system file picker. False when the user cancelled.</summary>
