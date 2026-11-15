@@ -5,7 +5,7 @@
              xmlns:explorer="clr-namespace:Player.App.Features.Explorer"
              xmlns:loc="clr-namespace:Player.App.Localization"
              x:DataType="explorer:FoldersViewModel"
-             Title="{Binding Title, TargetNullValue='Ariel Player'}">
+             Title="{Binding Title, TargetNullValue='AV Player'}">
 
     <ContentPage.ToolbarItems>
         <ToolbarItem Text="{Binding LayoutText}" Command="{Binding ToggleLayoutCommand}" />

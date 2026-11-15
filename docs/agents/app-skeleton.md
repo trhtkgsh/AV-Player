@@ -39,3 +39,4 @@
 ## Log
 
 - 2026-11-15 (P5-50): `MauiProgram` calls `AddFileOps()` after `AddMediaService()`. Checked the composition root: `MediaStoreFileOperations` needs `IPlaybackStateStore` (registered by `AddPlaybackStateStore()`) and `ConsentLauncher` (registered by `AddFileOps()` itself). No placeholder `IFileOperations` registration existed. Only the wiring line and its `using` changed.
+- 2026-11-15 (R7-60, spec 13 items 14-15): visible name "AV Player" (`ApplicationTitle`, `AppShell.xaml`, `FoldersPage.xaml` TargetNullValue, explorer permission text en/he). `ApplicationId` `com.arielplayer.app` unchanged. Icon: background `#2E7D32` (`MauiIcon Color`, `appicon.svg`, `splash.svg` circle); play symbol scaled to 60% about the canvas center in `appicon.svg`/`appiconfg.svg` and `splash.svg`. The owner's brief asks for the play triangle's optical center; I centred the triangle's centroid on the canvas center, which puts its box slightly right of center.
