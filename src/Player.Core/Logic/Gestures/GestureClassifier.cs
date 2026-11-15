@@ -30,6 +30,9 @@ public sealed class GestureClassifier
 
     private PendingTap? _pending;
 
+    // Written by the UI thread of the HUD, read by the touch thread.
+    private volatile bool _locked;
+
     private readonly record struct PendingTap(
         long UpTimeMs, double DownX, double DownY, ScreenSide Side, double FocusX, double FocusY);
 
@@ -59,13 +62,24 @@ public sealed class GestureClassifier
     /// Screen lock. Only <see cref="GestureKind.Tap"/> is reported, at once on release.
     /// It is read when a touch goes down and holds for that whole touch.
     /// </summary>
-    public bool Locked { get; set; }
+    public bool Locked
+    {
+        get => _locked;
+        set => _locked = value;
+    }
 
     /// <summary>
     /// The time at which <see cref="Tick"/> must be called to report the waiting single tap,
     /// or null when no tap is waiting. Same time base as the events.
     /// </summary>
     public long? NextTickMs => _pending is { } p && !_secondTap ? p.UpTimeMs + Options.DoubleTapWindowMs : null;
+
+    /// <summary>Drops any pending tap and any active gesture without reporting anything.</summary>
+    public void Reset()
+    {
+        _pending = null;
+        EndTouch();
+    }
 
     /// <summary>Reports the waiting single tap once the double-tap window has passed.</summary>
     public void Tick(long nowMs)
@@ -260,7 +274,7 @@ public sealed class GestureClassifier
                 break;
         }
 
-        Reset();
+        EndTouch();
     }
 
     private void OnCancel()
@@ -276,10 +290,10 @@ public sealed class GestureClassifier
         }
 
         // A tap that was waiting for its double stays pending; Tick reports it.
-        Reset();
+        EndTouch();
     }
 
-    private void Reset()
+    private void EndTouch()
     {
         _state = State.Idle;
         _count = 0;
@@ -308,9 +322,11 @@ public sealed class GestureClassifier
     private GestureEvent TapEvent(GestureKind kind, double x, double y, ScreenSide side) =>
         new(kind, GesturePhase.Ended, side, 0, 0, 1, x / SafeWidth, y / SafeHeight);
 
+    /// <summary>An axis-locked drag reports only its own axis; a pan reports both.</summary>
     private GestureEvent DragEvent(GesturePhase phase) => new(
         _dragKind, phase, _side,
-        (_xs[0] - _originX) / SafeWidth, (_ys[0] - _originY) / SafeHeight,
+        _dragKind == GestureKind.VerticalDrag ? 0 : (_xs[0] - _originX) / SafeWidth,
+        _dragKind == GestureKind.HorizontalDrag ? 0 : (_ys[0] - _originY) / SafeHeight,
         1, _xs[0] / SafeWidth, _ys[0] / SafeHeight);
 
     /// <summary>Deltas of a pinch are the movement of the midpoint since the pinch began.</summary>
