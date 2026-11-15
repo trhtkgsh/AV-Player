@@ -4,7 +4,13 @@ Tracking file required by docs/MASTER.md section 8. Updated by the orchestrator 
 
 ## Current phase
 
-Phase 4, revision 2: built on 2026-11-15, waits for the owner's device test. Phase 5 does not start before it.
+Phase 5, in work since 2026-11-15 19:10, together with the owner's new request (the quiet display during
+playback, `docs/specs/12-playback-overlay.md`). On 2026-11-15 19:10 the owner reported on
+`ArielPlayer-phase4-r2.apk`: "Everything is fine", asked for the quiet display and said to complete it and
+continue to Phase 5. He did not say which items were run; audio focus, media buttons, Bluetooth, BG-1 and
+BG-12 were not mentioned, so they stay in the Phase 5 list.
+
+Before that: Phase 4, revision 2 was built on 2026-11-15.
 On 2026-11-15 18:15 the owner reported on `ArielPlayer-phase4.apk` (Samsung Galaxy A55, Android 17): three
 faults and one wish (table "Owner feedback on 2026-11-15 (Phase 4 APK)" below), "works" for the second point of
 the report, and the three Phase 4 decisions approved with the remark that the new settings must be on. He did
@@ -132,6 +138,13 @@ The owner's order is kept in the first column. "Phase" is the phase whose module
 | 14 | After returning to the player during playback the picture is black, and parts become colored with motion, for some seconds until it settles. | Not reproduced: on the emulators the picture came back clean with MP4 and MKV. The description fits a hardware decoder that began between two key frames. The code allowed two ways to that (SPIKE finding 36): the video track was selected again in mid-stream and then resynchronized by a seek; and a surface loss that was followed at once by a new surface could pass unseen by the engine, leaving the decoder on a dead surface. | R5-01, R5-02: the picture comes back by starting the input again at the position (as a file is opened); the surface is released in order, with the video output stopped before the views are detached. | Changed on the two suspected paths; the cause is not proven, so only the phone can confirm it (R2-1 to R2-3). The sound now stops for a moment at the return. |
 | 15 | If possible, the picture in the seek drag should change faster. | The engine waited 150 ms after LibVLC had the data before it took the next target, and 350 ms of rest before the exact picture. | R5-01: 60 ms and 250 ms. | Done. The rest of the time is LibVLC's own seek and the decoder; how much faster it feels on the phone is not measured. |
 
+## Owner request on 2026-11-15 19:10 (Phase 4 revision 2 APK: "everything is fine")
+
+| # | Request | Reading and decision | Task | State |
+|---|---|---|---|---|
+| 16 | While playing on the full screen without the controls, show, each optional in the player settings: a thin line along the whole screen with the progress "in the color that was set"; the clock; the battery percent; elapsed, total and remaining time (choose the combination). Position: a corner of the screen, not of the video, flush with 0 gap, plus a choice of the margin from the edge; size; color, white by default. | Spec 12. Orchestrator's readings, to be confirmed by the owner: the line uses the theme's progress color; one corner holds all the texts in one line; the margin default is 0; the line's edge (bottom or top) is a setting; the time combination is a setting with six choices, default "elapsed / total". | R6-01, R6-10, R6-20, R6-T1 | in work |
+| 17 | Elapsed and remaining time in the playback controls too. | The seek row shows elapsed at the left and `-remaining / total` at the right. | R6-20 | in work |
+
 ## Gates
 
 | Phase | Build | Tests | Reviewer | Owner device test | Status |
@@ -142,8 +155,8 @@ The owner's order is kept in the first column. "Phase" is the phase whose module
 | 3 | green (Debug and Release) | 1340 pass (989 Core, 351 Data) | every merged task approved; engine, surface, gestures, theming, localization and coordinator had a gate review | 2026-11-15: "no faults found so far" (full checklist run not stated); eleven requests, see spec 11 | superseded by revision 2 |
 | 3, revision 2 | green (Debug and Release) | 1634 pass (1104 Core, 530 Data) | every merged product task approved; R3-T2 (tests only, Sonnet) checked by the orchestrator | 2026-11-15: four items reported (fixed in revision 3), three readings approved; a full run of the list was not stated | not closed on its own: tested together with Phase 4 by the owner's decision |
 | 4 (with revision 3) | green (Debug and Release) | 1728 pass (1198 Core, 530 Data) | every merged product task approved; engine, surface, media service, session and Picture-in-Picture had a gate review (two or three rounds each); P4-T1 (tests only, Sonnet) checked by the orchestrator | 2026-11-15: three faults and one wish (fixed in revision 2); a full run of the list was not stated; focus, buttons and Bluetooth not reported | superseded by revision 2 |
-| 4, revision 2 | green (Debug and Release) | 1728 pass (1198 Core, 530 Data) | R5-01, R5-02 gate review: approve | pending (`docs/qa/phase-4-r2-checklist.md` and the open items of `phase-4-checklist.md`) | built, waiting for the owner |
-| 5 | - | - | - | - | not started |
+| 4, revision 2 | green (Debug and Release) | 1728 pass (1198 Core, 530 Data) | R5-01, R5-02 gate review: approve | 2026-11-15 19:10: "Everything is fine" (which items were run was not stated; focus, buttons and Bluetooth not reported) | PASSED by the owner's report |
+| 5 (with the quiet display, spec 12) | - | - | - | - | in work |
 
 ## Section 9 checklist
 
