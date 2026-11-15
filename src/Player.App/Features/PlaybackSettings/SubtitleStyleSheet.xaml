@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage
+    x:Class="Player.App.Features.PlaybackSettings.SubtitleStyleSheet"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:Player.App.Features.PlaybackSettings"
+    x:DataType="local:SubtitleStyleSheetViewModel"
+    Shell.PresentationMode="ModalNotAnimated"
+    Shell.NavBarIsVisible="False"
+    BackgroundColor="Transparent">
+
+    <Grid RowDefinitions="*,Auto">
+
+        <!-- (a) The video stays visible here. A tap outside the panel closes the sheet. -->
+        <ContentView Grid.Row="0" BackgroundColor="Transparent">
+            <ContentView.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding CloseCommand}" />
+            </ContentView.GestureRecognizers>
+        </ContentView>
+
+        <!-- (b) The translucent panel, on a dimmed backing so that bright video does not show through its text. -->
+        <Grid Grid.Row="1">
+            <BoxView
+                Color="{DynamicResource ColorBackground}"
+                Opacity="0.72"
+                HorizontalOptions="Fill"
+                VerticalOptions="Fill" />
+            <ScrollView
+                MaximumHeightRequest="520"
+            BackgroundColor="{DynamicResource ColorHudBackground}">
+            <VerticalStackLayout
+                Padding="16,12,16,24"
+                Spacing="12">
+
+                <Label Text="Subtitle style" Style="{StaticResource LabelHud}" />
+                <Label
+                    Text="For text subtitles. The picture restarts briefly after a change."
+                    FontSize="12"
+                    Style="{StaticResource LabelHud}" />
+
+                <!-- Size -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label
+                        Grid.Column="0"
+                        Text="Size"
+                        VerticalOptions="Center"
+                        Style="{StaticResource LabelHud}" />
+                    <Label
+                        Grid.Column="1"
+                        Text="{Binding FontScaleText}"
+                        VerticalOptions="Center"
+                        Style="{StaticResource LabelHud}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button
+                        Grid.Column="0"
+                        Text="Smaller"
+                        Command="{Binding SmallerCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                    <Button
+                        Grid.Column="1"
+                        Text="Larger"
+                        Command="{Binding LargerCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                </Grid>
+
+                <!-- Text color -->
+                <Label Text="Text color" Style="{StaticResource LabelHud}" />
+                <HorizontalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding TextColors}">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="local:StyleSwatch">
+                            <Border
+                                WidthRequest="36"
+                                HeightRequest="36"
+                                StrokeShape="RoundRectangle 8"
+                                BackgroundColor="{Binding Color}"
+                                Stroke="{DynamicResource ColorHudOnBackground}"
+                                StrokeThickness="1"
+                                SemanticProperties.Description="{Binding Name}">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                        <Setter Property="Stroke" Value="{DynamicResource ColorAccent}" />
+                                        <Setter Property="StrokeThickness" Value="3" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding SelectTextColorCommand, Source={RelativeSource AncestorType={x:Type local:SubtitleStyleSheetViewModel}}, x:DataType=local:SubtitleStyleSheetViewModel}"
+                                        CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </HorizontalStackLayout>
+
+                <!-- Outline color -->
+                <Label Text="Outline color" Style="{StaticResource LabelHud}" />
+                <HorizontalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding OutlineColors}">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="local:StyleSwatch">
+                            <Border
+                                WidthRequest="36"
+                                HeightRequest="36"
+                                StrokeShape="RoundRectangle 8"
+                                BackgroundColor="{Binding Color}"
+                                Stroke="{DynamicResource ColorHudOnBackground}"
+                                StrokeThickness="1"
+                                SemanticProperties.Description="{Binding Name}">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding IsSelected}" Value="True">
+                                        <Setter Property="Stroke" Value="{DynamicResource ColorAccent}" />
+                                        <Setter Property="StrokeThickness" Value="3" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding SelectOutlineColorCommand, Source={RelativeSource AncestorType={x:Type local:SubtitleStyleSheetViewModel}}, x:DataType=local:SubtitleStyleSheetViewModel}"
+                                        CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </HorizontalStackLayout>
+
+                <!-- Outline thickness -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label
+                        Grid.Column="0"
+                        Text="Outline"
+                        VerticalOptions="Center"
+                        Style="{StaticResource LabelHud}" />
+                    <Label
+                        Grid.Column="1"
+                        Text="{Binding OutlineText}"
+                        VerticalOptions="Center"
+                        Style="{StaticResource LabelHud}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button
+                        Grid.Column="0"
+                        Text="Thinner"
+                        Command="{Binding ThinnerCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                    <Button
+                        Grid.Column="1"
+                        Text="Thicker"
+                        Command="{Binding ThickerCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                </Grid>
+
+                <!-- Background opacity -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label
+                        Grid.Column="0"
+                        Text="Background"
+                        VerticalOptions="Center"
+                        Style="{StaticResource LabelHud}" />
+                    <Label
+                        Grid.Column="1"
+                        Text="{Binding BackgroundText}"
+                        VerticalOptions="Center"
+                        Style="{StaticResource LabelHud}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button
+                        Grid.Column="0"
+                        Text="Lighter"
+                        Command="{Binding LighterCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                    <Button
+                        Grid.Column="1"
+                        Text="Darker"
+                        Command="{Binding DarkerCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                </Grid>
+
+                <!-- Bold -->
+                <HorizontalStackLayout Spacing="10">
+                    <Switch IsToggled="{Binding Bold, Mode=TwoWay}" VerticalOptions="Center" />
+                    <Label Text="Bold" VerticalOptions="Center" Style="{StaticResource LabelHud}" />
+                </HorizontalStackLayout>
+
+                <!-- Bottom margin -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label
+                        Grid.Column="0"
+                        Text="Distance from the bottom"
+                        VerticalOptions="Center"
+                        Style="{StaticResource LabelHud}" />
+                    <Label
+                        Grid.Column="1"
+                        Text="{Binding MarginText}"
+                        VerticalOptions="Center"
+                        Style="{StaticResource LabelHud}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button
+                        Grid.Column="0"
+                        Text="Lower"
+                        Command="{Binding LowerCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                    <Button
+                        Grid.Column="1"
+                        Text="Higher"
+                        Command="{Binding HigherCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                </Grid>
+
+                <!-- Defaults -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button
+                        Grid.Column="0"
+                        Text="Save as default"
+                        Command="{Binding SaveAsDefaultCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                    <Button
+                        Grid.Column="1"
+                        Text="Back to default"
+                        Command="{Binding RestoreDefaultCommand}"
+                        Style="{StaticResource ButtonHud}" />
+                </Grid>
+
+                <Label Text="{Binding StatusMessage}" Style="{StaticResource LabelHud}" />
+
+                <Label
+                    Text="{Binding ErrorMessage}"
+                    IsVisible="{Binding HasError}"
+                    TextColor="{DynamicResource ColorDanger}" />
+            </VerticalStackLayout>
+        </ScrollView>
+        </Grid>
+    </Grid>
+</ContentPage>

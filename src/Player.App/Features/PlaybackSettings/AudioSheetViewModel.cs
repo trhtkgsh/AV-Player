@@ -24,6 +24,7 @@ public sealed partial class AudioSheetViewModel : ObservableObject
     private readonly IPlaybackStateRecorder _recorder;
     private bool _active;
     private bool _closing;
+    private int _runningDelays;
 
     [ObservableProperty] private long _delayMs;
     [ObservableProperty] private string _delayText = "0 ms";
@@ -111,6 +112,7 @@ public sealed partial class AudioSheetViewModel : ObservableObject
     {
         long value = Math.Clamp(requested, MinDelayMs, MaxDelayMs);
         DelayMs = value; // synchronous: the next tap steps from this value
+        _runningDelays++;
 
         try
         {
@@ -121,7 +123,12 @@ public sealed partial class AudioSheetViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
-            ResetFromEngine();
+            // Reset only when no other delay step is in flight: it would overwrite the value of that step.
+            if (_runningDelays == 1) ResetFromEngine();
+        }
+        finally
+        {
+            _runningDelays--;
         }
     }
 

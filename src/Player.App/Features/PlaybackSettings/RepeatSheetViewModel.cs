@@ -44,9 +44,6 @@ public sealed partial class RepeatSheetViewModel : ObservableObject
     {
         if (_active) return;
 
-        // A point A that was set on another file is ignored and dropped.
-        if (_draft.FileId != _engine.Snapshot.Current) _draft.Clear();
-
         _active = true;
         _coordinator.Changed += OnCoordinatorChanged;
         ErrorMessage = "";
@@ -70,15 +67,21 @@ public sealed partial class RepeatSheetViewModel : ObservableObject
     [RelayCommand]
     private Task SetRepeatFolderAsync() => ApplyRepeatAsync(RepeatMode.Folder);
 
-    /// <summary>Stores the current position as A. Any range that is set is cleared first.</summary>
+    /// <summary>Stores the current position as A. Does nothing when no file is playing. Any range that is set is cleared first.</summary>
     [RelayCommand]
     private async Task SetAAsync()
     {
+        // Read before the await: the position must be the one the user saw when tapping.
+        MediaFileId? file = _engine.Snapshot.Current;
+        if (file is null) return;
+
+        long position = _engine.Snapshot.PositionMs;
+
         try
         {
             await _coordinator.SetAbRepeatAsync(null, CancellationToken.None);
-            _draft.StartMs = _engine.Snapshot.PositionMs;
-            _draft.FileId = _engine.Snapshot.Current;
+            _draft.StartMs = position;
+            _draft.FileId = file;
             ErrorMessage = "";
         }
         catch (Exception ex)
@@ -108,6 +111,10 @@ public sealed partial class RepeatSheetViewModel : ObservableObject
             _draft.Clear();
             ErrorMessage = "";
         }
+        catch (ArgumentException)
+        {
+            ErrorMessage = "This A-B range is not valid for this file.";
+        }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
@@ -116,14 +123,14 @@ public sealed partial class RepeatSheetViewModel : ObservableObject
         RefreshAb();
     }
 
-    /// <summary>Removes the range and the point A.</summary>
+    /// <summary>Removes the range and the point A. The point A is dropped only when the coordinator accepted the change.</summary>
     [RelayCommand]
     private async Task ClearAbAsync()
     {
-        _draft.Clear();
         try
         {
             await _coordinator.SetAbRepeatAsync(null, CancellationToken.None);
+            _draft.Clear();
             ErrorMessage = "";
         }
         catch (Exception ex)
@@ -184,6 +191,9 @@ public sealed partial class RepeatSheetViewModel : ObservableObject
 
     private void RefreshAb()
     {
+        // A point A of another file is dropped, so it cannot become valid again when the player returns to that file.
+        if (_draft.FileId != _engine.Snapshot.Current) _draft.Clear();
+
         AbRepeat? range = _coordinator.AbRepeat;
         long? draftStart = DraftStartForCurrentFile();
 
