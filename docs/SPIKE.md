@@ -72,6 +72,11 @@ Evidence: `docs/evidence/phase1/`.
 24. **MAUI mirrors `Path` shapes and the layout when the flow direction is right to left.** Media transport controls must set `FlowDirection="LeftToRight"` themselves. A text view takes its paragraph direction from the first strong character, so a Hebrew word in a left-to-right page (and the reverse) jumps to the far edge unless it starts with a direction mark.
 25. **Test tooling.** The Android per-app locale (`cmd locale set-app-locales <package> --user 0 --locales he-IL`) makes the app see a Hebrew device. `adb shell monkey -f <script>` with `PinchZoom(...)` injects a real two-finger pinch (it also changes the rotation: lock it again afterwards); `sendevent` is denied on the Play Store images and the emulator console does not deliver `BTN_TOUCH` to the touch device. `adb shell settings put secure immersive_mode_confirmations confirmed` removes the system's full-screen hint, which otherwise swallows the first touches.
 
+### Findings added in the Phase 3 revision (emulator API 34, 2026-11-15)
+
+26. **A seek while paused draws the frame of the new position** (`IPlayerEngine.SeekAsync` on a paused input, hardware and software decoder). So the seek gesture can show the target picture without playing and without any engine change: the HUD pauses, seeks while the finger moves and resumes on release. Not measured: how fast a real phone redraws on a long 1080p or 4K file with far-apart key frames.
+27. **Showing and hiding the system bars does not move the picture when the window is laid out edge to edge.** Below API 35 the window must be told so (`WindowCompat.SetDecorFitsSystemWindows(window, false)`); from API 35 it is the default. The space of the bars and of a display cutout is read with `GetInsetsIgnoringVisibility`, so the HUD's paddings do not change when the bars hide. `input swipe x y x y 1600` injects a long press.
+
 ## Go / no-go
 
 **GO for LibVLCSharp (LibVLC 3) as the engine. The Media3 fallback is not needed.**

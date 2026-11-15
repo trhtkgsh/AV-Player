@@ -44,6 +44,14 @@
 - The battery level comes from MAUI's `Battery` API; the permission it requires is declared in `BatteryPermission.cs`.
 - Texts come from `PlayerStrings` (spec 10). Error alerts show localized generic texts; the engine's own message goes to the debug log.
 
+**Decisions made in the Phase 3 revision (spec 11; they win over the text above).**
+- Top bar: the title has the first line to itself. Second line: status (clock and battery), the speed chip, Aspect, the menu button, Lock. There is no Back button (the system Back closes the player) and no Subtitles, Audio, Repeat or decoder button.
+- The menu is an action sheet: "Subtitles", "Audio track", "Repeat", "Decoder: HW" or "Decoder: SW". The first three open their sheets; the last one switches the decoder.
+- Bottom bar: the seek row and Previous, Play or Pause, Next. Nothing else.
+- The system bars follow the controls: `IVideoSurface.SetSystemBarsVisible` is called with the visibility of the HUD. The bars' paddings come from `IVideoSurface.SystemBarInsets`, so the controls keep clear of the bars and of a camera hole. The picture never moves.
+- Seek drag: playback is paused when the drag starts, each move seeks to the target (only the latest target is sent while a seek is running), so the picture shows the target frame. On release playback continues when it was playing before; a cancelled drag returns to the start position.
+- `LongPress` while playing and not locked: the speed becomes `UiSettings.LongPressSpeed` with a held indicator, and the earlier speed returns when the finger lifts. The change is never recorded for the file.
+
 **Out of scope.** Touch recognition, surface rendering, engine code, settings pages, PiP implementation.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned path is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

@@ -33,6 +33,10 @@
 - The surface keeps its last shape when the engine reports "no format" (a stop); a newly attached view starts from the engine's current format.
 - The engine fills the surface exactly (it sets LibVLC's aspect ratio to the surface size), so the rectangle computed here is the shape of the picture in every mode.
 
+**Decisions made in the Phase 3 revision (spec 11; they win over the text above).**
+- `SetImmersive(true)` is the player mode: the window is laid out edge to edge and the system bars start hidden. `SetSystemBarsVisible` shows or hides them inside that mode without a new layout, so the picture never moves.
+- `SystemBarInsets` gives the space taken by the system bars and the display cutout (read ignoring visibility), for the HUD's paddings. It is read again after a mode change and after a layout of the container.
+
 **Out of scope.** Touch recognition (gestures). HUD (player-hud-ui). Engine internals. Picture-in-Picture.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned path is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

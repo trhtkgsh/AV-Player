@@ -36,6 +36,10 @@
 - Every stored field is read tolerantly whatever its JSON kind, so one bad field never loses the others.
 - Texts come from `InterfaceStrings` (spec 10); a failed save shows a localized text.
 
+**Decisions made in the Phase 3 revision (spec 11; they win over the text above).**
+- New stored fields: `Layout` (List, Grid), `ExplorerFontScale` (0.8 to 1.6), `IncludeAudioOnlyFolders` (default on), `LongPressSpeed` (0.25 to 4.0, default 2.0). `ViewMode` has four values (Folders, Flat, Tree, Favorites).
+- New rows on the Interface page: "Speed while holding the picture", "Size of names", "Show folders with audio only". The view mode and the layout are chosen in the explorer, not here.
+
 **Out of scope.** Playback defaults, theming page content, explorer and HUD reactions to the settings.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

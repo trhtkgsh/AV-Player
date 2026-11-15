@@ -34,6 +34,9 @@
 - A one-pointer drag is a `Pan` while the picture is zoomed: `GestureSource` reads `IVideoSurface.Transform.Scale` before each touch-down.
 - A long press without movement is a tap. `Reset()` drops pending state when the view detaches.
 
+**Decisions made in the Phase 3 revision (spec 11; they win over the text above).**
+- A finger held still for `LongPressMs` (500 ms) is `GestureKind.LongPress`: `Began` when the time has passed, `Ended` when the finger lifts, `Cancelled` when a second finger comes down or the touch is cancelled. A shorter hold is still a tap. Movement beyond the slop before the time has passed starts a drag instead.
+
 **Out of scope.** Applying gestures (player-hud-ui ViewModel). OSD visuals. Zoom limits (video-surface).
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

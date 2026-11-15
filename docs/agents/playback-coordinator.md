@@ -31,6 +31,8 @@
 - Covered by test-writer with fakes: every step above, including two overlapping `OpenAsync` calls and an `Ended` event that arrives during `NextAsync`.
 - Device: next/previous through a folder, each repeat mode at end of file, an A-B loop of 5 s runs 10 times without drifting.
 
+**Decisions made in the Phase 3 revision (spec 11).** The coordinator reads the folder's settings (`IFolderSettingsStore`, by the item's bucket) and passes them to the resolver, so the speed of a file is its own saved speed, then the folder's default speed, then the general default. A failed read of the folder settings is treated as "no folder settings".
+
 **Out of scope.** Engine internals. Persisting per-file state (playback-state-store). UI. Subtitle and track policy (subtitles-audio). Media session and service.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned path is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

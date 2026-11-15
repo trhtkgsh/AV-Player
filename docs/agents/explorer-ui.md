@@ -32,6 +32,14 @@
 - `[ObservableProperty]` and `[RelayCommand]` only. No logic in code-behind. `DynamicResource` tokens only.
 - Device: spec 01 acceptance list.
 
+**Decisions made in the Phase 3 revision (spec 11; they win over the text above).**
+- Also uses `IFolderSettingsStore`. New pure logic in Core/Logic/Explorer: `FolderTree` (the media folders as a directory tree, one level at a time) and `GridTiles` (column count).
+- "View" opens a list of four modes saved in `UiSettings.ViewMode`: Media folders, File browser (the tree; the system Back goes one level up; a directory with files and sub-directories shows a first row "Files in this folder"), Favorites (folders with `FolderSettings.Favorite`), All files.
+- "Grid" or "List" toggles `UiSettings.Layout` for both pages: two columns in portrait, up to four in landscape.
+- Folder options open from a three-dot button on the folder's row or tile (MAUI has no long-press recognizer for list rows): add to or remove from favorites, default speed for the folder (a fixed list of speeds and "Use the general default"). File options stay a Phase 5 task.
+- Folders with `MediaFolder.AudioOnly` are hidden in every mode while `UiSettings.IncludeAudioOnlyFolders` is false; in "All files" their files are hidden too.
+- Folder and file names use `UiSettings.ExplorerFontScale`; detail lines keep their size.
+
 **Out of scope.** MediaStore access, thumbnail decoding, file operations, the player page, settings pages.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

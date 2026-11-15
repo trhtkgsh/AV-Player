@@ -28,6 +28,8 @@
 - Build green. Pure classes covered by test-writer.
 - Device: API 30+ and, if available, API 29 or lower. 500+ files load in under 2 s. Denying the permission returns false without a crash. Adding a file with another app refreshes the list.
 
+**Decisions made in the Phase 3 revision (spec 11).** `MediaFolder.AudioOnly` is true when no file of the folder is a video. The library always returns every folder; the explorer hides the audio-only ones when the setting says so.
+
 **Out of scope.** Thumbnails and durations (thumbnail-cache). Sort and search (explorer-ui). Rename and trash (file-ops). SAF folder trees.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.
