@@ -3,7 +3,7 @@ using Player.Core.Contracts;
 using Player.Core.Models;
 using SQLite;
 
-namespace Player.Data.PlaybackStateStore;
+namespace Player.Data.PlaybackStateStorage;
 
 /// <summary>Per-file playback state in table playback_state. Never touches the settings table.</summary>
 public sealed class PlaybackStateRepository : IPlaybackStateStore
@@ -101,8 +101,8 @@ public sealed class PlaybackStateRepository : IPlaybackStateStore
             Finished = row.Finished,
             LastPlayedUtc = row.LastPlayedUtc,
             Speed = overrides.Speed,
-            Decoder = overrides.Decoder,
-            Aspect = overrides.Aspect,
+            Decoder = overrides.GetDecoder(),
+            Aspect = overrides.GetAspect(),
             AudioTrackId = overrides.AudioTrackId,
             AudioDelayMs = overrides.AudioDelayMs,
             SubtitleTrackId = overrides.SubtitleTrackId,

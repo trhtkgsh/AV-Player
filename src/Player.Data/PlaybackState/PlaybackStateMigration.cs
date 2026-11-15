@@ -1,7 +1,7 @@
 using Player.Core.Contracts;
 using SQLite;
 
-namespace Player.Data.PlaybackStateStore;
+namespace Player.Data.PlaybackStateStorage;
 
 public sealed class PlaybackStateMigration : IDbMigration
 {

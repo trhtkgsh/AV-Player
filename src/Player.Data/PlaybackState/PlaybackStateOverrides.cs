@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Player.Core.Models;
 
-namespace Player.Data.PlaybackStateStore;
+namespace Player.Data.PlaybackStateStorage;
 
 /// <summary>
 /// The nullable per-file fields of <see cref="PlaybackState"/>, stored together as
@@ -11,8 +11,13 @@ namespace Player.Data.PlaybackStateStore;
 public sealed class PlaybackStateOverrides
 {
     public float? Speed { get; set; }
-    public DecoderMode? Decoder { get; set; }
-    public AspectMode? Aspect { get; set; }
+
+    /// <summary>The <see cref="DecoderMode"/> name. Read with <see cref="GetDecoder"/>.</summary>
+    public string? Decoder { get; set; }
+
+    /// <summary>The <see cref="AspectMode"/> name. Read with <see cref="GetAspect"/>.</summary>
+    public string? Aspect { get; set; }
+
     public int? AudioTrackId { get; set; }
     public long? AudioDelayMs { get; set; }
     public int? SubtitleTrackId { get; set; }
@@ -25,11 +30,20 @@ public sealed class PlaybackStateOverrides
         AudioDelayMs is null && SubtitleTrackId is null && SubtitleDelayMs is null &&
         ExternalSubtitleUri is null;
 
+    /// <summary>Null when not set, not a name of <see cref="DecoderMode"/>, or an undefined value.</summary>
+    public DecoderMode? GetDecoder() => ParseEnum<DecoderMode>(Decoder);
+
+    /// <summary>Null when not set, not a name of <see cref="AspectMode"/>, or an undefined value.</summary>
+    public AspectMode? GetAspect() => ParseEnum<AspectMode>(Aspect);
+
+    private static T? ParseEnum<T>(string? text) where T : struct, Enum =>
+        Enum.TryParse<T>(text, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed) ? parsed : null;
+
     public static PlaybackStateOverrides From(PlaybackState state) => new()
     {
         Speed = state.Speed,
-        Decoder = state.Decoder,
-        Aspect = state.Aspect,
+        Decoder = state.Decoder?.ToString(),
+        Aspect = state.Aspect?.ToString(),
         AudioTrackId = state.AudioTrackId,
         AudioDelayMs = state.AudioDelayMs,
         SubtitleTrackId = state.SubtitleTrackId,
@@ -67,9 +81,7 @@ public sealed class PlaybackStateOverrides
     }
 }
 
-[JsonSourceGenerationOptions(
-    UseStringEnumConverter = true,
-    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(PlaybackStateOverrides))]
 public sealed partial class PlaybackStateJsonContext : JsonSerializerContext
 {
