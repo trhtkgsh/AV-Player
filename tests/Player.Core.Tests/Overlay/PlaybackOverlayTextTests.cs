@@ -144,6 +144,102 @@ public sealed class PlaybackOverlayTextTests
         Assert.Throws<ArgumentNullException>(
             () => PlaybackOverlayText.FormatLine(null!, Pos, Dur, "21:05", 80));
 
+    private static PlaybackOverlaySettings Corners(
+        OverlayCorner time, OverlayCorner clock, OverlayCorner battery,
+        OverlayTimeMode mode = OverlayTimeMode.Elapsed, bool clockOn = true, bool batteryOn = true) =>
+        new()
+        {
+            Time = mode, Corner = time, Clock = clockOn, ClockCorner = clock,
+            Battery = batteryOn, BatteryCorner = battery,
+        };
+
+    [Fact]
+    public void FormatCorner_AllItemsInOneCorner_EqualsFormatLine()
+    {
+        var s = Corners(OverlayCorner.TopLeft, OverlayCorner.TopLeft, OverlayCorner.TopLeft,
+            OverlayTimeMode.ElapsedTotal);
+        Assert.Equal(PlaybackOverlayText.FormatLine(s, Pos, Dur, "21:05", 80),
+            PlaybackOverlayText.FormatCorner(s, OverlayCorner.TopLeft, Pos, Dur, "21:05", 80));
+        Assert.Equal("12:30 / 45:00  21:05  80%",
+            PlaybackOverlayText.FormatCorner(s, OverlayCorner.TopLeft, Pos, Dur, "21:05", 80));
+    }
+
+    [Fact]
+    public void FormatCorner_ItemsInDifferentCorners_EachOnlyInOwnCorner()
+    {
+        var s = Corners(OverlayCorner.TopLeft, OverlayCorner.TopRight, OverlayCorner.BottomLeft);
+        Assert.Equal("12:30", PlaybackOverlayText.FormatCorner(s, OverlayCorner.TopLeft, Pos, Dur, "21:05", 80));
+        Assert.Equal("21:05", PlaybackOverlayText.FormatCorner(s, OverlayCorner.TopRight, Pos, Dur, "21:05", 80));
+        Assert.Equal("80%", PlaybackOverlayText.FormatCorner(s, OverlayCorner.BottomLeft, Pos, Dur, "21:05", 80));
+    }
+
+    [Fact]
+    public void FormatCorner_NoItemInCorner_IsEmpty()
+    {
+        var s = Corners(OverlayCorner.TopLeft, OverlayCorner.TopRight, OverlayCorner.BottomLeft);
+        Assert.Equal("", PlaybackOverlayText.FormatCorner(s, OverlayCorner.BottomRight, Pos, Dur, "21:05", 80));
+    }
+
+    [Fact]
+    public void FormatCorner_ClockAndBatteryShareCorner_JoinedWithTwoSpaces()
+    {
+        var s = Corners(OverlayCorner.TopLeft, OverlayCorner.TopRight, OverlayCorner.TopRight);
+        Assert.Equal("21:05  80%",
+            PlaybackOverlayText.FormatCorner(s, OverlayCorner.TopRight, Pos, Dur, "21:05", 80));
+    }
+
+    [Fact]
+    public void FormatCorner_ClockSwitchOff_LeavesClockOut()
+    {
+        var s = Corners(OverlayCorner.TopLeft, OverlayCorner.TopLeft, OverlayCorner.TopLeft, clockOn: false);
+        Assert.Equal("12:30  80%",
+            PlaybackOverlayText.FormatCorner(s, OverlayCorner.TopLeft, Pos, Dur, "21:05", 80));
+    }
+
+    [Fact]
+    public void FormatCorner_BatterySwitchOff_LeavesBatteryOut()
+    {
+        var s = Corners(OverlayCorner.TopLeft, OverlayCorner.TopLeft, OverlayCorner.TopLeft, batteryOn: false);
+        Assert.Equal("12:30  21:05",
+            PlaybackOverlayText.FormatCorner(s, OverlayCorner.TopLeft, Pos, Dur, "21:05", 80));
+    }
+
+    [Fact]
+    public void FormatCorner_NullClock_LeavesClockOut()
+    {
+        var s = Corners(OverlayCorner.TopLeft, OverlayCorner.TopLeft, OverlayCorner.TopLeft);
+        Assert.Equal("12:30  80%",
+            PlaybackOverlayText.FormatCorner(s, OverlayCorner.TopLeft, Pos, Dur, null, 80));
+    }
+
+    [Fact]
+    public void FormatCorner_NullBattery_LeavesBatteryOut()
+    {
+        var s = Corners(OverlayCorner.TopLeft, OverlayCorner.TopLeft, OverlayCorner.TopLeft);
+        Assert.Equal("12:30  21:05",
+            PlaybackOverlayText.FormatCorner(s, OverlayCorner.TopLeft, Pos, Dur, "21:05", null));
+    }
+
+    [Fact]
+    public void FormatCorner_ClockSwitchOffInItsCorner_CornerIsEmpty()
+    {
+        var s = Corners(OverlayCorner.TopLeft, OverlayCorner.TopRight, OverlayCorner.TopLeft, clockOn: false);
+        Assert.Equal("", PlaybackOverlayText.FormatCorner(s, OverlayCorner.TopRight, Pos, Dur, "21:05", 80));
+    }
+
+    [Fact]
+    public void FormatCorner_TimesModeNone_LeavesTimesOut()
+    {
+        var s = Corners(OverlayCorner.TopLeft, OverlayCorner.TopLeft, OverlayCorner.TopLeft, OverlayTimeMode.None);
+        Assert.Equal("21:05  80%",
+            PlaybackOverlayText.FormatCorner(s, OverlayCorner.TopLeft, Pos, Dur, "21:05", 80));
+    }
+
+    [Fact]
+    public void FormatCorner_NullSettings_Throws() =>
+        Assert.Throws<ArgumentNullException>(
+            () => PlaybackOverlayText.FormatCorner(null!, OverlayCorner.TopLeft, Pos, Dur, "21:05", 80));
+
     [Theory]
     [InlineData(0, Dur, 0.0)]
     [InlineData(Dur / 2, Dur, 0.5)]

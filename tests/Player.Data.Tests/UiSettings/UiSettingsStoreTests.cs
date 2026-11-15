@@ -119,9 +119,8 @@ public sealed class UiSettingsStoreTests : TempDatabaseTestBase
         Assert.Equal(3, value.HudAutoHideSeconds);
         Assert.True(value.ShowClock);
         Assert.True(value.ShowBattery);
-        Assert.Equal(
-            ExplorerInfoFields.Duration | ExplorerInfoFields.Resolution | ExplorerInfoFields.Size,
-            value.ExplorerFields);
+        Assert.Equal(new Player.Core.Models.UiSettings().ExplorerFields, value.ExplorerFields);
+        Assert.Equal(ExplorerInfoFields.None, value.ExplorerFields);
         Assert.Equal(ExplorerViewMode.Folders, value.ViewMode);
         Assert.Equal(SortField.Name, value.SortField);
         Assert.Equal(SortDirection.Ascending, value.SortDirection);
