@@ -205,6 +205,39 @@ The arm64 failures on the ARM translation (SPIKE finding 20):
 
 Not verified at all in Phase 2: pitch at 0.25x and 4.0x and the audio delay by ear (the emulator runs without audio), a file with several audio tracks or embedded subtitle tracks (no such test file), the preferred language defaults on a real file, A-B repeat on the emulator (unit tests only), repeat "Folder" wrap-around on the emulator (unit tests only).
 
+## Phase 3 task log (started 2026-11-15)
+
+Scope decisions by the orchestrator:
+- Owner request: a Hebrew interface as an option. Spec 10 (`docs/specs/10-localization.md`), a new agent `localization` (Sonnet 5.5; spec and `.github/agents/localization.agent.md` written; the agent type is not available to the `task` tool until the session restarts, so it runs through `general-purpose` with the roster model set). Texts live with their module: one `IStringSource` class per module, keys `<Module>.<Name>`. `UiSettings.Language`: System (default, follows the device), English, Hebrew. The language changes at once; the direction is set on the window.
+- The transport bar of the player is never mirrored (left to right in every language); symbols are not mirrored except the back arrow.
+- The window of the player (immersive bars, brightness) belongs to video-surface: `IVideoSurface.SetImmersive`.
+- LibVLC is told to fill the surface exactly (aspect ratio = surface size), so the surface view alone decides the shape of the picture. This makes Stretch work without a contract change to the engine.
+- The coordinator applies the resolved aspect mode when it opens an item (`IVideoSurface.SetAspect`).
+- Top bar of the player: Back, title with a status line (clock and battery), Subtitles, Audio, Repeat, Aspect, Lock.
+- The battery level uses MAUI's `Battery` API; the HUD module declares the permission it requires (`BatteryStats`) with an assembly attribute in its own path (ARCHITECTURE section 2).
+- The first page is created only after the saved theme and language are applied (no flash of the wrong theme or language).
+
+| Task | Agent | Model | Attempts | Result |
+|---|---|---|---|---|
+| P3-01, P3-05 | player-engine, video-surface | Fable 5.2 (orchestrator) | 1, 1 | merged. Owner feedback 6. The video format is read again while the first pictures are shown (LibVLC raises no event when the decoder corrects the track size; before, the next read came only with a pause or a play). The surface keeps its shape when the engine stops, so the last picture is not stretched while the page closes. `SetImmersive`. LibVLC fills the surface. Gate review: approve; its notes fixed in P3-05 (no forced aspect while the format of a new file is unknown, the aspect is sent only when it changes, audio files skip the format checks). The 99% picture could not be reproduced on the emulators (1080p file, portrait and landscape, HW and SW): the fix follows from the code path, not from a reproduction. |
+| P3-02 | player-hud-ui | Haiku 5.5 | 1 | merged. Owner feedback 7. Bottom bar left to right, `HudIconButton.MirrorInRightToLeft`. Reviewer: approve. Emulator with a Hebrew app locale: transport row in place, back arrow mirrored. |
+| P3-03 | core-contracts | Fable 5.2 (orchestrator) | 1 | merged. Contracts: `SetImmersive`, `AppLanguage`, `UiSettings.Language`, `LocalizedText`, `ILocalizer`, `IStringSource`. Spec 10, agent spec. |
+| P3-10 | gestures | Sonnet 5.5 | 2 rounds | merged. `GestureClassifier` (pure), overlay view, `GestureSource`. Gate review: approve; follow-ups done (reset on detach, off-axis delta zero, subscriber exceptions caught). |
+| P3-T1 | test-writer | Sonnet 5.5 | 2 rounds | merged. 125 classifier tests. No product bug. |
+| P3-20a, b, c | theming-engine | Sonnet 5.5 | 2 launches (the first died on a stream error with nothing written), then 3 steps | in review. Accent palette, token resolver, `ThemeSettingsRepository`, runtime swap, system bars, shared styles, theme page (route `settings-theme`). Gate review: changes-required (accent-colored text on the background fails the contrast rule in Light), fixed in P3-20c, second round requested. |
+| P3-30, P3-31, P3-32 | player-hud-ui | Haiku 5.5 | 3 rounds | in review. Gesture handling with OSD (tap, double tap, volume, brightness, seek, zoom, pan), immersive window, new top bar, aspect button, screen lock, battery, texts. Reviewer: changes-required (the lock was released when the app went to the background), fix round running. |
+| P3-40, P3-41 | playback-coordinator | Sonnet 5.5 | 1, 1 | merged. Aspect mode applied on open; not for a cancelled open. Gate review: approve. |
+| P3-50, P3-51 | app-skeleton | Haiku 5.5 | 2 rounds, 1 | P3-50 merged (gestures and localization wired; reviewer: approve). P3-51 in review (first page after the saved theme and language). |
+| L10N-01, L10N-02 | localization | Sonnet 5.5 | 2 rounds | merged. `StringCatalog`, `Localizer`, `{loc:T}`, common texts. Gate review: changes-required (a quick sequence of language changes could end on the wrong one), fixed in L10N-02, second look: approve. |
+| L10N-T1 | test-writer | Sonnet 5.5 | 1 | merged. 69 catalog tests. |
+| L10N-11 | explorer-ui | Haiku 5.5 | 2 rounds | merged. Explorer texts. Reviewer: approve. |
+| L10N-13, L10N-16 | playback-settings-ui | Haiku 5.5 | 3 rounds | merged. Sheet texts. Reviewer: approve; Hebrew corrections applied. |
+| L10N-14 | global-defaults-store | Haiku 5.5 | 3 rounds | merged. Defaults pages texts, default aspect row shown. Reviewer: approve; Hebrew corrections applied. |
+| L10N-15 | ui-settings | Haiku 5.5 | 2 launches (the first died on a stream error after its first commit), 3 steps | in review. Language stored and chosen on the Interface page, skip length, battery switch, Theme row, texts. |
+
+Emulator findings so far (API 34, x86_64): the Hebrew layout works (right to left, texts, counted texts); immersive player; volume, brightness and seek gestures with their OSD; Stretch, Crop and 100% while playing and while paused, with the hardware and the software decoder; pinch zoom works. Known limit: an aspect change after the file has ended shows a wrong picture until playback starts again (nothing renders a new frame).
+Android shows its own "Viewing full screen" hint the first time the player hides the system bars.
+
 ## Known gaps carried forward
 
 - Stretch aspect mode: LibVLC letterboxes inside the surface, so the engine must force the display aspect. Phase 3, needs a contract decision.
