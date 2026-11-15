@@ -58,6 +58,32 @@ internal sealed class FakeVideoSurface : IVideoSurface
     {
     }
 
+    private readonly List<bool> _systemBarsCalls = new();
+
+    /// <summary>Every <see cref="SetSystemBarsVisible"/> argument, in call order.</summary>
+    public IReadOnlyList<bool> SystemBarsCalls
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _systemBarsCalls.ToArray();
+            }
+        }
+    }
+
+    public EdgeInsets SystemBarInsets { get; set; }
+
+    public void SetSystemBarsVisible(bool visible)
+    {
+        lock (_lock)
+        {
+            _systemBarsCalls.Add(visible);
+        }
+
+        _log?.Invoke($"SetSystemBarsVisible:{visible}");
+    }
+
     public void SetTransform(ViewTransform transform) => Transform = transform;
 
     public void SetWindowBrightness(double? value)
