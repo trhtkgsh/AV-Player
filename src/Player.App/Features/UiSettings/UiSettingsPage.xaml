@@ -67,6 +67,14 @@
                          IsChecked="{Binding IsEdgeTop, Mode=TwoWay}" />
 
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" Text="{loc:T Interface.Overlay.ProgressLineThickness}" VerticalOptions="Center" />
+                <Label Grid.Column="1" Text="{Binding OverlayLineThicknessText}" VerticalOptions="Center" />
+            </Grid>
+            <Slider Minimum="1" Maximum="12"
+                    Value="{Binding OverlayLineThickness, Mode=TwoWay}"
+                    DragCompletedCommand="{Binding SaveOverlayLineThicknessCommand}" />
+
+            <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
                 <Label Grid.Column="0" Text="{loc:T Interface.Overlay.Clock}" VerticalOptions="Center" />
                 <Switch Grid.Column="1" IsToggled="{Binding OverlayClock, Mode=TwoWay}" />
             </Grid>
@@ -98,6 +106,26 @@
                          IsChecked="{Binding IsCornerBottomLeft, Mode=TwoWay}" />
             <RadioButton Content="{loc:T Interface.Overlay.Corner.BottomRight}" GroupName="OverlayCorner"
                          IsChecked="{Binding IsCornerBottomRight, Mode=TwoWay}" />
+
+            <Label Text="{loc:T Interface.Overlay.ClockCorner}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.TopLeft}" GroupName="OverlayClockCorner"
+                         IsChecked="{Binding IsClockCornerTopLeft, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.TopRight}" GroupName="OverlayClockCorner"
+                         IsChecked="{Binding IsClockCornerTopRight, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.BottomLeft}" GroupName="OverlayClockCorner"
+                         IsChecked="{Binding IsClockCornerBottomLeft, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.BottomRight}" GroupName="OverlayClockCorner"
+                         IsChecked="{Binding IsClockCornerBottomRight, Mode=TwoWay}" />
+
+            <Label Text="{loc:T Interface.Overlay.BatteryCorner}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.TopLeft}" GroupName="OverlayBatteryCorner"
+                         IsChecked="{Binding IsBatteryCornerTopLeft, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.TopRight}" GroupName="OverlayBatteryCorner"
+                         IsChecked="{Binding IsBatteryCornerTopRight, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.BottomLeft}" GroupName="OverlayBatteryCorner"
+                         IsChecked="{Binding IsBatteryCornerBottomLeft, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.Overlay.Corner.BottomRight}" GroupName="OverlayBatteryCorner"
+                         IsChecked="{Binding IsBatteryCornerBottomRight, Mode=TwoWay}" />
 
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
                 <Label Grid.Column="0" Text="{loc:T Interface.Overlay.Margin}" VerticalOptions="Center" />
@@ -132,6 +160,12 @@
                          IsChecked="{Binding IsColorRed, Mode=TwoWay}" />
 
             <Label Text="{loc:T Interface.FileList}" Style="{StaticResource LabelSection}" Margin="0,16,0,0" />
+
+            <Label Text="{loc:T Interface.ItemSize}" />
+            <RadioButton Content="{loc:T Interface.ItemSize.Large}" GroupName="ItemSize"
+                         IsChecked="{Binding IsItemSizeLarge, Mode=TwoWay}" />
+            <RadioButton Content="{loc:T Interface.ItemSize.Small}" GroupName="ItemSize"
+                         IsChecked="{Binding IsItemSizeSmall, Mode=TwoWay}" />
 
             <Grid Style="{StaticResource SettingsRow}" ColumnDefinitions="*,Auto">
                 <Label Grid.Column="0" Text="{loc:T Interface.NameSize}" VerticalOptions="Center" />

@@ -46,6 +46,12 @@
 - "Theme accent" is not offered: reading the accent needs the theming store, which is not a read-only contract for this module.
 - The "While the controls are hidden" group sits in the Player section. Switches and radios save at once. Margin and size are sliders that save on release.
 
+**Decisions made for R7-10 (2026-11-15, spec 13 items 5 to 8; they win over the text above).**
+- New stored keys in the same `ui_settings` row: `ItemSize` (Large, Small; enum name), `OverlayProgressLineThickness` (1 .. 12, clamped), `OverlayClockCorner` and `OverlayBatteryCorner` (enum names). `OverlayCorner` keeps its key and now means the corner of the times. Defaults: thickness 2, times top right, clock and battery top left.
+- Row version: the row holds an integer `SchemaVersion` (not a model field). Version 2 is written on every save, so a new installation writes 2.
+- One-time switch of the details: a row without `SchemaVersion`, or with a value below 2, is read with `ExplorerFields = None`. Reading never writes; the next save writes version 2 with the fields the user has. A row at version 2 keeps its stored `ExplorerFields`.
+- The page shows "Item size" (radios, "File list" section), "Line thickness" (slider 1 .. 12, saves on release, after the progress line edge) and two more corner groups, "Corner of the clock" and "Corner of the battery level". The page has no picker, so the corners are radio groups as before.
+
 **Out of scope.** Playback defaults, theming page content, explorer and HUD reactions to the settings.
 
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.

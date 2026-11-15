@@ -116,6 +116,24 @@ public sealed partial class UiSettingsViewModel : ObservableObject
     private OverlayCorner _cornerChoice = OverlayCorner.TopRight;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsClockCornerTopLeft), nameof(IsClockCornerTopRight),
+        nameof(IsClockCornerBottomLeft), nameof(IsClockCornerBottomRight))]
+    private OverlayCorner _clockCornerChoice = OverlayCorner.TopLeft;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBatteryCornerTopLeft), nameof(IsBatteryCornerTopRight),
+        nameof(IsBatteryCornerBottomLeft), nameof(IsBatteryCornerBottomRight))]
+    private OverlayCorner _batteryCornerChoice = OverlayCorner.TopLeft;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsItemSizeLarge), nameof(IsItemSizeSmall))]
+    private ExplorerItemSize _itemSizeChoice = ExplorerItemSize.Large;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OverlayLineThicknessText))]
+    private double _overlayLineThickness = 2;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsColorWhite), nameof(IsColorLightGray), nameof(IsColorYellow),
         nameof(IsColorGreen), nameof(IsColorCyan), nameof(IsColorOrange), nameof(IsColorRed))]
     private uint _colorChoice = 0xFFFFFFFF;
@@ -156,6 +174,10 @@ public sealed partial class UiSettingsViewModel : ObservableObject
 
     public string OverlayMarginText =>
         ClampRound(OverlayMargin, PlaybackOverlaySettings.MinMarginDp, PlaybackOverlaySettings.MaxMarginDp)
+            .ToString(CultureInfo.InvariantCulture);
+
+    public string OverlayLineThicknessText =>
+        ClampRound(OverlayLineThickness, PlaybackOverlaySettings.MinProgressLineThickness, PlaybackOverlaySettings.MaxProgressLineThickness)
             .ToString(CultureInfo.InvariantCulture);
 
     public string OverlaySizeText =>
@@ -232,6 +254,66 @@ public sealed partial class UiSettingsViewModel : ObservableObject
     {
         get => CornerChoice == OverlayCorner.BottomRight;
         set => ChooseCorner(OverlayCorner.BottomRight, value);
+    }
+
+    public bool IsClockCornerTopLeft
+    {
+        get => ClockCornerChoice == OverlayCorner.TopLeft;
+        set => ChooseClockCorner(OverlayCorner.TopLeft, value);
+    }
+
+    public bool IsClockCornerTopRight
+    {
+        get => ClockCornerChoice == OverlayCorner.TopRight;
+        set => ChooseClockCorner(OverlayCorner.TopRight, value);
+    }
+
+    public bool IsClockCornerBottomLeft
+    {
+        get => ClockCornerChoice == OverlayCorner.BottomLeft;
+        set => ChooseClockCorner(OverlayCorner.BottomLeft, value);
+    }
+
+    public bool IsClockCornerBottomRight
+    {
+        get => ClockCornerChoice == OverlayCorner.BottomRight;
+        set => ChooseClockCorner(OverlayCorner.BottomRight, value);
+    }
+
+    public bool IsBatteryCornerTopLeft
+    {
+        get => BatteryCornerChoice == OverlayCorner.TopLeft;
+        set => ChooseBatteryCorner(OverlayCorner.TopLeft, value);
+    }
+
+    public bool IsBatteryCornerTopRight
+    {
+        get => BatteryCornerChoice == OverlayCorner.TopRight;
+        set => ChooseBatteryCorner(OverlayCorner.TopRight, value);
+    }
+
+    public bool IsBatteryCornerBottomLeft
+    {
+        get => BatteryCornerChoice == OverlayCorner.BottomLeft;
+        set => ChooseBatteryCorner(OverlayCorner.BottomLeft, value);
+    }
+
+    public bool IsBatteryCornerBottomRight
+    {
+        get => BatteryCornerChoice == OverlayCorner.BottomRight;
+        set => ChooseBatteryCorner(OverlayCorner.BottomRight, value);
+    }
+
+    public bool IsItemSizeLarge
+    {
+        get => ItemSizeChoice == ExplorerItemSize.Large;
+        set => ChooseItemSize(ExplorerItemSize.Large, value);
+    }
+
+    public bool IsItemSizeSmall
+    {
+        get => ItemSizeChoice == ExplorerItemSize.Small;
+        set => ChooseItemSize(ExplorerItemSize.Small, value);
     }
 
     public bool IsColorWhite
@@ -341,13 +423,17 @@ public sealed partial class UiSettingsViewModel : ObservableObject
             IsLanguageHebrew = settings.Language == AppLanguage.Hebrew;
             OverlayProgressLine = settings.Overlay.ProgressLine;
             EdgeChoice = settings.Overlay.ProgressLineEdge;
+            OverlayLineThickness = settings.Overlay.ProgressLineThickness;
             OverlayClock = settings.Overlay.Clock;
             OverlayBattery = settings.Overlay.Battery;
             TimeChoice = settings.Overlay.Time;
             CornerChoice = settings.Overlay.Corner;
+            ClockCornerChoice = settings.Overlay.ClockCorner;
+            BatteryCornerChoice = settings.Overlay.BatteryCorner;
             OverlayMargin = settings.Overlay.MarginDp;
             OverlaySize = settings.Overlay.FontSize;
             ColorChoice = settings.Overlay.ColorArgb;
+            ItemSizeChoice = settings.ItemSize;
         }
         finally
         {
@@ -401,6 +487,15 @@ public sealed partial class UiSettingsViewModel : ObservableObject
         // Snap the slider to the value that is saved, so the thumb shows the stored number.
         NameSizePercent = SnapPercent(NameSizePercent);
         return SaveAsync(current => current with { ExplorerFontScale = SnapPercent(NameSizePercent) / 100 });
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task SaveOverlayLineThickness()
+    {
+        // Snap the slider to the value that is saved, so the thumb shows the stored number.
+        OverlayLineThickness = ClampRound(OverlayLineThickness,
+            PlaybackOverlaySettings.MinProgressLineThickness, PlaybackOverlaySettings.MaxProgressLineThickness);
+        return SaveOverlay(overlay => overlay with { ProgressLineThickness = (int)OverlayLineThickness });
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -475,6 +570,39 @@ public sealed partial class UiSettingsViewModel : ObservableObject
 
         CornerChoice = value;
         _ = SaveOverlay(overlay => overlay with { Corner = value });
+    }
+
+    private void ChooseClockCorner(OverlayCorner value, bool isChosen)
+    {
+        if (!isChosen || _loading || ClockCornerChoice == value)
+        {
+            return;
+        }
+
+        ClockCornerChoice = value;
+        _ = SaveOverlay(overlay => overlay with { ClockCorner = value });
+    }
+
+    private void ChooseBatteryCorner(OverlayCorner value, bool isChosen)
+    {
+        if (!isChosen || _loading || BatteryCornerChoice == value)
+        {
+            return;
+        }
+
+        BatteryCornerChoice = value;
+        _ = SaveOverlay(overlay => overlay with { BatteryCorner = value });
+    }
+
+    private void ChooseItemSize(ExplorerItemSize value, bool isChosen)
+    {
+        if (!isChosen || _loading || ItemSizeChoice == value)
+        {
+            return;
+        }
+
+        ItemSizeChoice = value;
+        _ = SaveAsync(current => current with { ItemSize = value });
     }
 
     private void ChooseColor(uint value, bool isChosen)
