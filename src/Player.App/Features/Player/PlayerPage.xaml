@@ -11,9 +11,10 @@
     x:DataType="vm:PlayerViewModel"
     Shell.NavBarIsVisible="False"
     Shell.TabBarIsVisible="False"
+    SafeAreaEdges="None"
     BackgroundColor="{DynamicResource ColorBackground}">
 
-    <Grid>
+    <Grid SafeAreaEdges="None">
         <!-- (a) The picture, behind everything. -->
         <surface:VideoSurfaceView HorizontalOptions="Fill" VerticalOptions="Fill" />
 
