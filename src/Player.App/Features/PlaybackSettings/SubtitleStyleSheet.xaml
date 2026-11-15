@@ -35,7 +35,7 @@
 
                 <Label Text="{loc:T Sheets.Style.Title}" Style="{StaticResource LabelHud}" />
                 <Label
-                                    Text="{loc:T Sheets.Style.Note}"
+                    Text="{loc:T Sheets.Style.Note}"
                     FontSize="12"
                     Style="{StaticResource LabelHud}" />
 
