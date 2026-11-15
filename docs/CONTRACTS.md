@@ -13,6 +13,10 @@ Changes after the freeze (orchestrator only, each one logged in PROGRESS.md):
 - 2026-11-15, Phase 2 (gate review): `IPlayerEngine.AddSubtitleFileAsync` takes a `displayName` for the file's track
   (LibVLC names it after the path of the local copy), and `ExternalSubtitlePath` reports the file the engine holds,
   so the subtitle service never adds the same file twice after a restart that the engine handled itself.
+- 2026-11-15, Phase 3: `IVideoSurface.SetImmersive`. The player page hides the system bars; that is window code,
+  which belongs behind the same interface as the window brightness.
+- 2026-11-15, Phase 3 (owner request: a Hebrew interface as an option): `AppLanguage`, `UiSettings.Language`,
+  `LocalizedText`, `ILocalizer`, `IStringSource`. See docs/specs/10-localization.md. Additions only.
 
 Namespaces: `Player.Core.Models`, `Player.Core.Contracts`. All types are public. Nullable enabled.
 
@@ -40,6 +44,7 @@ public enum SortField { Name, DateAdded, Size, Duration }
 public enum SortDirection { Ascending, Descending }
 public enum ExplorerViewMode { Folders, Flat }
 public enum ThemeId { DarkOled, DarkSlate, Light, HighContrast }
+public enum AppLanguage { System, English, Hebrew }          // System follows the language of the device
 public enum ScreenSide { Left, Right }
 public enum GesturePhase { Began, Changed, Ended, Cancelled }
 public enum GestureKind { Tap, DoubleTap, VerticalDrag, HorizontalDrag, Pinch, Pan }
@@ -120,7 +125,10 @@ public sealed record UiSettings
     public SortField SortField { get; init; } = SortField.Name;
     public SortDirection SortDirection { get; init; } = SortDirection.Ascending;
     public int NewTagDays { get; init; } = 7;
+    public AppLanguage Language { get; init; } = AppLanguage.System;
 }
+
+public readonly record struct LocalizedText(string English, string Hebrew);   // one UI text in every language
 
 public sealed record ThemeSettings
 {
@@ -206,6 +214,7 @@ public interface IVideoSurface
     ViewTransform Transform { get; }
     event EventHandler? Changed;
     void SetAspect(AspectMode mode);
+    void SetImmersive(bool enabled);                   // hide the system bars while the player is on screen
     void SetTransform(ViewTransform transform);        // clamped to 100% .. 400%, pan kept inside the picture
     void SetWindowBrightness(double? value);           // 0 .. 1, null = system default
     double WindowBrightness { get; }                   // 0 .. 1, or -1 while the system default is in effect
@@ -297,6 +306,25 @@ public interface IThemeService
     event EventHandler<ThemeSettings>? Changed;
     Task InitializeAsync(CancellationToken ct);                 // load and apply the saved theme
     Task ApplyAsync(ThemeSettings settings, CancellationToken ct);   // swaps resources at runtime and saves
+}
+
+// --- Localization (localization). Texts in the language in effect; follows UiSettings.Language by itself.
+public interface ILocalizer
+{
+    AppLanguage Language { get; }                       // the stored choice
+    string LanguageCode { get; }                        // the language in effect: "en" or "he"
+    bool IsRightToLeft { get; }
+    event EventHandler? Changed;                        // raised on the UI thread (exception to the convention above)
+    string this[string key] { get; }                    // unknown key: the key in square brackets
+    string Format(string key, params object?[] args);
+    string Plural(string key, int count);               // key + ".One" for 1, else key + ".Many" with {0} = count
+    Task InitializeAsync(CancellationToken ct);         // before the first page is shown
+}
+
+// One per module, registered in DI as IStringSource. Keys are unique in the app: "<Module>.<Name>".
+public interface IStringSource
+{
+    IReadOnlyDictionary<string, LocalizedText> Texts { get; }
 }
 
 // --- Subtitles and audio tracks (subtitles-audio). Policy on top of the engine primitives.
