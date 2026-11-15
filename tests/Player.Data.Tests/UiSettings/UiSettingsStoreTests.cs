@@ -592,4 +592,244 @@ public sealed class UiSettingsStoreTests : TempDatabaseTestBase
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => store.SaveAsync(null!, None));
     }
+
+    // ---- Language ----
+
+    public static TheoryData<AppLanguage> LanguageCases => new()
+    {
+        AppLanguage.System,
+        AppLanguage.English,
+        AppLanguage.Hebrew,
+    };
+
+    [Fact]
+    public void UiSettings_Default_LanguageIsSystem()
+    {
+        Assert.Equal(AppLanguage.System, new UiSettings().Language);
+    }
+
+    [Fact]
+    public async Task GetAsync_NoRow_LanguageIsSystem()
+    {
+        var value = await NewStore().GetAsync(None);
+
+        Assert.Equal(AppLanguage.System, value.Language);
+    }
+
+    [Theory]
+    [MemberData(nameof(LanguageCases))]
+    public async Task GetAsync_LanguageSavedOnOtherStore_RoundTrips(AppLanguage language)
+    {
+        await NewStore().SaveAsync(new UiSettings { Language = language }, None);
+
+        var loaded = await NewStore().GetAsync(None);
+
+        Assert.Equal(language, loaded.Language);
+    }
+
+    [Theory]
+    [MemberData(nameof(LanguageCases))]
+    public async Task GetAsync_LanguageSavedOnOtherStore_KeepsOtherMembers(AppLanguage language)
+    {
+        var expected = NonDefault() with { Language = language };
+        await NewStore().SaveAsync(expected, None);
+
+        var loaded = await NewStore().GetAsync(None);
+
+        Assert.Equal(expected, loaded);
+    }
+
+    [Theory]
+    [MemberData(nameof(LanguageCases))]
+    public async Task GetAsync_LanguageSavedOnSameStore_ReturnsSavedLanguage(AppLanguage language)
+    {
+        var store = NewStore();
+        await store.SaveAsync(new UiSettings { Language = language }, None);
+
+        var value = await store.GetAsync(None);
+
+        Assert.Equal(language, value.Language);
+    }
+
+    [Fact]
+    public async Task SaveAsync_HebrewLanguage_StoresNameInRow()
+    {
+        await NewStore().SaveAsync(new UiSettings { Language = AppLanguage.Hebrew }, None);
+
+        var json = await _repository.GetJsonAsync(UiSettingsStore.SettingsKey, None);
+
+        Assert.Contains("\"Hebrew\"", json);
+    }
+
+    [Fact]
+    public async Task SaveAsync_HebrewLanguage_RowHasLanguageAsString()
+    {
+        await NewStore().SaveAsync(new UiSettings { Language = AppLanguage.Hebrew }, None);
+
+        var json = await _repository.GetJsonAsync(UiSettingsStore.SettingsKey, None);
+
+        using var document = System.Text.Json.JsonDocument.Parse(json!);
+        var element = document.RootElement.GetProperty("Language");
+        Assert.Equal(System.Text.Json.JsonValueKind.String, element.ValueKind);
+        Assert.Equal("Hebrew", element.GetString());
+    }
+
+    [Fact]
+    public async Task GetAsync_OldRowWithoutLanguage_LanguageIsSystem()
+    {
+        var value = await LoadRawAsync("{\"SkipSeconds\":15,\"NewTagDays\":12}");
+
+        Assert.Equal(AppLanguage.System, value.Language);
+    }
+
+    [Fact]
+    public async Task GetAsync_OldRowWithoutLanguage_KeepsOtherStoredMembers()
+    {
+        var value = await LoadRawAsync("{\"SkipSeconds\":15,\"NewTagDays\":12}");
+
+        Assert.Equal(15, value.SkipSeconds);
+        Assert.Equal(12, value.NewTagDays);
+    }
+
+    [Theory]
+    [InlineData("\"Klingon\"")]
+    [InlineData("\"\"")]
+    [InlineData("null")]
+    public async Task GetAsync_UnknownEmptyOrNullLanguage_LanguageIsSystem(string literal)
+    {
+        var value = await LoadRawAsync($"{{\"Language\":{literal}}}");
+
+        Assert.Equal(AppLanguage.System, value.Language);
+    }
+
+    [Theory]
+    [InlineData("\"Klingon\"")]
+    [InlineData("\"\"")]
+    [InlineData("null")]
+    public async Task GetAsync_UnknownEmptyOrNullLanguage_KeepsOtherStoredMembers(string literal)
+    {
+        var value = await LoadRawAsync($"{{\"Language\":{literal},\"SkipSeconds\":15,\"NewTagDays\":12}}");
+
+        Assert.Equal(15, value.SkipSeconds);
+        Assert.Equal(12, value.NewTagDays);
+    }
+
+    [Theory]
+    [InlineData("hebrew", AppLanguage.Hebrew)]
+    [InlineData("HEBREW", AppLanguage.Hebrew)]
+    [InlineData("english", AppLanguage.English)]
+    [InlineData("sYsTeM", AppLanguage.System)]
+    public async Task GetAsync_LanguageNameInOtherCase_IsAccepted(string name, AppLanguage expected)
+    {
+        var value = await LoadRawAsync($"{{\"Language\":\"{name}\"}}");
+
+        Assert.Equal(expected, value.Language);
+    }
+
+    [Theory]
+    [InlineData("2", AppLanguage.Hebrew)]
+    [InlineData("1", AppLanguage.English)]
+    [InlineData("0", AppLanguage.System)]
+    public async Task GetAsync_DefinedNumberInString_IsAccepted(string number, AppLanguage expected)
+    {
+        var value = await LoadRawAsync($"{{\"Language\":\"{number}\"}}");
+
+        Assert.Equal(expected, value.Language);
+    }
+
+    [Theory]
+    [InlineData("7")]
+    [InlineData("-1")]
+    public async Task GetAsync_UndefinedNumberInString_LanguageIsSystem(string number)
+    {
+        var value = await LoadRawAsync($"{{\"Language\":\"{number}\"}}");
+
+        Assert.Equal(AppLanguage.System, value.Language);
+    }
+
+    [Theory]
+    [InlineData("7")]
+    [InlineData("-1")]
+    public async Task GetAsync_UndefinedJsonNumber_LanguageIsSystem(string number)
+    {
+        var value = await LoadRawAsync($"{{\"Language\":{number}}}");
+
+        Assert.Equal(AppLanguage.System, value.Language);
+    }
+
+    [Fact]
+    public async Task GetAsync_DefinedJsonNumber_LanguageIsSystemOrHebrew()
+    {
+        var value = await LoadRawAsync("{\"Language\":2}");
+
+        Assert.True(
+            value.Language is AppLanguage.System or AppLanguage.Hebrew,
+            $"Unexpected language {value.Language}");
+    }
+
+    [Fact]
+    public async Task GetAsync_JsonNumberLanguage_KeepsOtherStoredMembers()
+    {
+        var value = await LoadRawAsync("{\"Language\":7,\"SkipSeconds\":15,\"NewTagDays\":12}");
+
+        Assert.Equal(15, value.SkipSeconds);
+        Assert.Equal(12, value.NewTagDays);
+    }
+
+    [Theory]
+    [MemberData(nameof(LanguageCases))]
+    public async Task SaveAsync_Language_RaisesChangedWithSavedLanguage(AppLanguage language)
+    {
+        var store = NewStore();
+        UiSettings? raised = null;
+        store.Changed += (_, v) => raised = v;
+
+        await store.SaveAsync(new UiSettings { Language = language }, None);
+
+        Assert.Equal(language, raised!.Language);
+    }
+
+    [Fact]
+    public async Task SaveAsync_UndefinedLanguage_StoresSystem()
+    {
+        await NewStore().SaveAsync(new UiSettings { Language = (AppLanguage)42 }, None);
+
+        var loaded = await NewStore().GetAsync(None);
+
+        Assert.Equal(AppLanguage.System, loaded.Language);
+    }
+
+    [Fact]
+    public async Task SaveAsync_UndefinedLanguage_RowHoldsSystemName()
+    {
+        await NewStore().SaveAsync(new UiSettings { Language = (AppLanguage)42 }, None);
+
+        var json = await _repository.GetJsonAsync(UiSettingsStore.SettingsKey, None);
+
+        Assert.Contains("\"System\"", json);
+        Assert.DoesNotContain("42", json);
+    }
+
+    [Fact]
+    public async Task SaveAsync_UndefinedLanguage_RaisesChangedWithSystem()
+    {
+        var store = NewStore();
+        UiSettings? raised = null;
+        store.Changed += (_, v) => raised = v;
+
+        await store.SaveAsync(new UiSettings { Language = (AppLanguage)42 }, None);
+
+        Assert.Equal(AppLanguage.System, raised!.Language);
+    }
+
+    [Fact]
+    public async Task SaveAsync_UndefinedLanguage_ReturnsSystemOnSameStore()
+    {
+        var store = NewStore();
+        await store.SaveAsync(new UiSettings { Language = (AppLanguage)42 }, None);
+
+        var value = await store.GetAsync(None);
+
+        Assert.Equal(AppLanguage.System, value.Language);
+    }
 }
