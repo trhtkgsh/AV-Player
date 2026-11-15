@@ -184,10 +184,21 @@ public sealed class SubtitleService : ISubtitleService, IDisposable
         }
 
         var defaults = await _defaults.GetAsync(ct).ConfigureAwait(false);
-        var hint = defaults.PreferredSubtitleLanguage ?? CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+        var hint = LanguageSuffix(displayName) ?? defaults.PreferredSubtitleLanguage
+            ?? CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
         var text = SubtitleTextEncoding.Decode(bytes, hint);
         var local = await Task.Run(() => SubtitleFileStore.Write(text, sourceKey, extension), ct).ConfigureAwait(false);
         return await AddToEngineAsync(local, record, ct).ConfigureAwait(false);
+    }
+
+    // The language part of "name.he.srt" (also for names with more dots); null when there is none.
+    private static string? LanguageSuffix(string displayName)
+    {
+        var stem = Path.GetFileNameWithoutExtension(displayName);
+        var dot = stem.LastIndexOf('.');
+        return dot <= 0
+            ? null
+            : SidecarMatcher.Match(stem.Substring(0, dot) + ".mp4", [displayName], null).FirstOrDefault()?.Language;
     }
 
     private async Task<bool> AddToEngineAsync(string local, bool record, CancellationToken ct)
