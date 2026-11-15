@@ -25,6 +25,10 @@ public sealed partial class FoldersViewModel : ObservableObject
     private CancellationTokenSource? _session;
     private int _loadVersion;
     private bool _flatSeen;
+    private bool _openingSettings;
+
+    // The NewTagDays the folder list on screen was loaded with. Null while no list is shown.
+    private int? _shownNewTagDays;
 
     [ObservableProperty]
     private bool _isLoading;
@@ -62,6 +66,7 @@ public sealed partial class FoldersViewModel : ObservableObject
         StopSession();
         _session = new CancellationTokenSource();
         _library.Changed += OnLibraryChanged;
+        _uiSettings.Changed += OnSettingsChanged;
         await LoadAsync(LoadReason.Activate);
     }
 
@@ -130,6 +135,32 @@ public sealed partial class FoldersViewModel : ObservableObject
     private Task RetryPermission() => LoadAsync(LoadReason.Retry);
 
     [RelayCommand]
+    private async Task OpenSettings()
+    {
+        if (_openingSettings)
+        {
+            return;
+        }
+
+        _openingSettings = true;
+        try
+        {
+            if (Shell.Current is { } shell)
+            {
+                await shell.GoToAsync("settings");
+            }
+        }
+        catch (Exception)
+        {
+            ErrorMessage = "Settings could not be opened.";
+        }
+        finally
+        {
+            _openingSettings = false;
+        }
+    }
+
+    [RelayCommand]
     private void OpenAppSettings()
     {
         try
@@ -185,6 +216,7 @@ public sealed partial class FoldersViewModel : ObservableObject
             {
                 PermissionDenied = true;
                 Folders.Clear();
+                _shownNewTagDays = null;
                 IsEmpty = false;
                 return;
             }
@@ -202,6 +234,7 @@ public sealed partial class FoldersViewModel : ObservableObject
                 Folders.Add(new FolderRow(folder));
             }
 
+            _shownNewTagDays = settings.NewTagDays;
             IsEmpty = Folders.Count == 0;
         }
         catch (OperationCanceledException)
@@ -245,6 +278,7 @@ public sealed partial class FoldersViewModel : ObservableObject
     private void StopSession()
     {
         _library.Changed -= OnLibraryChanged;
+        _uiSettings.Changed -= OnSettingsChanged;
 
         _session?.Cancel();
         _session?.Dispose();
@@ -256,6 +290,16 @@ public sealed partial class FoldersViewModel : ObservableObject
         {
             // A callback queued before Deactivate does nothing.
             if (_session is not null)
+            {
+                _ = LoadAsync(LoadReason.Library);
+            }
+        });
+
+    private void OnSettingsChanged(object? sender, UiSettings settings) =>
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            // Only the new-tag window changes the folder list. A callback queued before Deactivate does nothing.
+            if (_session is not null && settings.NewTagDays != _shownNewTagDays)
             {
                 _ = LoadAsync(LoadReason.Library);
             }

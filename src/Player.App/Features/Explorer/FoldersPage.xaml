@@ -8,6 +8,7 @@
 
     <ContentPage.ToolbarItems>
         <ToolbarItem Text="All files" Command="{Binding ShowAllCommand}" />
+        <ToolbarItem Text="Settings" Order="Secondary" Command="{Binding OpenSettingsCommand}" />
     </ContentPage.ToolbarItems>
 
     <Grid RowDefinitions="*,Auto">
