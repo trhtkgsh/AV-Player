@@ -341,6 +341,7 @@ public sealed partial class VlcPlayerEngine : IPlayerEngine, IVideoOutputBinding
         Interlocked.Increment(ref _generation);
         _player?.Dispose();
         _player = null;
+        _appliedAspect = null;
         if (_libVlc is { } libVlc)
         {
             libVlc.Log -= OnLog;
