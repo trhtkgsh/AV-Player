@@ -15,6 +15,7 @@ internal sealed class VideoSurfaceContainer : ViewGroup, ISurfaceHolderCallback
 {
     private readonly VideoSurfaceController _controller;
     private readonly SurfaceView _surface;
+    private readonly AndroidView _statusStrip;
     private bool _surfaceReported;
     private int _reportedWidth;
     private int _reportedHeight;
@@ -30,6 +31,11 @@ internal sealed class VideoSurfaceContainer : ViewGroup, ISurfaceHolderCallback
         _surface = new SurfaceView(context);
         _surface.Holder!.AddCallback(this);
         AddView(_surface);
+
+        // Drawn over the surface: a zoomed picture is cut at the status bar instead of lying under it.
+        _statusStrip = new AndroidView(context);
+        _statusStrip.SetBackgroundColor(AndroidColor.Black);
+        AddView(_statusStrip);
     }
 
     public void SurfaceCreated(ISurfaceHolder holder)
@@ -95,6 +101,7 @@ internal sealed class VideoSurfaceContainer : ViewGroup, ISurfaceHolderCallback
         var surfaceLeft = (int)Math.Round(rect.Left);
         var surfaceTop = (int)Math.Round(rect.Top);
         _surface.Layout(surfaceLeft, surfaceTop, surfaceLeft + Pixels(rect.Width), surfaceTop + Pixels(rect.Height));
+        _statusStrip.Layout(0, 0, right - left, Math.Min(_controller.TopInsetPx, bottom - top));
 
         // A rotation moves the system bars. Posted: subscribers may change their own layout.
         Post(() => _controller.RefreshInsets(this));
