@@ -16,6 +16,7 @@ namespace Player.App.Pip;
 public sealed partial class PictureInPictureController
 {
     private static readonly TimeSpan StopCheckDelay = TimeSpan.FromMilliseconds(600);
+    private static readonly TimeSpan ExpandCheckDelay = TimeSpan.FromMilliseconds(300);
     private const long EarlyEndWindowMs = 1000;
 
     private WeakReference<Activity>? _activity;
@@ -45,9 +46,11 @@ public sealed partial class PictureInPictureController
             if (!closing)
             {
                 // Either an expand to full screen, or a dismiss whose onStop has not arrived yet.
-                if (wasActive)
+                if (wasActive && !IsResumed(activity))
                 {
-                    _endedWithoutCloseAt = Environment.TickCount64;
+                    var mark = Environment.TickCount64;
+                    _endedWithoutCloseAt = mark;
+                    ScheduleExpandCheck(activity, mark);
                 }
 
                 ApplyParamsAgain();
@@ -235,6 +238,46 @@ public sealed partial class PictureInPictureController
         var keyguard = context.GetSystemService(Context.KeyguardService) as KeyguardManager;
         return power?.IsInteractive == true && keyguard?.IsKeyguardLocked == false;
     }
+
+    /// <summary>
+    /// An expand to full screen resumes the activity, a dismissal never does. Shortly after the mark is set,
+    /// a resumed activity clears it, so Home pressed soon after an expand is not taken for a dismissal.
+    /// </summary>
+    private void ScheduleExpandCheck(Activity activity, long mark)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(ExpandCheckDelay, _lifetime.Token).ConfigureAwait(false);
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    try
+                    {
+                        if (_endedWithoutCloseAt == mark && IsResumed(activity))
+                        {
+                            _endedWithoutCloseAt = null;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn(Tag, $"The expand check failed: {ex}");
+                    }
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                // Disposed.
+            }
+            catch (Exception ex)
+            {
+                Log.Warn(Tag, $"Scheduling the expand check failed: {ex}");
+            }
+        });
+    }
+
+    private static bool IsResumed(Activity activity) =>
+        activity is ILifecycleOwner owner && owner.Lifecycle.CurrentState.IsAtLeast(Lifecycle.State.Resumed!);
 
     private static bool IsAtLeastStarted(Activity activity) =>
         activity is not ILifecycleOwner owner || owner.Lifecycle.CurrentState.IsAtLeast(Lifecycle.State.Started!);
