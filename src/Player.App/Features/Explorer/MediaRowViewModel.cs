@@ -40,6 +40,14 @@ public sealed partial class MediaRowViewModel : ObservableObject
     [ObservableProperty]
     private bool _isWatched;
 
+    // The font size of the file name: the base size times the explorer font scale. Set by the ViewModel.
+    [ObservableProperty]
+    private double _nameFontSize;
+
+    // The height of the grid thumbnail: the tile width in a 16:9 box. Set by the ViewModel.
+    [ObservableProperty]
+    private double _thumbnailHeight;
+
     public void Apply(
         MediaMetadata? metadata,
         PlaybackState? state,

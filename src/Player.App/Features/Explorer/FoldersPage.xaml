@@ -5,41 +5,103 @@
              xmlns:explorer="clr-namespace:Player.App.Features.Explorer"
              xmlns:loc="clr-namespace:Player.App.Localization"
              x:DataType="explorer:FoldersViewModel"
-             Title="Ariel Player">
+             Title="{Binding Title, TargetNullValue='Ariel Player'}">
 
     <ContentPage.ToolbarItems>
-        <ToolbarItem Text="{loc:T Explorer.AllFiles}" Command="{Binding ShowAllCommand}" />
+        <ToolbarItem Text="{loc:T Explorer.View}" Command="{Binding ChooseViewCommand}" />
+        <ToolbarItem Text="{Binding LayoutText}" Command="{Binding ToggleLayoutCommand}" />
         <ToolbarItem Text="{loc:T Common.Settings}" Order="Secondary" Command="{Binding OpenSettingsCommand}" />
     </ContentPage.ToolbarItems>
 
+    <ContentPage.Resources>
+        <!-- The ⋮ button: no border, transparent, muted, with a touch area of 44 x 44. -->
+        <Style x:Key="OptionsButton" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="BorderWidth" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="TextColor" Value="{DynamicResource ColorOnSurfaceMuted}" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="MinimumWidthRequest" Value="44" />
+            <Setter Property="MinimumHeightRequest" Value="44" />
+        </Style>
+
+        <DataTemplate x:Key="ListItem" x:DataType="explorer:FolderRow">
+
+            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*,Auto,Auto" RowDefinitions="Auto,Auto">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer
+                        Command="{Binding OpenRowCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                        CommandParameter="{Binding .}" />
+                </Grid.GestureRecognizers>
+
+                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Text="★" IsVisible="{Binding Favorite}"
+                       TextColor="{DynamicResource ColorOnSurfaceMuted}" VerticalOptions="Center" />
+                <Label Grid.Row="0" Grid.Column="1" Text="{Binding DisplayName}" Style="{StaticResource LabelTitle}"
+                       FontSize="{Binding NameFontSize, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}" />
+                <Label Grid.Row="1" Grid.Column="1" Text="{Binding CountText}" IsVisible="{Binding ShowCount}"
+                       Style="{StaticResource LabelMuted}" />
+                <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="2" Text="{Binding NewText}"
+                       IsVisible="{Binding HasNew}" TextColor="{DynamicResource ColorAccent}"
+                       FontAttributes="Bold" VerticalOptions="Center" />
+                <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="3" Text="⋮" IsVisible="{Binding HasOptions}"
+                        SemanticProperties.Description="{loc:T Explorer.FolderOptions}"
+                        Style="{StaticResource OptionsButton}" VerticalOptions="Center"
+                        Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                        CommandParameter="{Binding .}" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="GridItem" x:DataType="explorer:FolderRow">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4" Padding="6">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer
+                        Command="{Binding OpenRowCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                        CommandParameter="{Binding .}" />
+                </Grid.GestureRecognizers>
+
+                <!-- The symbol and the ⋮ button share one cell: the button sits in the top-end corner of the symbol row. -->
+                <Grid Grid.Row="0">
+                    <Path Data="M3 6 H10 L12 8 H21 V19 H3 Z" Aspect="Uniform" WidthRequest="72" HeightRequest="56"
+                          HorizontalOptions="Center" VerticalOptions="Center">
+                        <Path.Fill>
+                            <SolidColorBrush Color="{DynamicResource ColorOnSurfaceMuted}" />
+                        </Path.Fill>
+                    </Path>
+                    <Button Text="⋮" IsVisible="{Binding HasOptions}" HorizontalOptions="End" VerticalOptions="Start"
+                            SemanticProperties.Description="{loc:T Explorer.FolderOptions}"
+                            Style="{StaticResource OptionsButton}"
+                            Command="{Binding OpenOptionsCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                            CommandParameter="{Binding .}" />
+                </Grid>
+
+
+                <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
+                    <Label Grid.Column="0" Text="★" IsVisible="{Binding Favorite}" TextColor="{DynamicResource ColorOnSurfaceMuted}" />
+                    <Label Grid.Column="1" Text="{Binding DisplayName}" Style="{StaticResource LabelTitle}"
+                           MaxLines="2" LineBreakMode="TailTruncation"
+                           FontSize="{Binding NameFontSize, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}" />
+                </Grid>
+                <Label Grid.Row="2" Text="{Binding CountText}" IsVisible="{Binding ShowCount}" Style="{StaticResource LabelMuted}" />
+                <Label Grid.Row="3" Text="{Binding NewText}" IsVisible="{Binding HasNew}"
+                       TextColor="{DynamicResource ColorAccent}" FontAttributes="Bold" />
+            </Grid>
+        </DataTemplate>
+    </ContentPage.Resources>
+
     <Grid RowDefinitions="*,Auto">
         <RefreshView IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
-            <CollectionView ItemsSource="{Binding Folders}" SelectionMode="None">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="explorer:FolderRow">
-                        <Grid Style="{StaticResource ListRow}" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                            <Grid.GestureRecognizers>
-                                <TapGestureRecognizer
-                                    Command="{Binding OpenFolderCommand, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
-                                    CommandParameter="{Binding .}" />
-                            </Grid.GestureRecognizers>
-
-                            <Label Grid.Row="0" Grid.Column="0" Text="{Binding Name}" Style="{StaticResource LabelTitle}" />
-                            <Label Grid.Row="1" Grid.Column="0" Text="{Binding CountText}" Style="{StaticResource LabelMuted}" />
-                            <Label Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Text="{Binding NewText}"
-                                   IsVisible="{Binding HasNew}" TextColor="{DynamicResource ColorAccent}"
-                                   FontAttributes="Bold" VerticalOptions="Center" />
-                        </Grid>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
+            <CollectionView x:Name="List" ItemsSource="{Binding Folders}" SelectionMode="None"
+                            SizeChanged="OnListSizeChanged" />
         </RefreshView>
 
         <ActivityIndicator IsRunning="{Binding ShowBusy}" IsVisible="{Binding ShowBusy}"
                            HorizontalOptions="Center" VerticalOptions="Center" />
 
-        <Label Text="{loc:T Explorer.NoFolders}" IsVisible="{Binding IsEmpty}"
+        <Label Text="{loc:T Explorer.NoFolders}" IsVisible="{Binding ShowNoFolders}"
                HorizontalOptions="Center" VerticalOptions="Center" />
+
+        <Label Text="{loc:T Explorer.NoFavorites}" IsVisible="{Binding ShowNoFavorites}"
+               HorizontalTextAlignment="Center" HorizontalOptions="Fill" VerticalOptions="Center" Margin="24" />
 
         <VerticalStackLayout IsVisible="{Binding PermissionDenied}" Padding="24" Spacing="12"
                              HorizontalOptions="Fill" VerticalOptions="Center">

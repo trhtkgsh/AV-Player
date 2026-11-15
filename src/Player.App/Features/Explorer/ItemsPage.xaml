@@ -9,7 +9,63 @@
 
     <ContentPage.ToolbarItems>
         <ToolbarItem Text="{loc:T Explorer.Sort}" Command="{Binding ChooseSortCommand}" />
+        <ToolbarItem Text="{Binding LayoutText}" Command="{Binding ToggleLayoutCommand}" />
     </ContentPage.ToolbarItems>
+
+    <ContentPage.Resources>
+        <DataTemplate x:Key="ListItem" x:DataType="explorer:MediaRowViewModel">
+            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer
+                        Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
+                        CommandParameter="{Binding .}" />
+                </Grid.GestureRecognizers>
+
+                <VerticalStackLayout Grid.Column="0" Spacing="4">
+                    <Image Source="{Binding ThumbnailPath}" WidthRequest="96" HeightRequest="54"
+                           Aspect="AspectFill" BackgroundColor="{DynamicResource ColorSurface}" />
+                    <ProgressBar WidthRequest="96" Progress="{Binding Progress}"
+                                 IsVisible="{Binding HasProgress}" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                    <Label Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation"
+                           FontSize="{Binding NameFontSize}" />
+                    <Label Text="{Binding InfoLine}" Style="{StaticResource LabelMuted}" />
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="{loc:T Explorer.NewTag}" IsVisible="{Binding IsNew}"
+                               TextColor="{DynamicResource ColorAccent}" FontAttributes="Bold" />
+                        <Label Text="{loc:T Explorer.Watched}" IsVisible="{Binding IsWatched}"
+                               TextColor="{DynamicResource ColorWatched}" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="GridItem" x:DataType="explorer:MediaRowViewModel">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer
+                        Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
+                        CommandParameter="{Binding .}" />
+                </Grid.GestureRecognizers>
+
+                <Image Grid.Row="0" Source="{Binding ThumbnailPath}" HorizontalOptions="Fill"
+                       HeightRequest="{Binding ThumbnailHeight}"
+                       Aspect="AspectFill" BackgroundColor="{DynamicResource ColorSurface}" />
+                <ProgressBar Grid.Row="1" Progress="{Binding Progress}" IsVisible="{Binding HasProgress}" />
+                <Label Grid.Row="2" Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation" Margin="6,0"
+                       FontSize="{Binding NameFontSize}" />
+                <Label Grid.Row="3" Text="{Binding InfoLine}" Style="{StaticResource LabelMuted}" Margin="6,0" />
+                <HorizontalStackLayout Grid.Row="4" Spacing="8" Margin="6,0">
+                    <Label Text="{loc:T Explorer.NewTag}" IsVisible="{Binding IsNew}"
+                           TextColor="{DynamicResource ColorAccent}" FontAttributes="Bold" />
+                    <Label Text="{loc:T Explorer.Watched}" IsVisible="{Binding IsWatched}"
+                           TextColor="{DynamicResource ColorWatched}" />
+                </HorizontalStackLayout>
+            </Grid>
+        </DataTemplate>
+    </ContentPage.Resources>
 
     <Grid RowDefinitions="Auto,*,Auto">
         <Entry Grid.Row="0" Placeholder="{loc:T Explorer.Search}" Text="{Binding SearchText, Mode=TwoWay}"
@@ -18,37 +74,7 @@
         <Grid Grid.Row="1">
             <RefreshView IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
                 <CollectionView x:Name="List" ItemsSource="{Binding Rows}" SelectionMode="None"
-                                Scrolled="OnListScrolled">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="explorer:MediaRowViewModel">
-                            <Grid Style="{StaticResource ListRow}" ColumnDefinitions="Auto,*">
-                                <Grid.GestureRecognizers>
-                                    <TapGestureRecognizer
-                                        Command="{Binding OpenCommand, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
-                                        CommandParameter="{Binding .}" />
-                                </Grid.GestureRecognizers>
-
-                                <VerticalStackLayout Grid.Column="0" Spacing="4">
-                                    <Image Source="{Binding ThumbnailPath}" WidthRequest="96" HeightRequest="54"
-                                           Aspect="AspectFill" BackgroundColor="{DynamicResource ColorSurface}" />
-                                    <ProgressBar WidthRequest="96" Progress="{Binding Progress}"
-                                                 IsVisible="{Binding HasProgress}" />
-                                </VerticalStackLayout>
-
-                                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
-                                    <Label Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation" />
-                                    <Label Text="{Binding InfoLine}" Style="{StaticResource LabelMuted}" />
-                                    <HorizontalStackLayout Spacing="8">
-                                        <Label Text="{loc:T Explorer.NewTag}" IsVisible="{Binding IsNew}"
-                                               TextColor="{DynamicResource ColorAccent}" FontAttributes="Bold" />
-                                        <Label Text="{loc:T Explorer.Watched}" IsVisible="{Binding IsWatched}"
-                                               TextColor="{DynamicResource ColorWatched}" />
-                                    </HorizontalStackLayout>
-                                </VerticalStackLayout>
-                            </Grid>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
+                                Scrolled="OnListScrolled" SizeChanged="OnListSizeChanged" />
             </RefreshView>
 
             <ActivityIndicator IsRunning="{Binding ShowBusy}" IsVisible="{Binding ShowBusy}"
