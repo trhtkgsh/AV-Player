@@ -102,6 +102,12 @@ internal sealed class FakePlayerEngine : IPlayerEngine
     public long SubtitleDelayMs { get; set; }
     public SubtitleStyle SubtitleStyle { get; set; } = SubtitleStyle.Default;
 
+    /// <summary>Set by <see cref="AddSubtitleFileAsync"/>, reset to null by <see cref="OpenAsync"/>.</summary>
+    public string? ExternalSubtitlePath { get; set; }
+
+    /// <summary>The display name passed to the last <see cref="AddSubtitleFileAsync"/> call.</summary>
+    public string? LastSubtitleDisplayName { get; private set; }
+
     public void RaiseTracksChanged() => TracksChanged?.Invoke(this, EventArgs.Empty);
 
     public int Count(string call) => Calls.Count(c => c == call);
@@ -135,6 +141,7 @@ internal sealed class FakePlayerEngine : IPlayerEngine
             _opens.Add(new OpenCall(item, settings, startPaused));
         }
 
+        ExternalSubtitlePath = null;
         CurrentAudioTrackId = settings.AudioTrackId;
         CurrentSubtitleTrackId = settings.SubtitleTrackId;
         AudioDelayMs = settings.AudioDelayMs;
@@ -212,7 +219,12 @@ internal sealed class FakePlayerEngine : IPlayerEngine
         return Task.CompletedTask;
     }
 
-    public Task AddSubtitleFileAsync(string localFilePath, CancellationToken ct) => Task.CompletedTask;
+    public Task AddSubtitleFileAsync(string localFilePath, string displayName, CancellationToken ct)
+    {
+        ExternalSubtitlePath = localFilePath;
+        LastSubtitleDisplayName = displayName;
+        return Task.CompletedTask;
+    }
 
     public Task SetSubtitleStyleAsync(SubtitleStyle style, CancellationToken ct)
     {
