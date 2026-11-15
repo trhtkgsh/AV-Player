@@ -120,6 +120,7 @@ internal sealed class VideoSurfaceController : IVideoSurface
         else
         {
             insets.Show(AndroidX.Core.View.WindowInsetsCompat.Type.SystemBars());
+            insets.SystemBarsBehavior = AndroidX.Core.View.WindowInsetsControllerCompat.BehaviorDefault;
         }
 
         if (OperatingSystem.IsAndroidVersionAtLeast(28) && window.Attributes is { } attributes)

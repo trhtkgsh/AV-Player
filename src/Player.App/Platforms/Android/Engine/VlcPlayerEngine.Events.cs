@@ -64,9 +64,13 @@ public sealed partial class VlcPlayerEngine
         _queue.Post(ApplySurfaceAspect);
     }
 
+    private string? _appliedAspect;   // the last aspect ratio given to the current input; null = LibVLC's own
+
     /// <summary>
     /// The surface view decides the shape of the picture (aspect mode, zoom). LibVLC would keep the
     /// video's own proportions inside the surface and add bars, so it is told to fill the surface exactly.
+    /// While the format of a new file is not known the surface still has the shape of the previous one,
+    /// so LibVLC keeps the proportions itself until the format arrives.
     /// </summary>
     private void ApplySurfaceAspect()
     {
@@ -76,7 +80,16 @@ public sealed partial class VlcPlayerEngine
         if (!Live || _status == PlayerStatus.Opening || width <= 0 || height <= 0)
             return;
 
-        _player!.AspectRatio = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{width}:{height}");
+        var aspect = _format is null
+            ? null
+            : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{width}:{height}");
+
+        // The surface is resized on every frame of a pinch: only a new value reaches LibVLC.
+        if (aspect == _appliedAspect)
+            return;
+
+        _appliedAspect = aspect;
+        _player!.AspectRatio = aspect;
     }
 
     public void SurfaceLost()
@@ -282,7 +295,8 @@ public sealed partial class VlcPlayerEngine
                 if (_formatChecks > 0)
                 {
                     _formatChecks--;
-                    RefreshFormat(_media?.Tracks ?? []);
+                    if (_item?.Kind == MediaKind.Video)
+                        RefreshFormat(_media?.Tracks ?? []);
                 }
 
                 if (_revealingFrame)
@@ -514,6 +528,7 @@ public sealed partial class VlcPlayerEngine
 
         _format = format;
         Raise(() => FormatChanged?.Invoke(this, format));
+        ApplySurfaceAspect();
     }
 
     private void OnLog(object? sender, LogEventArgs e)
