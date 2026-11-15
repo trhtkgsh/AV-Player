@@ -45,6 +45,7 @@ public sealed class PlayerGestureHandler
     private bool _panActive;
     private bool _longPressActive;
     private float? _longPressRestoreSpeed; // set while a long press plays faster; the speed to return to
+    private MediaItem? _longPressItem; // the file the long press started on; its speed is restored only while it is open
     private int _lastBrightnessPercent = -1;
     private ViewTransform _zoomStart = new(1, 0, 0);
     private ViewTransform _panStart = new(1, 0, 0);
@@ -235,11 +236,14 @@ public sealed class PlayerGestureHandler
         switch (e.Phase)
         {
             case GesturePhase.Began:
+                if (_longPressRestoreSpeed is not null) return; // a repeated Began must not remember the fast speed
+
                 var snapshot = _engine.Snapshot;
                 if (snapshot.Status != PlayerStatus.Playing) return;
 
                 float speed = _settings().LongPressSpeed;
                 _longPressRestoreSpeed = snapshot.Speed;
+                _longPressItem = _coordinator.Current;
                 Fire(() => _engine.SetSpeedAsync(speed, CancellationToken.None));
                 _osd.Hold(_localizer.Format("Player.Osd.Speed", speed.ToString("0.0#", CultureInfo.InvariantCulture)));
                 break;
@@ -251,13 +255,19 @@ public sealed class PlayerGestureHandler
         }
     }
 
-    /// <summary>Returns to the speed from before a long press. Does nothing when no long press changed it.</summary>
+    /// <summary>
+    /// Returns to the speed from before a long press. Does nothing when no long press changed it. When the file
+    /// has changed since the press (it ended during the hold), the new file keeps its own speed. Always clears
+    /// the remembered state and releases the indicator.
+    /// </summary>
     private void RestoreSpeed()
     {
         if (_longPressRestoreSpeed is not float restore) return;
 
+        MediaItem? item = _longPressItem;
         _longPressRestoreSpeed = null;
-        Fire(() => _engine.SetSpeedAsync(restore, CancellationToken.None));
+        _longPressItem = null;
+        if (ReferenceEquals(_coordinator.Current, item)) Fire(() => _engine.SetSpeedAsync(restore, CancellationToken.None));
         _osd.Release();
     }
 
