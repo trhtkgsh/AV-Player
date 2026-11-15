@@ -58,3 +58,12 @@
 **Escalation.** Stop and report when a contract is missing or wrong, a file outside the owned paths is needed, an acceptance item cannot be met, or the same step failed twice. Never change a contract.
 
 **Report format.** `STATUS: done | blocked`, `BRANCH`, `FILES`, `BUILD`, `TESTS`, `DEVICE CHECKLIST` (items for the owner), `DEVIATIONS`, `QUESTIONS`.
+
+**Decisions made for spec 13, items 5 and 6 (2026-11-15, R7-40; they win over the text above).**
+- Item size: `UiSettings.ItemSize` (Large, Small) applies to file rows and tiles and folder tiles in every mode. The explorer only reads it and follows the store's change at once (`RebuildRows` and `ApplySettings`).
+- Large is the look before the setting. Small list: file thumbnail 48 x 27 (Large 96 x 54), progress bar as wide as the thumbnail. Small grid: three columns in portrait, six at most in landscape (Large two to four); folder symbol 36 x 28 (Large 72 x 56). Sizes come from `ItemSizes` (Core/Logic/Explorer).
+- Folder list rows have no symbol today, so Small adds none (open question for the owner).
+- Name only: an empty details line is hidden (`MediaRowViewModel.HasInfoLine`) and takes no space in a row or tile. The NEW and Watched marks and the progress bar stay. Grid marks wrap in a `FlexLayout` so they stay inside the tile at a large font scale.
+- Names keep `ExplorerFontScale`; no fixed heights on names. A tile's ⋮ button sits inside the thumbnail's top-end corner.
+- Pure signatures changed or added: `GridTiles.Columns(double width, ExplorerItemSize size)` (new overload; `Columns(double)` kept for Large), `GridTiles.SmallMinTileWidth` (120), `GridTiles.SmallMinColumns` (3), `GridTiles.SmallMaxColumns` (6); new `ItemSizes.ListThumbnailWidth(size)`, `ListThumbnailHeight(size)`, `FolderIconWidth(size)`, `FolderIconHeight(size)`. No existing test covered `GridTiles`.
+- View models: `ItemsViewModel` and `FoldersViewModel` keep the list width and derive columns from width and size; `ItemsViewModel` exposes `ListThumbnailWidth` and `ListThumbnailHeight`; `FoldersViewModel` exposes `FolderIconWidth` and `FolderIconHeight`; `MediaRowViewModel` exposes `HasInfoLine`.

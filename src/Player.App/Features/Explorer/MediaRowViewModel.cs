@@ -28,6 +28,11 @@ public sealed partial class MediaRowViewModel : ObservableObject
     [ObservableProperty]
     private string _infoLine = string.Empty;
 
+    // False when no details are enabled: the details line then takes no space.
+    public bool HasInfoLine => InfoLine.Length > 0;
+
+    partial void OnInfoLineChanged(string value) => OnPropertyChanged(nameof(HasInfoLine));
+
     [ObservableProperty]
     private bool _isNew;
 

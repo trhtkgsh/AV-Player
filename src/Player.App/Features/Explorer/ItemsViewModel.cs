@@ -56,6 +56,15 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     // The height of a grid tile's thumbnail, set on every row. Kept here for the rows made later.
     private double _thumbnailHeight;
 
+    // The width of the list, as the page reported it. The columns follow it and the item size.
+    private double _listWidth;
+
+    [ObservableProperty]
+    private double _listThumbnailWidth = ItemSizes.ListThumbnailWidth(ExplorerItemSize.Large);
+
+    [ObservableProperty]
+    private double _listThumbnailHeight = ItemSizes.ListThumbnailHeight(ExplorerItemSize.Large);
+
     [ObservableProperty]
     private string _title = string.Empty;
 
@@ -342,19 +351,30 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
             return;
         }
 
-        var columns = GridTiles.Columns(width);
-        var changed = columns != Columns;
-        Columns = columns;
-        _thumbnailHeight = GridTiles.TileWidth(width, columns) * 9 / 16;
+        _listWidth = width;
+        var previous = Columns;
+        UpdateColumns();
+
+        // A new span shows other tiles: their thumbnails are requested now.
+        if (Columns != previous)
+        {
+            VisibleRangeChanged(0, InitialLastIndex());
+        }
+    }
+
+    // The columns and the tile thumbnail follow the list width and the item size. Rows are updated here or by RebuildRows.
+    private void UpdateColumns()
+    {
+        if (_listWidth <= 0)
+        {
+            return;
+        }
+
+        Columns = GridTiles.Columns(_listWidth, _settings.ItemSize);
+        _thumbnailHeight = GridTiles.TileWidth(_listWidth, Columns) * 9 / 16;
         foreach (var row in Rows)
         {
             row.ThumbnailHeight = _thumbnailHeight;
-        }
-
-        // A new span shows other tiles: their thumbnails are requested now.
-        if (changed)
-        {
-            VisibleRangeChanged(0, InitialLastIndex());
         }
     }
 
@@ -561,6 +581,9 @@ public sealed partial class ItemsViewModel : ObservableObject, IQueryAttributabl
     private void RebuildRows()
     {
         IsGrid = _settings.Layout == ExplorerLayout.Grid;
+        ListThumbnailWidth = ItemSizes.ListThumbnailWidth(_settings.ItemSize);
+        ListThumbnailHeight = ItemSizes.ListThumbnailHeight(_settings.ItemSize);
+        UpdateColumns();
 
         var previous = _rows;
         _rows = new Dictionary<MediaFileId, MediaRowViewModel>(_items.Count);

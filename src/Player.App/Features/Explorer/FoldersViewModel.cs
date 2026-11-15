@@ -82,6 +82,17 @@ public sealed partial class FoldersViewModel : ObservableObject
     [ObservableProperty]
     private int _columns = GridTiles.MinColumns;
 
+    // The size of the folder symbol on a grid tile. Follows the item size.
+    [ObservableProperty]
+    private double _folderIconWidth = ItemSizes.FolderIconWidth(ExplorerItemSize.Large);
+
+    [ObservableProperty]
+    private double _folderIconHeight = ItemSizes.FolderIconHeight(ExplorerItemSize.Large);
+
+    // The width of the list, as the page reported it, and the item size: the columns follow both.
+    private double _listWidth;
+    private ExplorerItemSize _itemSize = ExplorerItemSize.Large;
+
     // The view mode in effect. The mode buttons above the list show it.
     [ObservableProperty]
     private ExplorerViewMode _viewMode = ExplorerViewMode.Folders;
@@ -304,7 +315,17 @@ public sealed partial class FoldersViewModel : ObservableObject
     {
         if (width > 0)
         {
-            Columns = GridTiles.Columns(width);
+            _listWidth = width;
+            UpdateColumns();
+        }
+    }
+
+    // The columns follow the list width and the item size.
+    private void UpdateColumns()
+    {
+        if (_listWidth > 0)
+        {
+            Columns = GridTiles.Columns(_listWidth, _itemSize);
         }
     }
 
@@ -725,6 +746,10 @@ public sealed partial class FoldersViewModel : ObservableObject
         ViewMode = settings.ViewMode;
         NameFontSize = BaseNameFontSize * settings.ExplorerFontScale;
         IsGrid = settings.Layout == ExplorerLayout.Grid;
+        _itemSize = settings.ItemSize;
+        FolderIconWidth = ItemSizes.FolderIconWidth(_itemSize);
+        FolderIconHeight = ItemSizes.FolderIconHeight(_itemSize);
+        UpdateColumns();
         RebuildRows();
     }
 

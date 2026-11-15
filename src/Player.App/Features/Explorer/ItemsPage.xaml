@@ -33,16 +33,18 @@
                 </Grid.GestureRecognizers>
 
                 <VerticalStackLayout Grid.Column="0" Spacing="4">
-                    <Image Source="{Binding ThumbnailPath}" WidthRequest="96" HeightRequest="54"
+                    <Image Source="{Binding ThumbnailPath}"
+                           WidthRequest="{Binding ListThumbnailWidth, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
+                           HeightRequest="{Binding ListThumbnailHeight, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}"
                            Aspect="AspectFill" BackgroundColor="{DynamicResource ColorSurface}" />
-                    <ProgressBar WidthRequest="96" Progress="{Binding Progress}"
-                                 IsVisible="{Binding HasProgress}" />
+                    <ProgressBar Progress="{Binding Progress}" IsVisible="{Binding HasProgress}"
+                                 WidthRequest="{Binding ListThumbnailWidth, Source={RelativeSource AncestorType={x:Type explorer:ItemsViewModel}}, x:DataType=explorer:ItemsViewModel}" />
                 </VerticalStackLayout>
 
                 <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
                     <Label Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation"
                            FontSize="{Binding NameFontSize}" />
-                    <Label Text="{Binding InfoLine}" Style="{StaticResource LabelMuted}" />
+                    <Label Text="{Binding InfoLine}" IsVisible="{Binding HasInfoLine}" Style="{StaticResource LabelMuted}" />
                     <HorizontalStackLayout Spacing="8">
                         <Label Text="{loc:T Explorer.NewTag}" IsVisible="{Binding IsNew}"
                                TextColor="{DynamicResource ColorAccent}" FontAttributes="Bold" />
@@ -78,13 +80,14 @@
                 <ProgressBar Grid.Row="1" Progress="{Binding Progress}" IsVisible="{Binding HasProgress}" />
                 <Label Grid.Row="2" Text="{Binding Name}" MaxLines="2" LineBreakMode="TailTruncation" Margin="6,0"
                        FontSize="{Binding NameFontSize}" />
-                <Label Grid.Row="3" Text="{Binding InfoLine}" Style="{StaticResource LabelMuted}" Margin="6,0" />
-                <HorizontalStackLayout Grid.Row="4" Spacing="8" Margin="6,0">
-                    <Label Text="{loc:T Explorer.NewTag}" IsVisible="{Binding IsNew}"
+                <Label Grid.Row="3" Text="{Binding InfoLine}" IsVisible="{Binding HasInfoLine}" Style="{StaticResource LabelMuted}" Margin="6,0" />
+                <!-- The marks wrap to a second line rather than leave the tile at a large font scale. -->
+                <FlexLayout Grid.Row="4" Wrap="Wrap" Margin="6,0">
+                    <Label Text="{loc:T Explorer.NewTag}" IsVisible="{Binding IsNew}" Margin="0,0,8,0"
                            TextColor="{DynamicResource ColorAccent}" FontAttributes="Bold" />
-                    <Label Text="{loc:T Explorer.Watched}" IsVisible="{Binding IsWatched}"
+                    <Label Text="{loc:T Explorer.Watched}" IsVisible="{Binding IsWatched}" Margin="0,0,8,0"
                            TextColor="{DynamicResource ColorWatched}" />
-                </HorizontalStackLayout>
+                </FlexLayout>
             </Grid>
         </DataTemplate>
     </ContentPage.Resources>

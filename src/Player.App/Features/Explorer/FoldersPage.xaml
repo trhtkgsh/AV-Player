@@ -72,7 +72,9 @@
 
                 <!-- The symbol and the ⋮ button share one cell: the button sits in the top-end corner of the symbol row. -->
                 <Grid Grid.Row="0">
-                    <Path Data="M3 6 H10 L12 8 H21 V19 H3 Z" Aspect="Uniform" WidthRequest="72" HeightRequest="56"
+                    <Path Data="M3 6 H10 L12 8 H21 V19 H3 Z" Aspect="Uniform"
+                          WidthRequest="{Binding FolderIconWidth, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
+                          HeightRequest="{Binding FolderIconHeight, Source={RelativeSource AncestorType={x:Type explorer:FoldersViewModel}}, x:DataType=explorer:FoldersViewModel}"
                           HorizontalOptions="Center" VerticalOptions="Center">
                         <Path.Fill>
                             <SolidColorBrush Color="{DynamicResource ColorOnSurfaceMuted}" />
