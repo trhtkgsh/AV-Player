@@ -17,7 +17,7 @@
 - Each item has one action, the expected result and its source.
 - `[emulator ok]`: can be run on an emulator.
 - `[physical device required]`: must be run on a phone.
-- `[emulator ok, verified 2026-11-15]`: the orchestrator already checked the item on an emulator (Pixel 5 AVD, API 34; the Release APK was also installed over the Phase 1 APK on that emulator). It still needs its normal run on the phone when the normal marker says physical.
+- `[emulator ok, verified 2026-11-15]`: the orchestrator already checked the item on an emulator (Pixel 5 AVD, API 34, x86_64; the Release APK was also installed over the Phase 1 APK there, and its x86_64 half was run on a Pixel 7 AVD, API 36). It still needs its normal run on the phone when the normal marker says physical.
 - Phase 2 behaviour (temporary): when the app goes to the background, playback still pauses. Background playback comes in Phase 4.
 - These settings exist but are hidden until their phase: aspect mode, skip length, battery indicator (Phase 3), background audio, Picture-in-Picture (Phase 4). The theme choice comes in Phase 3. Skip length is tested in Phase 3.
 - Android does not show `.ass` and `.ssa` files to the app on its own. They do not appear under "Files next to the video". Load them with "Open a subtitle file...".
@@ -35,6 +35,19 @@ Put these files on the phone (internal storage, for example `Movies/`).
 5. An MKV video with two audio tracks in different languages and at least one embedded subtitle track (used by AUD-1, AUD-2, DEF-6, DEF-7, SUB-6).
 6. A video longer than 2 minutes with speech or music (used by STATE-1, STATE-2, UI-1, SPD-1, SPD-2, SPD-3, SPD-4, REP-4, REP-5, REP-6, AUD-3, STY-7).
 7. Accessories: wired or Bluetooth headphones are not needed. The phone speaker is enough for the pitch and delay items (used by SPD-3, SPD-4, AUD-3).
+
+## Run these first (real phone only)
+
+These two items check a problem that was seen only on an emulator that translates ARM code. Run them before the rest. If one fails, stop and report it.
+
+- [ ] **ARM-1** `[physical device required]`
+  - Action: Open a video and pause it. Press the speed chip and close the "Speed" sheet by tapping outside it. Repeat this 10 times. Then open the Subtitles sheet and press "Style...".
+  - Expected: Every sheet opens and closes. The app never shows "isn't responding".
+  - Source: (agent report: orchestrator, emulator run 2026-11-15, API 36 arm64 translation)
+- [ ] **ARM-2** `[physical device required]`
+  - Action: With the video still paused, press "Larger" twice in the style sheet and close it. Press the decoder chip twice (HW to SW and back). Then press Play.
+  - Expected: The picture restarts each time at the same position and the app does not close. Playback continues.
+  - Source: (agent report: orchestrator, emulator run 2026-11-15, API 36 arm64 translation)
 
 ## Playback state (spec 04)
 
@@ -345,3 +358,4 @@ Write the results in the table at the top of this file and send:
 - Failed item IDs: ____
 - What was seen instead (for each failed item): ____
 - Items not run, and why: ____
+- For ARM-1 and ARM-2, also write how many times you opened a sheet before the problem appeared.
